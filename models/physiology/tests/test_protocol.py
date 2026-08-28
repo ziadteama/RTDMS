@@ -103,3 +103,64 @@ def test_tracker_keeps_last_accepted_packet_after_reordering() -> None:
 
     assert observation.sequence_gap == 0
     assert observation.sample_gap == 0
+
+
+def test_tracker_mcu_reset_does_not_corrupt_sample_gap() -> None:
+    """Verify MCU reset with index 0 returns sample_gap == 0 and increments session_id."""
+    tracker = PacketTracker()
+    samples_20 = tuple((i, i + 1) for i in range(20))
+    p1 = make_packet(sequence=10, first_sample_index=360000, samples=samples_20)
+    obs1 = tracker.observe(p1)
+    assert obs1.session_id == 0
+
+    p_reset = make_packet(
+        sequence=11,
+        first_sample_index=0,
+        status=SensorStatus.SENSOR_RESET,
+        samples=((1, 2),),
+    )
+    obs_reset = tracker.observe(p_reset)
+
+    assert obs_reset.reset_detected
+    assert obs_reset.sample_gap == 0
+    assert obs_reset.sequence_gap == 0
+    assert obs_reset.session_id == 1
+
+
+def test_tracker_backwards_rollback_without_reset_returns_zero_sample_gap() -> None:
+    """Verify index rollback without reset flag does not report sample_gap and updates state."""
+    tracker = PacketTracker()
+    samples_20 = tuple((i, i + 1) for i in range(20))
+    p1 = make_packet(sequence=10, first_sample_index=100, samples=samples_20)
+    assert tracker.observe(p1).session_id == 0
+
+    p2 = make_packet(sequence=11, first_sample_index=50, samples=((1, 2),))
+    obs2 = tracker.observe(p2)
+
+    assert not obs2.reset_detected
+    assert obs2.sample_gap == 0
+    assert obs2.sequence_gap == 0
+    assert obs2.session_id == 0
+
+    p3 = make_packet(sequence=12, first_sample_index=51, samples=((1, 2),))
+    obs3 = tracker.observe(p3)
+
+    assert obs3.sample_gap == 0
+    assert obs3.sequence_gap == 0
+
+
+def test_tracker_detects_delayed_duplicates() -> None:
+    """Verify that duplicates delivered late are correctly detected."""
+    tracker = PacketTracker()
+    p1 = make_packet(sequence=10, first_sample_index=100)
+    p2 = make_packet(sequence=11, first_sample_index=102)
+    p3 = make_packet(sequence=12, first_sample_index=104)
+
+    assert not tracker.observe(p1).duplicate
+    assert not tracker.observe(p2).duplicate
+    assert not tracker.observe(p3).duplicate
+
+    obs_dup = tracker.observe(p2)
+    assert obs_dup.duplicate
+    assert obs_dup.sample_gap == 0
+    assert obs_dup.sequence_gap == 0
