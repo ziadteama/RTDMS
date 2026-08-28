@@ -10,7 +10,7 @@ import math
 from .acquisition import ReplaySource
 from .fusion import InMemorySink
 from .service import PhysiologyService
-from .types import Channel, PpgFrame, PpgPacket, SensorStatus
+from .types import PpgFrame
 
 
 def synthetic_frames(
@@ -18,28 +18,26 @@ def synthetic_frames(
 ) -> tuple[PpgFrame, ...]:
     """Generate repeatable pulse-shaped raw PPG frames with known 60 bpm rhythm."""
 
+    from .waveform import WaveformConfig, generate_ppg
+
+    config = WaveformConfig(
+        seconds=float(seconds),
+        sample_rate_hz=float(sample_rate_hz),
+        batch_size=batch_size,
+        hr_constant=60.0,
+        baseline_drift=True,
+        baseline_drift_amplitude=500.0,
+        baseline_drift_frequency=1.0 / (40.0 * math.pi),
+        seed=42,
+    )
+
     frames: list[PpgFrame] = []
-    total = seconds * sample_rate_hz
-    for sequence, start in enumerate(range(0, total, batch_size)):
-        rows: list[tuple[int, ...]] = []
-        for index in range(start, min(start + batch_size, total)):
-            phase = (index % sample_rate_hz) / sample_rate_hz
-            pulse = math.exp(-(((phase - 0.18) / 0.06) ** 2))
-            drift = 500.0 * math.sin(index / sample_rate_hz / 20.0)
-            rows.append((round(50_000 + drift + 18_000 * pulse),))
-        packet = PpgPacket(
-            version=1,
-            sequence=sequence % (1 << 16),
-            first_sample_index=start,
-            channels=Channel.INFRARED,
-            status=SensorStatus.NONE,
-            samples=tuple(rows),
-        )
+    for packet, _ in generate_ppg(config):
         frames.append(
             PpgFrame(
                 packet=packet,
                 sample_rate_hz=sample_rate_hz,
-                received_at_seconds=start / sample_rate_hz,
+                received_at_seconds=packet.first_sample_index / sample_rate_hz,
             )
         )
     return tuple(frames)
