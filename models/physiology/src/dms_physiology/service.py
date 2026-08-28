@@ -19,6 +19,7 @@ from .protocol import PacketTracker
 from .quality import assess_quality
 from .signal import (
     AdaptivePeakDetector,
+    FloatArray,
     FloatRingBuffer,
     Interval,
     IntervalRejector,
@@ -151,7 +152,9 @@ class PhysiologyService:
         return self._model.probability(features.model_features())
 
 
-def _select_primary_channel(channels: Channel, rows: tuple[tuple[int, ...], ...]) -> np.ndarray:
+def _select_primary_channel(
+    channels: Channel, rows: tuple[tuple[int, ...], ...]
+) -> FloatArray:
     offset = 1 if channels == (Channel.RED | Channel.INFRARED) else 0
     return np.asarray([row[offset] for row in rows], dtype=np.float32)
 

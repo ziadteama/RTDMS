@@ -13,6 +13,23 @@ services:
       MKL_NUM_THREADS: "1"
       NUMEXPR_NUM_THREADS: "1"
 
+  # The Raspberry Pi runs Python 3.13. Same tree, same gates, other interpreter.
+  # No volume mount: this must verify the image as built, not the host checkout,
+  # so a 3.13-only failure cannot be masked by 3.11 bytecode caches.
+  verify-py313:
+    build:
+      context: .
+      target: development
+      args:
+        PYTHON_VERSION: "3.13"
+    command: >
+      sh -c "pytest && ruff check . && mypy src"
+    environment:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+
   simulate:
     build:
       context: .

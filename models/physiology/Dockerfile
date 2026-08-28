@@ -1,5 +1,8 @@
 # syntax=docker/dockerfile:1
-FROM python:3.11-slim AS base
+# 3.11 is the reference environment and the floor the linters target. The Pi runs
+# 3.13, so `verify-py313` builds this same tree against it to catch drift.
+ARG PYTHON_VERSION=3.11
+FROM python:${PYTHON_VERSION}-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

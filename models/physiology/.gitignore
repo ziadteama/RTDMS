@@ -10,6 +10,7 @@ dist/
 build/
 *.egg-info/
 data/
+.data/
 recordings/
 models/*.json
 !models/.gitkeep

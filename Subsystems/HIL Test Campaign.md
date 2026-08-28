@@ -102,6 +102,86 @@ scipy is used in **exactly three places**, all in `signal.py`:
 
 ---
 
+## Milestone — the subsystem now runs on the target hardware
+
+2026-08-28. First time this code has ever executed on the Pi.
+
+```
+26 passed                              # full suite, Python 3.13.5, aarch64
+mean_hr_bpm: 60.0  state: good  score: 1.0  packet_loss_fraction: 0.0
+```
+
+The Python pin relaxation (WP-0a) works: `pip install -e ".[dev,train]"` succeeds on 3.13, and
+`numpy 2.2.4` / `scipy 1.18.1` / `bleak` all resolve to cp313 aarch64 wheels.
+
+### Resource measurements on the Pi (2026-08-28)
+
+Measured **in-process**, with frame construction outside the timed region so startup and setup
+cannot contaminate the steady-state figure.
+
+| Data | CPU | % of one core at realtime | Peak RSS | Outputs |
+|---|---:|---:|---:|---:|
+| 70 s | 0.125 s | **0.18%** | 104.4 MB | 84 |
+| 300 s | 0.582 s | **0.19%** | 107.9 MB | 360 |
+
+> [!success] CPU passes comfortably; memory passes but with little room
+> **CPU 0.19%** against a <1% target and 2% hard gate — a wide margin.
+> **RSS ~108 MB** against a 120 MB target and 150 MB hard max — passes, but only ~12 MB of headroom.
+>
+> The memory story is entirely scipy: the import floor alone is 103 MB, so the actual working set
+> is only about **5 MB**. Dropping scipy (WP-14) would take RSS to roughly 31 MB. Not blocking —
+> we pass the hard gate as built — but it is the one lever that turns a tight number into a
+> comfortable one.
+
+> [!warning] Correction
+> An earlier reading of this measurement put CPU at ~1.7%, from timing the whole process including
+> interpreter startup and the numpy/scipy import (~0.95 s of fixed cost). That figure was wrong;
+> the in-process numbers above supersede it. Recorded here rather than quietly deleted, because the
+> methodology error is the point: **any CPU number that includes startup is meaningless for a
+> long-running service.**
+
+> [!important] The MTU risk is now quantified, not theoretical
+> These numbers are at batch size 20. At the MTU-realistic batch size of 3, `find_peaks` runs ~6×
+> more often, which would put CPU near **1.1%** — over the target. **B2, the MTU sweep, is the test
+> that decides whether the CPU budget actually holds.**
+
+The 104.4 → 107.9 MB growth between runs tracks the `InMemorySink` accumulating 84 → 360 output
+dicts — the known unbounded-sink defect, not a leak in the processing path.
+
+Also confirmed from the run: `fatigue_probability: null` and `model_version: null` — the model path
+really is dead code (what WP-11 exists to fix). And `rmssd_ms: 0.0, sdnn_ms: 0.0, cvnn: 0.0`,
+because the current synthetic signal is perfectly periodic with **zero** heart-rate variability —
+which is precisely why WP-6's realistic generator matters: today's simulator cannot exercise the
+PRV path at all.
+
+## Measurement readiness (checked on the Pi before the soak)
+
+| Primitive | Ledger | State |
+|---|---|---|
+| `vcgencmd get_throttled` | 12.13 | ✅ present → `0x0` |
+| `/sys/class/thermal/thermal_zone0/temp` | 12.12 | ✅ 45.2 °C |
+| `/sys/.../cpu0/cpufreq/scaling_cur_freq` | 12.14 | ✅ — but see below |
+| `/proc/self/stat` fields 14/15/20, `CLK_TCK`=100 | 12.2 | ✅ |
+| `/proc/self/status` VmRSS/VmHWM/ctxt switches | 12.3 | ✅ |
+| cgroup v2 + `systemd-run --user --scope -p MemoryMax=` | 12.11 | ✅ delegated, works |
+| **`/proc/pressure/*` (PSI)** | 12.15 | ❌ **not enabled in this kernel** |
+
+> [!warning] Ledger 12.15 — DEFERRED, not dropped
+> PSI is not compiled/enabled in the running kernel. Enabling it needs `psi=1` in
+> `/boot/firmware/cmdline.txt` **and a reboot**. This is the only Pi we have, PSI is a
+> nice-to-have rather than a gate, and [[Pi Setup Plan]] mandates one config change at a time.
+> **Decision: defer.** Memory pressure will be inferred from cgroup `memory.events` and the RSS
+> slope instead. Recorded here so it is not silently lost.
+
+> [!important] The governor is a measurement-validity problem, not just a latency one
+> `scaling_cur_freq` read **1.6 GHz**, not 2.4 GHz — `ondemand` had clocked down at idle. A
+> "% of one core" figure taken at a varying clock is **not comparable across runs**, so every CPU
+> number in this campaign is ambiguous until the clock is pinned.
+>
+> This is a second, independent reason to switch to the `performance` governor proposed in
+> [[Pi Setup Plan]] — the first was latency jitter. The matrix must run on one governor, recorded,
+> and never changed mid-campaign.
+
 ## Work packages
 
 | WP | What | Route | Status |

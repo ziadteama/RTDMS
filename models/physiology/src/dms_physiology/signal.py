@@ -110,11 +110,12 @@ class AdaptivePeakDetector:
         # Squaring emphasizes the systolic pulse while retaining a very small detector state.
         energy = np.square(np.maximum(history, 0.0))
         threshold = float(np.median(energy) + 0.35 * np.std(energy))
+        epsilon = float(np.finfo(np.float32).eps)
         candidates, _ = find_peaks(
             energy,
-            height=max(threshold, np.finfo(np.float32).eps),
+            height=max(threshold, epsilon),
             distance=max(self._refractory_samples, 1),
-            prominence=max(float(np.std(energy)) * 0.2, np.finfo(np.float32).eps),
+            prominence=max(float(np.std(energy)) * 0.2, epsilon),
         )
         emitted: list[int] = []
         safe_end = first_sample_index + values.size - self._refractory_samples

@@ -7,7 +7,7 @@ name = "dms-physiology"
 version = "0.1.0"
 description = "Lightweight real-time PPG, PRV, and fatigue inference for a driver monitoring system."
 readme = "README.md"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "DMS Graduation Project" }]
 dependencies = [
