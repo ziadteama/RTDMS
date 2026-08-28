@@ -97,3 +97,4 @@ class PacketObservation:
     duplicate: bool
     reordered: bool
     reset_detected: bool
+    session_id: int

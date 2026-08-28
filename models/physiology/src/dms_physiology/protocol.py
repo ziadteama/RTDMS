@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import struct
+from collections import deque
 
 from .types import Channel, PacketObservation, PpgPacket, SensorStatus
 
@@ -115,39 +116,69 @@ class PacketTracker:
 
     def __init__(self) -> None:
         self._previous: PpgPacket | None = None
+        self._seen: deque[tuple[int, int]] = deque(maxlen=16)
+        self._session_id: int = 0
 
     def reset(self) -> None:
         """Forget continuity state, for example after an explicit new session."""
 
         self._previous = None
+        self._seen.clear()
+        self._session_id += 1
 
     def observe(self, packet: PpgPacket) -> PacketObservation:
         """Record an incoming packet and return its continuity assessment."""
 
         PacketCodec._validate_packet(packet)
+
+        reset_detected = bool(packet.status & SensorStatus.SENSOR_RESET)
+        if reset_detected:
+            self._session_id += 1
+            self._previous = packet
+            self._seen.clear()
+            self._seen.append((packet.sequence, packet.first_sample_index))
+            return PacketObservation(
+                sequence_gap=0,
+                sample_gap=0,
+                duplicate=False,
+                reordered=False,
+                reset_detected=True,
+                session_id=self._session_id,
+            )
+
+        duplicate = (packet.sequence, packet.first_sample_index) in self._seen
+
         previous = self._previous
         if previous is None:
             self._previous = packet
-            return PacketObservation(0, 0, False, False, False)
+            self._seen.append((packet.sequence, packet.first_sample_index))
+            return PacketObservation(
+                sequence_gap=0,
+                sample_gap=0,
+                duplicate=duplicate,
+                reordered=False,
+                reset_detected=False,
+                session_id=self._session_id,
+            )
 
         sequence_step = (packet.sequence - previous.sequence) % _SEQUENCE_MODULUS
         expected_index = (
             previous.first_sample_index + previous.sample_count
         ) % _SAMPLE_INDEX_MODULUS
         sample_step = (packet.first_sample_index - expected_index) % _SAMPLE_INDEX_MODULUS
-        duplicate = (
-            packet.sequence == previous.sequence
-            and packet.first_sample_index == previous.first_sample_index
-        )
+        if sample_step >= 2**31:
+            sample_step -= _SAMPLE_INDEX_MODULUS
+
         reordered = not duplicate and sequence_step > _SEQUENCE_MODULUS // 2
-        reset_detected = bool(packet.status & SensorStatus.SENSOR_RESET)
         if not duplicate and not reordered:
             self._previous = packet
+            self._seen.append((packet.sequence, packet.first_sample_index))
 
         return PacketObservation(
             sequence_gap=0 if duplicate or reordered else max(sequence_step - 1, 0),
-            sample_gap=0 if duplicate or reordered else sample_step,
+            sample_gap=0 if duplicate or reordered else max(sample_step, 0),
             duplicate=duplicate,
             reordered=reordered,
-            reset_detected=reset_detected,
+            reset_detected=False,
+            session_id=self._session_id,
         )
