@@ -13,6 +13,12 @@ Other related docs live in `C:\Users\ziadt\Desktop\GradProject\` (business model
 survey, dataset selection/collection, user stories & requirements, stakeholders & use-cases, etc.)
 — not yet pulled into this repo.
 
+**This repo is also an Obsidian vault** (`.obsidian/` at root — open the repo root in Obsidian).
+The full report is transcribed section-by-section, verbatim, into `Report/` with wikilinks between
+related sections; start at [Home.md](Home.md). Coverage verified against the source (every Table/
+Figure reference and every heading present) — see `Home.md` → "Report — full coverage". A
+`bases/Report Sections.base` gives table views over all report notes.
+
 ## What it is
 
 A vision + physiological driver monitoring system detecting drowsiness, gaze deviation/distraction,

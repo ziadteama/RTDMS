@@ -1,0 +1,44 @@
+filters:
+  and:
+    - 'file.inFolder("Report")'
+    - 'file.ext == "md"'
+
+formulas:
+  kind: 'if(file.hasTag("chapter"), "Chapter", if(file.hasTag("section"), "Section", "Other"))'
+
+properties:
+  presented_by:
+    displayName: "Presented By"
+  formula.kind:
+    displayName: "Kind"
+
+views:
+  - type: table
+    name: "All Report Notes"
+    order:
+      - file.name
+      - formula.kind
+      - presented_by
+      - tags
+    groupBy:
+      property: formula.kind
+      direction: ASC
+
+  - type: table
+    name: "Chapters"
+    filters:
+      and:
+        - 'file.hasTag("chapter")'
+    order:
+      - file.name
+      - presented_by
+
+  - type: table
+    name: "Sections"
+    filters:
+      and:
+        - 'file.hasTag("section")'
+    order:
+      - file.name
+      - presented_by
+      - tags
