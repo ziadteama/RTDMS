@@ -18,6 +18,11 @@ Project 2 (the build phase this repo is for).
 > usage from a cabin camera, cross-verified against heart-rate/HRV from a wearable, escalating
 > through buzzer + vibration alerts — all processed locally, no cloud.
 
+## Implementation (Project 2)
+
+- [[Models Index]] — status of all three models + fusion/alert/firmware
+  - [[Physiology Subsystem]] — HR/PRV fatigue inference · `models/physiology/` · **implemented**
+
 ## Report — full coverage (chapter order)
 
 - [[00 Front Matter]] — declaration, acknowledgment, abstract, acronyms, standards
@@ -55,6 +60,8 @@ Project 2 (the build phase this repo is for).
 ## Vault database
 
 ![[bases/Report Sections.base]]
+
+![[bases/Subsystems.base]]
 
 ## Other project docs (not yet imported)
 

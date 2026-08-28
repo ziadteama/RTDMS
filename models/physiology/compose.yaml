@@ -1,0 +1,27 @@
+services:
+  verify:
+    build:
+      context: .
+      target: development
+    command: >
+      sh -c "pytest && ruff check . && mypy src"
+    volumes:
+      - .:/app
+    environment:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+
+  simulate:
+    build:
+      context: .
+      target: development
+    command: ["dms-physiology-simulate", "--seconds", "70"]
+    volumes:
+      - .:/app
+    environment:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"

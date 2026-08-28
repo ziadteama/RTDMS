@@ -1,0 +1,21 @@
+filters:
+  and:
+    - 'file.inFolder("Subsystems")'
+    - 'file.ext == "md"'
+
+properties:
+  status:
+    displayName: "Status"
+  code_path:
+    displayName: "Code"
+  language:
+    displayName: "Language"
+
+views:
+  - type: table
+    name: "Subsystems"
+    order:
+      - file.name
+      - status
+      - code_path
+      - language

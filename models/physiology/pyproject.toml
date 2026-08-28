@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dms-physiology"
+version = "0.1.0"
+description = "Lightweight real-time PPG, PRV, and fatigue inference for a driver monitoring system."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { text = "MIT" }
+authors = [{ name = "DMS Graduation Project" }]
+dependencies = [
+  "numpy>=2.0,<3",
+  "scipy>=1.13,<2",
+  "bleak>=0.22,<1",
+]
+
+[project.optional-dependencies]
+train = ["scikit-learn>=1.5,<2"]
+dev = [
+  "mypy>=1.13,<2",
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.24,<1",
+  "pytest-cov>=6.0,<7",
+  "ruff>=0.8,<1",
+]
+
+[project.scripts]
+dms-physiology-simulate = "dms_physiology.simulate:main"
+dms-physiology-service = "dms_physiology.service:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dms_physiology"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["scipy", "scipy.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+branch = true
+source = ["dms_physiology"]

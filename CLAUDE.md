@@ -143,6 +143,26 @@ rated with mitigations in the report; overall assessed as feasible with staged v
 5. **Validation & final prototype testing** — accuracy benchmarking vs. 85–90% targets, environmental
    stress testing (−10°C to 50°C, day/night), final self-contained offline privacy-preserving unit.
 
+## Code layout (Project 2)
+
+Monorepo. See [README.md](README.md) for the full map and `models/README.md` for the conventions a
+new model must follow.
+
+- `models/physiology/` — HR/PRV fatigue inference from wrist PPG. **Implemented** (replay pipeline;
+  hardware + trained artifact pending). Python 3.11, strict mypy, Docker-verified. Adopted
+  2026-08-28 from `Z:\Programming\Grad\HR&HRV` (standalone repo `ziadteama/HR-HRV`, commit
+  `3339d58`); stray unrelated files (a physics-textbook audit, two mockup PNGs) were dropped in the
+  copy. Notes: [Subsystems/Physiology Subsystem.md](Subsystems/Physiology%20Subsystem.md).
+- Two vision models, fusion, alerts, wearable firmware, and the app: not yet created.
+
+Verify physiology with `cd models/physiology && docker compose run --rm verify` (Docker is
+canonical — no Python 3.11 on this machine). Last run: 17 passed, ruff + mypy clean.
+
+Key invariants across models: models emit scores + quality, **fusion owns alert decisions**; bad
+input yields null output, never a guess; quality gates outputs but is never a model feature;
+training deps stay out of the runtime path; resource budgets are validated with all models running
+concurrently on the Pi.
+
 ## Repo skills available
 
 Copied from `Z:\Plegmo\.agents\skills\` into `.claude/skills/`:

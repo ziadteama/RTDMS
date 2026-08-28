@@ -1,0 +1,23 @@
+[runtime]
+sample_rate_hz = 100.0
+hr_update_seconds = 1.0
+feature_update_seconds = 5.0
+feature_window_seconds = 60.0
+baseline_window_seconds = 300.0
+raw_buffer_seconds = 120.0
+
+[filter]
+lowcut_hz = 0.5
+highcut_hz = 5.0
+order = 2
+
+[quality]
+good_score = 0.8
+degraded_score = 0.5
+max_good_packet_loss_fraction = 0.01
+max_degraded_packet_loss_fraction = 0.05
+max_good_artifact_fraction = 0.10
+max_degraded_artifact_fraction = 0.25
+
+[fusion]
+socket_path = "/run/dms-physiology.sock"
