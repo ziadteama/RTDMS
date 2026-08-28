@@ -186,23 +186,62 @@ PRV path at all.
 
 | WP | What | Route | Status |
 |---|---|---|---|
-| 0a | Relax Python pin to `>=3.11`, add `verify-py313` | me | pending |
-| 0b | Pi venv + runtime deps | me | **done** — scipy 1.18.1 + bleak wheels exist for cp313/aarch64 |
-| 0c | Import-cost baseline | me | **done** — see above |
-| 1 | `PacketTracker` signed step + sessions (fixes P0-B) | agy (worktree) | running |
-| 2 | Loss accounting + post-reset rebasing (fixes P0-A) | chain A | pending |
-| 3 | Single publish + injectable clock | chain A | pending |
-| 4 | State machine `WARMUP/VALID/DEGRADED/STALE` + time-driven loop | chain A | pending |
-| 5 | Robustness guards + `SessionHealth` | chain A | pending |
-| 6 | Waveform + fault generator | agy (worktree) | running |
+| 0a | Relax Python pin to `>=3.11`, add `verify-py313` | me | ✅ **done** |
+| 0b | Pi venv + runtime deps | me | ✅ **done** — scipy 1.18.1 + bleak wheels exist for cp313/aarch64 |
+| 0c | Import-cost baseline | me | ✅ **done** — see above |
+| 1 | `PacketTracker` signed step + sessions (fixes P0-B) | agy (worktree) | ✅ **merged, P0-B verified fixed on hardware** |
+| 2 | Loss accounting + post-reset rebasing (fixes P0-A) | chain A | running |
+| 3 | Single publish + injectable clock | chain A | running |
+| 4 | State machine `WARMUP/VALID/DEGRADED/STALE` + time-driven loop | chain A | running |
+| 5 | Robustness guards + `SessionHealth` | chain A | running |
+| 6 | Waveform + fault generator | agy (worktree) | ✅ **merged** |
 | 7 | Shared `_FramePump` + `SocketSampleSource` | chain B | pending |
 | 8 | `tools/mock_wearable.py` | chain B | pending |
-| 9 | `FakeBleakClient` tests | Sonnet | running |
+| 9 | `FakeBleakClient` tests | Sonnet | ✅ **merged** |
 | 10 | `--source` CLI + fusion probe + systemd unit | chain B | pending |
-| 11 | `make_dummy_model.py` | Sonnet | running |
+| 11 | `make_dummy_model.py` | Sonnet | ✅ **merged** |
 | 12 | `benchmark_pi.py` rewrite | pending | pending |
 | 13 | Execute matrix + `docs/EVIDENCE.md` | pending | pending |
 | **14** | **Drop scipy (conditional)** | conditional on WP-12 RSS | costed, not started |
+
+### Current verified state on the Pi (merged main)
+
+```
+54 passed                                  # was 26 at session start
+ruff: All checks passed!
+mypy: Success: no issues found in 13 source files
+BIDMC hr_mae_bpm: 0.5049918437361341       # bit-identical across every change
+simulate CLI: exit 0
+```
+
+**P0-B proven fixed on hardware** by direct reproduction:
+
+| Scenario | Before | After |
+|---|---|---|
+| MCU reset packet | `sample_gap = 4,294,607,276` | `0`, new `session_id` |
+| Backwards rollback (FIFO re-read) | ~4.29e9 | `0` |
+
+### Process notes worth keeping
+
+> [!warning] Four concurrent Docker builds starved the agents
+> I launched the main verify plus two agy worktree verifies plus a 3.13 build at once. scipy is a
+> 34 MB download at ~300 kB/s, so the builds contended on bandwidth and deadlocked; one agy job gave
+> up and fell back to a host Python 3.14 venv. **Fix: the Pi is now the primary verification
+> environment** — no image build, and it is the actual target. Docker 3.11 stays as the reference
+> for byte-equality assertions only.
+
+> [!important] The type gate was not reproducible across environments
+> Docker (mypy 1.20.2 / numpy 2.4.6) passed code that the Pi (mypy 1.15.0 / numpy 2.2.4) rejected
+> with three errors — a bare `np.ndarray` return and two `max()` calls mixing `float` with
+> `floating[_32Bit]`. All three were genuine imprecision. Fixed; BIDMC output was bit-identical
+> afterwards, confirming the change was behaviour-neutral.
+
+> [!note] A brief defect caught by the ledger discipline
+> My Chain A brief assigned the decode guard (5.1/5.2) to an agent that does not own
+> `acquisition.py`, where `PacketCodec.decode` actually lives — while the plan places it in WP-7's
+> `_FramePump`. A double-assignment like that is precisely how a requirement ends up dropped by both
+> parties. Corrected mid-flight by messaging the agent with a revised seam: the service reads
+> transport counters through an optional `health()` protocol that WP-7 will implement.
 
 ### Delegation topology
 
