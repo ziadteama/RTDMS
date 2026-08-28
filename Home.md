@@ -22,6 +22,12 @@ Project 2 (the build phase this repo is for).
 
 - [[Models Index]] — status of all three models + fusion/alert/firmware
   - [[Physiology Subsystem]] — HR/PRV fatigue inference · `models/physiology/` · **implemented**
+- [[Raspberry Pi 5 Target]] — the deployment device, surveyed live over SSH
+- [[Pi Setup Plan]] — researched optimal configuration + the blockers to resolve first
+
+> [!warning] Working principle
+> The report is a **starting point, not a spec**. Prefer the better/optimal technical option, then
+> record the divergence so the final report can be updated or the choice defended.
 
 ## Report — full coverage (chapter order)
 
