@@ -373,3 +373,45 @@ work before a human did:
 This confirms holding it off `main` was correct. Ledger items 2.4 (rolling loss window), 4.5 (sticky
 sensor status), 4.8 (frame-driven parity), and 5.9 (the ten-field session block) are the ones still
 open.
+
+---
+
+## Milestone — the mock-ESP32 rig works end to end
+
+2026-08-29. WP-7 + WP-8 merged (`247aaf5`). Synthetic PPG → wire-format encode → TCP → decode →
+`PacketTracker`, all in one run:
+
+```
+frames decoded      : 400
+samples/packet      : 3          <- MTU-realistic default, not the old 20
+first seq/index     : 0/0
+last  seq/index     : 399/1197
+sequence gaps       : 0
+elapsed             : 9.63s -> 41.5 packets/sec
+health              : {'packets_received': 400, 'decode_errors': 0,
+                       'queue_depth': 0, 'queue_high_water': 2, 'dropped_frames': 0}
+stream contiguous   : True
+```
+
+`last_index == first_index + (n-1) * sample_count` holds exactly, so nothing was dropped, reordered,
+or silently fabricated across the transport. **This is the "we act as the ESP32" capability the
+campaign was built for** — minus the radio, which no available hardware can provide.
+
+> [!warning] Not hardware-verified
+> This ran in the Docker Python 3.11 reference container on x86_64, **not on the Pi**, which is
+> offline. Throughput and latency figures from a container are not Pi figures. The rig is proven to
+> *work*; its performance numbers still need the real target.
+
+### What the rig now gives us
+
+- `_FramePump` shared by `BleakSampleSource` and `SocketSampleSource`: bounded queue (drop-newest,
+  counted), decode guard so one malformed packet no longer kills the service, and a `health()`
+  protocol (`packets_received`, `decode_errors`, `queue_depth`, `queue_high_water`,
+  `dropped_frames`).
+- The socket reader is **independently driven**, so TCP's kernel flow control cannot mask the
+  overflow the bounded queue exists to guard against. The earlier demo showed 34 packets received
+  while only 10 had been consumed — proof the reader runs ahead of the consumer.
+- `tools/mock_wearable.py` with `--mtu` (default 3), BLE-style 30 ms connection-interval bursting,
+  jitter, `--disconnect-at` / `--reconnect-after`, `--firehose`, and a `perf_counter_ns` sidecar CSV
+  for end-to-end latency joins.
+- The two TODO tests that documented the old defects are retired and now assert correct behaviour.
