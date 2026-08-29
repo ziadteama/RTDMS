@@ -14,3 +14,6 @@ data/
 recordings/
 models/*.json
 !models/.gitkeep
+
+# mock_wearable latency sidecar output
+*.csv

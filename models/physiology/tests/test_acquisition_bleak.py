@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import sys
 from collections.abc import AsyncGenerator, Callable, Sequence
 from types import ModuleType
@@ -8,7 +7,7 @@ from types import ModuleType
 import pytest
 
 from dms_physiology.acquisition import BleakSampleSource
-from dms_physiology.protocol import PACKET_VERSION, PacketCodec, PacketCodecError
+from dms_physiology.protocol import PACKET_VERSION, PacketCodec
 from dms_physiology.types import Channel, PpgFrame, PpgPacket, SensorStatus
 
 ADDRESS = "AA:BB:CC:DD:EE:FF"
@@ -98,16 +97,19 @@ async def test_notification_stream_round_trips_packets(monkeypatch: pytest.Monke
     assert clients[0].started == [CHARACTERISTIC_UUID]
 
 
-async def test_malformed_notification_kills_the_stream(monkeypatch: pytest.MonkeyPatch) -> None:
-    # TODO(WP-5): flip to assert stream continues + decode_errors == 1 once the decode guard lands
+async def test_malformed_notification_is_dropped(monkeypatch: pytest.MonkeyPatch) -> None:
     good = PacketCodec.encode(make_packet(1, 0))
-    clients = install_fake_bleak(monkeypatch, [b"\x01\x02\x03", good])
-    stream = open_stream()
+    install_fake_bleak(monkeypatch, [b"\x01\x02\x03", good])
+    source = BleakSampleSource(ADDRESS, CHARACTERISTIC_UUID, SAMPLE_RATE_HZ)
+    stream = source.frames()
 
-    with pytest.raises(PacketCodecError):
-        await anext(stream)
+    frame = await anext(stream)
 
-    assert clients[0].stopped == [CHARACTERISTIC_UUID]
+    assert frame.packet.sequence == 1
+    assert source.health()["decode_errors"] == 1
+    assert source.health()["packets_received"] == 2
+
+    await stream.aclose()
 
 
 async def test_disconnect_mid_stream_stops_notifications(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -123,19 +125,21 @@ async def test_disconnect_mid_stream_stops_notifications(monkeypatch: pytest.Mon
         await anext(stream)
 
 
-async def test_fast_notifications_grow_the_queue_without_bound(
+async def test_fast_notifications_drop_packets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # TODO(WP-7): assert bounded queue + drop counter once _FramePump lands
-    payloads = [PacketCodec.encode(make_packet(index, index * 2)) for index in range(50)]
+    payloads = [PacketCodec.encode(make_packet(index, index * 2)) for index in range(70)]
     install_fake_bleak(monkeypatch, payloads)
-    stream = open_stream()
+    source = BleakSampleSource(ADDRESS, CHARACTERISTIC_UUID, SAMPLE_RATE_HZ)
+    stream = source.frames()
 
     await anext(stream)
-    queue: asyncio.Queue[tuple[float, bytes]] = stream.ag_frame.f_locals["queue"]
+    health = source.health()
 
-    assert queue.maxsize == 0
-    assert queue.qsize() == 49
+    assert health["queue_high_water"] == 64
+    assert health["dropped_frames"] == 6
+    assert health["packets_received"] == 70
+
     await stream.aclose()
 
 
