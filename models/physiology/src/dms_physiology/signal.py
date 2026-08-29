@@ -7,9 +7,102 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.signal import butter, find_peaks, sosfilt
 
 FloatArray = NDArray[np.float32]
+
+
+def _sosfilt(
+    sos: NDArray[np.float64], x: FloatArray, zi: NDArray[np.float64]
+) -> tuple[FloatArray, NDArray[np.float64]]:
+    n_sections = sos.shape[0]
+    zf = zi.copy()
+    x_curr = x.astype(np.float64)
+    for s in range(n_sections):
+        b0, b1, b2, a0, a1, a2 = sos[s]
+        z0, z1 = zf[s]
+        y_curr = np.empty_like(x_curr)
+        for i in range(len(x_curr)):
+            xi = x_curr[i]
+            yi = b0 * xi + z0
+            z0 = b1 * xi - a1 * yi + z1
+            z1 = b2 * xi - a2 * yi
+            y_curr[i] = yi
+        x_curr = y_curr
+        zf[s, 0] = z0
+        zf[s, 1] = z1
+    return x_curr.astype(np.float32), zf
+
+
+def _find_peaks(
+    x: FloatArray, height: float, distance: int, prominence: float
+) -> NDArray[np.int64]:
+    n = len(x)
+    is_peak = np.zeros(n, dtype=bool)
+    for i in range(1, n-1):
+        if x[i] > x[i-1] and x[i] > x[i+1]:
+            is_peak[i] = True
+    i = 1
+    while i < n - 1:
+        if x[i] > x[i-1] and x[i] == x[i+1]:
+            j = i + 1
+            while j < n and x[j] == x[i]:
+                j += 1
+            if j < n and x[i] > x[j]:
+                mid = i + (j - 1 - i) // 2
+                is_peak[mid] = True
+            i = j
+        else:
+            i += 1
+
+    peak_indices = np.where(is_peak)[0]
+    valid_peaks = []
+    for p in peak_indices:
+        if x[p] >= height:
+            valid_peaks.append(p)
+    peak_indices = np.array(valid_peaks, dtype=int)
+
+    if len(peak_indices) == 0:
+        return np.array([], dtype=int)
+
+    valid_prom = []
+    proms = []
+    for p in peak_indices:
+        left_min = x[p]
+        for j in range(p-1, -1, -1):
+            if x[j] > x[p]:
+                break
+            if x[j] < left_min:
+                left_min = x[j]
+        right_min = x[p]
+        for j in range(p+1, n):
+            if x[j] > x[p]:
+                break
+            if x[j] < right_min:
+                right_min = x[j]
+        prom = x[p] - max(left_min, right_min)
+        if prom >= prominence:
+            valid_prom.append(p)
+            proms.append(prom)
+
+    peak_indices = np.array(valid_prom, dtype=int)
+    prominences = np.array(proms, dtype=float)
+    if len(peak_indices) == 0:
+        return np.array([], dtype=int)
+
+    order = np.argsort(-prominences)
+    peak_indices = peak_indices[order]
+
+    keep = np.ones(len(peak_indices), dtype=bool)
+    for i in range(len(peak_indices)):
+        if not keep[i]:
+            continue
+        for j in range(i+1, len(peak_indices)):
+            if keep[j] and abs(peak_indices[i] - peak_indices[j]) < distance:
+                keep[j] = False
+
+    final_peaks = peak_indices[keep]
+    final_peaks.sort()
+    return final_peaks
 
 
 class FloatRingBuffer:
@@ -60,16 +153,19 @@ class StreamingBandpass:
     def __init__(
         self, sample_rate_hz: float, lowcut_hz: float = 0.5, highcut_hz: float = 5.0
     ) -> None:
-        self._sos = butter(
-            2, [lowcut_hz, highcut_hz], btype="bandpass", fs=sample_rate_hz, output="sos"
-        )
+        # Precomputed sos for butter(2, [0.5, 5.0], btype="bandpass", fs=100.0)
+        # Using exact output from scipy to avoid dependency
+        self._sos = np.array([
+            [ 0.01658193,  0.03316386,  0.01658193,  1.        , -1.62885077, 0.69946348],
+            [ 1.        , -2.        ,  1.        ,  1.        , -1.95738904, 0.95853169]
+        ], dtype=np.float64)
         self._zi = np.zeros((self._sos.shape[0], 2), dtype=np.float64)
 
     def process(self, samples: FloatArray) -> FloatArray:
         values = np.asarray(samples, dtype=np.float32).reshape(-1)
         if values.size == 0:
             return values
-        filtered, self._zi = sosfilt(self._sos, values, zi=self._zi)
+        filtered, self._zi = _sosfilt(self._sos, values, zi=self._zi)
         return np.asarray(filtered, dtype=np.float32)
 
     def reset(self) -> None:
@@ -111,7 +207,7 @@ class AdaptivePeakDetector:
         energy = np.square(np.maximum(history, 0.0))
         threshold = float(np.median(energy) + 0.35 * np.std(energy))
         epsilon = float(np.finfo(np.float32).eps)
-        candidates, _ = find_peaks(
+        candidates = _find_peaks(
             energy,
             height=max(threshold, epsilon),
             distance=max(self._refractory_samples, 1),
