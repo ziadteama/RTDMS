@@ -650,3 +650,70 @@ HONEST DEGRADATION  : True
 This also validates the WP-7 design note: because the socket reader is **independently driven**, TCP's
 kernel flow control did not mask the overflow. A naive read-then-yield loop would have shown
 `dropped_frames: 0` here and proven nothing.
+
+---
+
+## Merged main — P0-A fixed, P0-C corrected to STILL OPEN
+
+All work packages merged (`5a51a80`). **80 tests pass**, ruff and mypy clean.
+
+### P0-A — fixed, measured
+
+```
+P0-A  clean=200  reset=200  lost=0        (was losing 120/240 = 50%)
+P0-A  HR outputs after reset present: True
+```
+
+An MCU reset now costs **zero** outputs, against 120 lost before. The service resumes heart-rate
+output after the reset instead of falling silent for the rest of the run.
+
+(The clean-run count moved 240 → 200 because WP-3 removed the double publish. Fewer outputs here is
+the fix, not a regression.)
+
+### P0-C — I called this fixed. It is not.
+
+A first check at one loss rate reported "P0-C FIXED", and I nearly recorded that. A sweep across
+loss rates shows the real picture:
+
+| Loss pattern | Outputs | With HR | HR yield |
+|---|---:|---:|---:|
+| none | 200 | 140 | **70%** |
+| gap every 40 packets (2.5%) | 203 | 80 | **39%** |
+| gap every 20 packets (5%) | 203 | 20 | **10%** |
+| gap every 10 packets (10%) | 201 | 18 | 9% |
+| gap every 5 packets (20%) | 200 | 17 | 8% |
+| gap every 3 packets (33%) | 197 | 15 | 8% |
+
+> [!danger] P0-C remains open — 5% packet loss still collapses HR availability 7×
+> The root cause is untouched. `service.py:217-218` still calls `_reset_signal_state()` on **any**
+> `sample_gap`, and that method still ends with `self._intervals.clear()` (line 245) — discarding
+> the entire accumulated interval history for a gap of a single packet.
+>
+> What the merge changed was the *symptom*: the rolling loss window and emit-index rebasing let some
+> HR through between gaps. HR yield still falls from 70% to **10%** at 5% loss — a rate BLE will
+> routinely exceed.
+>
+> `ARCHITECTURE.md:116` requires resetting *"only affected detector state"* and rejecting *"the
+> affected window"*, not the whole history. **Tracked as WP-15, still open.**
+
+> [!warning] How the wrong conclusion nearly got recorded
+> The first check used one loss configuration and a hand-built frame stream; it showed HR present
+> and printed FIXED. The sweep used the generator's own loss injection across six rates and showed
+> a 7× collapse. **A single passing data point is not a fix**, and "the symptom went away at the one
+> setting I tried" is the easiest way to close a defect that is still there.
+
+### Two P1s from the codex review, both fixed with regression tests
+
+- **A sensor that never connects** now reports `STALE` instead of sitting in `WARMUP` forever
+  (`_emit_tick(stale=True)` on every timeout — a timeout *is* staleness).
+- **Wrong-rate frames** no longer refresh the freshness timestamp before being discarded, so a
+  misconfigured source can no longer hold `last_frame_age_seconds` near zero while dropping
+  everything.
+
+### Still open, honestly
+
+- **WP-15 / P0-C** — interval history discarded on any gap (above).
+- **Ledger 5.6-5.8 PARTIAL** — `BoundedOutputSink` is installed only by the CLI wrapper, so a raw
+  sink passed directly to `PhysiologyService` can still raise into acquisition.
+- **Nothing here is hardware-verified.** The Pi is offline; all of this is the Docker x86_64
+  reference.
