@@ -781,3 +781,116 @@ The real inefficiency is not the model, it is a **library import**:
   and the PCIe slot is contested ([[Pi Setup Plan#Blocker 2 — The PCIe contention problem]]).
 - **numpy replacement of the three scipy calls** — **selected.** Largest measured win, no new
   dependency, and verifiable by direct equivalence against the thing it replaces.
+
+## WP-14 executed then reverted; WP-15 confirmed as a real, partial win
+
+WP-14 (drop scipy from `signal.py`, replace with pure numpy) was implemented by an agy job and
+initially accepted: the equivalence proof held (max filter deviation 1.47e-08, peak indices
+identical on five synthetic signals), and BIDMC still reproduced closely (0.5075 vs 0.5082 bpm MAE,
+same 420 outputs).
+
+**Then it was reverted (`987b24b`).** Two things the agent's own report never surfaced, because
+its brief only required the equivalence proof and a BIDMC check, not a real-MTU CPU measurement:
+
+- **CPU regression.** At the realistic batch=3 MTU, CPU went from **1.97% to 3.27%**, over the 2%
+  hard gate. `sosfilt`'s C implementation is not something numpy can vectorise away — an IIR filter
+  is inherently sequential, one sample depends on the last, and a pure-Python per-sample loop pays
+  for every one of those dependencies. scipy's ~30 MB RSS cost buys real speed, not just convenience.
+- **A silent constructor bug**, found by direct code inspection, not testing: the numpy
+  `StreamingBandpass.__init__` accepted `sample_rate_hz`/`lowcut_hz`/`highcut_hz` but silently
+  ignored them, hardcoding fs=100 SOS coefficients. It "worked" only because every test in the repo
+  happens to use 100 Hz data — it would have silently misfiltered BIDMC's real 125 Hz signal, except
+  a separate regression (below) was masking BIDMC entirely at the time.
+
+Reverted in full: `signal.py` and `pyproject.toml` back to scipy, the equivalence test removed.
+WP-15 (independent, service.py-only) was kept — it doesn't touch the filter/peak-detector path.
+
+### A regression this campaign shipped, found by re-checking BIDMC after the revert
+
+While isolating whether WP-14 broke BIDMC, `validate_bidmc.py` failed with `RuntimeError("the
+replay produced no quality-gated HR outputs")` — on WP-14, and then, checked directly, **on plain
+`main` too**. Root cause: Chain A's merge (`5a51a80`) introduced schema v2's uppercase
+`STATE_VALID`/`STATE_DEGRADED` state vocabulary, but `validate_bidmc.py` still filtered on the old
+lowercase `"good"`/`"degraded"` strings, so every output was silently discarded. This had been
+merged to `main` and left there without re-running the BIDMC check the delegation brief for that
+work had actually required. Fixed in `40a47e7`; new baseline `0.5082470420003504 bpm MAE`, 420
+outputs (504→420 is WP-3's fixed double-publish, not a new problem) — recorded in
+`docs/EVIDENCE.md`.
+
+### P0-C re-measured after WP-15 — meaningfully better, still not closed
+
+The original discovery-time sweep (`70%→10%` HR yield at 5% loss) used a different config than what
+survives in the repo and cannot be reproduced exactly; the number below is a fresh, reproducible
+run against current `main` (`packet_loss_indices`, batch=20, 120 s, seed=5):
+
+```python
+# tools/verify_on_pi.sh-style inline check, run with PYTHONPATH=<checkout>/src
+from dms_physiology.waveform import WaveformConfig, generate_ppg
+cfg = WaveformConfig(seconds=120.0, batch_size=20, seed=5,
+                      packet_loss_indices=tuple(i for i in range(400) if i % every == 0))
+```
+
+| Loss | Outputs | With HR | HR yield |
+|---|---:|---:|---:|
+| none | 120 | 60 | 50.0% |
+| 2.5% | 120 | 60 | 50.0% |
+| 5% | 120 | 60 | 50.0% |
+| 10% | 120 | 38 | 31.7% |
+| 20% | 120 | 37 | 30.8% |
+| 33% | 127 | 42 | 33.1% |
+
+**WP-15 genuinely helps.** Yield no longer collapses at 5% loss — it matches the clean baseline
+exactly. The degradation now starts at 10%+ and plateaus around 31–33% instead of continuing to
+fall toward zero. It is still a real gap (roughly 20 points below baseline at 10%+, and
+`ARCHITECTURE.md:116`'s "only the affected window" is only partially honoured) — not closed, but no
+longer the near-total collapse it was at discovery.
+
+## The Pi went offline, then came back — 2026-08-29
+
+The Pi became unreachable across LAN IP, Tailscale IP, and MagicDNS hostname for an extended period
+while the user was away from home, prompting a direct question about physical damage. The answer,
+based on evidence rather than guesswork: **no indication of damage.** Last known-good telemetry
+before the outage was clean (45.2°C, `throttled=0x0`, no thermal/voltage fault ever recorded across
+the whole campaign), and a Pi 5 throttles and flags well before anything resembling real damage. The
+symptom pattern — dropped off SSH *and* ping *and* Tailscale roughly together, with the user's own
+Tailscale client separately showing coordination-server health problems — pointed at a mundane
+network/power interruption, not hardware failure.
+
+**It reconnected on its own.** `uptime` on reconnect showed the Pi had been up only ~5 minutes,
+confirming a reboot (crash, power blip, or a power cycle) rather than damage.
+
+### Full hardware verification, re-run end to end
+
+`tools/verify_on_pi.sh 192.168.100.181`, 2026-08-29, governor `ondemand`, boot device
+`/dev/mmcblk0p2` (microSD):
+
+```
+== environment ==
+raspberrypi  aarch64  Python 3.13.5
+temp: 47.7°C -> 51.6°C after load   throttled=0x0 (both)
+
+== gate ==
+pytest: 81 passed (3 async resource warnings — un-awaited pump.aclose() in
+        test_socket_source_health, and "Event loop is closed" GC noise from
+        test_property_codec_roundtrip; both pre-existing test hygiene, not failures)
+ruff:   All checks passed!
+mypy:   Success: no issues found in 13 source files
+
+== BIDMC ==
+hr_mae_bpm: 0.5082470420003504   evaluated_outputs: 420   (matches Docker exactly)
+
+== CPU and RSS, MTU sweep ==
+  batch=3  (ATT MTU 23, realistic)   1.31% CPU   108.5MB RSS
+  batch=20                            0.22% CPU   109.6MB RSS
+  batch=79 (MTU 247)                  0.08% CPU   109.7MB RSS
+```
+
+This closes the last open item this campaign was scoped to close: real-hardware CPU/RSS at the
+realistic MTU. All three MTUs land inside the 2%/150MB hard gates; only batch=3's CPU sits above
+the 1% *target* (1.31%), consistent with the expectation that real BLE (D-Bus marshalling, not
+measured here) will cost more than this TCP-rig lower bound, but with headroom to absorb it.
+
+`docs/EVIDENCE.md` has been updated to reflect all of the above as the current, hardware-verified
+state. **Nothing here required a second connectivity outage or a rebuild** — the sync-and-verify
+script written earlier in the campaign for exactly this scenario worked on the first try once the
+Pi answered SSH again.
