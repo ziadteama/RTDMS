@@ -297,3 +297,23 @@ the wrist-motion 80%-usable-windows risk.
 > A ~500 EGP MAX30102 breakout wired to the Pi's I2C (which [[Pi Setup Plan]] already proposes
 > enabling) would give **real optical data through the real signal path** — the only thing that
 > touches the sensor-domain-shift risk. Different gate from this campaign, but cheap and high value.
+
+### Pi offline — 2026-08-28 late session
+
+The Pi dropped off the network and did not return. Evidence: a full sweep of `192.168.100.100-200`
+found only three hosts, **none with a Raspberry Pi MAC** (`b8:27:eb` / `dc:a6:32` / `e4:5f:01` /
+`d8:3a:dd` / `2c:cf:67`). `192.168.100.181` answers ICMP but its TCP 22 is closed and it is absent
+from the ARP cache under a Pi MAC — so that address is now almost certainly held by a **different
+device** on a reassigned DHCP lease.
+
+**Needs physical attention**: check the Pi's power and Ethernet cable. It cannot be recovered
+remotely. Nothing was mid-write to its filesystem, so a power-cycle is safe.
+
+**Consequence:** hardware verification is blocked. Docker (Python 3.11 reference) is the interim
+gate. Every result recorded while the Pi is down must be labelled as **not hardware-verified** —
+the whole point of this campaign is evidence from the real target, and Docker on x86_64 is not that.
+
+> [!tip] Give the Pi a DHCP reservation
+> This is the second time its address has moved. Pin `192.168.100.181` to the Pi's MAC in the
+> router, or set a static address. An address that moves mid-campaign silently invalidates every
+> scripted run.
