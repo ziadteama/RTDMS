@@ -415,3 +415,29 @@ campaign was built for** — minus the radio, which no available hardware can pr
   jitter, `--disconnect-at` / `--reconnect-after`, `--firehose`, and a `perf_counter_ns` sidecar CSV
   for end-to-end latency joins.
 - The two TODO tests that documented the old defects are retired and now assert correct behaviour.
+
+### P0-A demonstrated empirically on `main`
+
+Previously P0-A was established by reading the code. It is now reproduced as a measurement, using
+the WP-6 generator to build a 200 s stream with a genuine MCU reset injected at the halfway point
+(status `SENSOR_RESET`, sample index restarting at 0 **and continuing from there**, as real hardware
+behaves):
+
+```
+CLEAN : 240 outputs
+RESET : 120 outputs   (reset injected at packet 500 = t+100s)
+OUTPUTS LOST TO THE RESET: 120  (50% of the run)
+```
+
+The service emitted **nothing at all for the entire 100 seconds following the reset** — exactly the
+predicted failure. In a real vehicle a wearable reset one hour into a drive would blind the
+physiological channel for an hour, while the system continued to report as if healthy.
+
+> [!note] A first attempt at this demo failed, and the failure was mine
+> The initial version injected the reset as a single-packet blip and let the sample index jump
+> straight back to its old value. Nothing reproduced, and it would have been easy to record that as
+> "P0-A not confirmed". A real reset restarts the index at 0 and *continues* from there; once the
+> stream was modelled correctly the defect appeared immediately and exactly. **A negative result
+> from a test that does not model the failure is not evidence of absence.**
+
+Fixed by WP-2 on `wp2345-chain-a-wip` (not yet merged — that branch still has 5 failing tests).
