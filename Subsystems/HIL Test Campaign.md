@@ -615,3 +615,38 @@ RSS here is 121-124 MB against the 120 MB target — slightly above, versus ~108
 Pi. The container carries more baseline than the Pi does, so the Pi figure is the one that counts,
 and it remains the honest number. Either way the story is unchanged: **the memory is scipy's import
 footprint, not the service's working set.**
+
+---
+
+## B3 — firehose overflow through the real socket rig
+
+`mock_wearable.py --firehose` against a deliberately throttled consumer (4 ms per frame), so the
+transmitter outruns the reader by ~33×:
+
+```
+frames consumed     : 121 (consumer throttled to 4ms/frame)
+health              : {'packets_received': 4000, 'decode_errors': 0,
+                       'queue_depth': 0, 'queue_high_water': 64, 'dropped_frames': 3879}
+gap events seen     : 55   samples accounted lost: 11565
+
+queue bounded       : True  (high_water=64, cap 64)
+decode errors       : 0
+HONEST DEGRADATION  : True
+```
+
+> [!success] Bounded, counted, and honest under 33× overload
+> - **`queue_high_water == 64`, exactly the cap.** The queue never grew past its bound, which is the
+>   whole point of WP-7 and what `VALIDATION.md:94` demands.
+> - **`decode_errors == 0`.** Dropping under pressure did not corrupt the stream — no partial or
+>   misaligned packet ever reached the codec.
+> - **Drops surfaced downstream as genuine counted gaps**: 3,879 dropped packets × 3 samples ≈
+>   11,637, against 11,565 samples the `PacketTracker` independently accounted as lost. The two
+>   numbers agree to within the packets still in flight.
+>
+> That last point is the requirement that matters (7.7). A system under overload that silently
+> produced *plausible but wrong* heart rates would be far more dangerous than one that reports
+> degradation. It degrades honestly.
+
+This also validates the WP-7 design note: because the socket reader is **independently driven**, TCP's
+kernel flow control did not mask the overflow. A naive read-then-yield loop would have shown
+`dropped_frames: 0` here and proven nothing.
