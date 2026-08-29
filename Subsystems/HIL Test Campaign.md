@@ -535,3 +535,52 @@ Tracked as **WP-15**.
 > are raised correctly and fatigue is correctly suppressed, so this is not a safety failure — but it
 > is the `WARMUP`/`BAD` vocabulary confusion that WP-4 exists to fix. A consumer cannot currently
 > distinguish "still starting up" from "sensor destroyed".
+
+---
+
+## Independent review of Chain A (codex, high reasoning)
+
+Codex reviewed `wp2345-chain-a-wip` against all 23 ledger items and hunted adversarially for bugs
+the checklist would miss. It ran the code, not just read it — it constructed a `SilentSource` and a
+`StopSink` to probe the state machine directly.
+
+**Requirement table:** 16 IMPLEMENTED, 3 PARTIAL (4.4, 4.8, 5.6-5.8), 2 WRONG (4.3, 4.6).
+
+### The two P1s — both "fails silently while looking healthy"
+
+> [!danger] P1 — a dead sensor at boot never becomes STALE
+> `service.py:162`. The timeout path passes `stale=False` until a frame has *already* arrived, so a
+> sensor that never connects sits in `WARMUP` **forever**. Fusion cannot distinguish "still warming
+> up" from "the wearable was never plugged in" — and WARMUP is not an alarming state, so nothing
+> escalates.
+
+> [!danger] P1 — a wrong-rate source suppresses stale detection entirely
+> `service.py:202`. Mismatched-rate frames refresh `_last_frame_ns` **before** being dropped, so a
+> misconfigured source keeps `last_frame_age_seconds` near zero while discarding every single
+> packet. The service reports a healthy, recent frame age while producing nothing.
+
+Both are exactly the failure class the review was asked to hunt: **silently wrong rather than loudly
+broken**, which in a driver-monitoring context means the physiological channel is dead while the
+system believes it is fine.
+
+### P2s
+
+- `service.py:166` — time-driven mode leaks queue occupancy into the payload, so `time_driven=False`
+  cannot byte-match it (breaking the 4.8 parity requirement); `queue_high_water` is also sampled
+  *after* dequeue, so it under-reports peak depth.
+- `service.py:199` — `run()` still awaits arbitrary sinks directly; only the CLI wrapper installs
+  `BoundedOutputSink`, so a raw sink exception can still escape into acquisition. 5.6-5.8 is
+  therefore only PARTIAL.
+
+### The finding that changes the plan
+
+> [!important] Four of the five failing tests are **test-data bugs, not source regressions**
+> `tests/conftest.py:94` and four cases in `test_service_states.py`: the gap helper slices past the
+> end of a 450/1000-packet run, and the 90-second fault case leaves only ~20 s after the fault —
+> less than the 60 s feature window needs.
+>
+> This matters because the obvious reading of "5 failing tests" is "the source is broken", and an
+> agent told to make them pass could easily have contorted working source to satisfy a broken
+> fixture. An independent reviewer that *runs* the code caught what a checklist could not. Chain A
+> was briefed to justify any test change rather than silently weaken one — its justification now has
+> a second opinion to be checked against.
