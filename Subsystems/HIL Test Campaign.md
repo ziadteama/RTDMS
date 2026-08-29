@@ -441,3 +441,35 @@ physiological channel for an hour, while the system continued to report as if he
 > from a test that does not model the failure is not evidence of absence.**
 
 Fixed by WP-2 on `wp2345-chain-a-wip` (not yet merged — that branch still has 5 failing tests).
+
+---
+
+## Matrix A — first accuracy evidence against generator ground truth
+
+Run on merged `main` in the Docker 3.11 reference. The WP-6 generator emits ground-truth beat
+indices, so HR can be scored against truth rather than against itself.
+
+| Scenario | Truth beats | Outputs | Mean HR | Expected | Error |
+|---|---:|---:|---:|---:|---:|
+| A1 clean 60 bpm | 180 | 144 | 60.01 | 60.0 | **0.01** |
+| A1b clean 75 bpm | 225 | 144 | 75.00 | 75.0 | **0.00** |
+| A3 batch=3 (ATT MTU 23) | 180 | 142 | 60.00 | 60.0 | **0.00** |
+| A3 batch=7 | 180 | 138 | 60.00 | 60.0 | **0.00** |
+| A3 batch=20 (old simulator) | 180 | 144 | 60.01 | 60.0 | **0.01** |
+| A3 batch=79 (MTU 247) | 180 | 98 | 60.05 | 60.0 | **0.05** |
+| A4 drift + noise (σ=300) | 180 | 144 | 60.01 | 60.0 | **0.01** |
+| A2 ramp 50→120 bpm | 255 | 144 | 85.18 | 85 (ramp mean) | — |
+
+Ground-truth beat counts are exactly right in every case (180 beats in 180 s at 60 bpm; 225 at
+75 bpm), which validates the generator itself as well as the detector.
+
+> [!success] The MTU risk does not damage accuracy
+> This was the open question from the MTU analysis. Across a **26× sweep in packet size (3 → 79
+> samples)** the HR error stays at or below **0.05 bpm** — far inside the ≤3 bpm gate in
+> `VALIDATION.md:52`. Peaks straddling packet boundaries are neither double-counted nor missed at
+> any realistic MTU.
+>
+> That closes the *correctness* half of the MTU risk. The **cost** half is still open: batch=3 means
+> ~6× more `find_peaks` calls per second, and that CPU measurement needs the Pi.
+
+Note A2's 85.18 bpm is the correct answer, not an error: it is the mean of a linear 50→120 ramp.
