@@ -717,3 +717,67 @@ loss rates shows the real picture:
   sink passed directly to `PhysiologyService` can still raise into acquisition.
 - **Nothing here is hardware-verified.** The Pi is offline; all of this is the Docker x86_64
   reference.
+
+---
+
+## Optimisation options assessed — ONNX is the wrong tool here
+
+The question was whether ONNX Runtime (or similar) would help this subsystem on the Pi. **It would
+make it worse**, and it is worth writing down why, because the reasoning is not obvious.
+
+### Why ONNX does not apply to physiology
+
+| | |
+|---|---|
+| **What the model is** | Logistic regression over **7 features**. Inference is 7 multiply-adds and one sigmoid. |
+| **How it runs today** | A JSON artifact loaded at startup, scored in plain Python/numpy. `docs/ARCHITECTURE.md:124` deliberately forbids unpickling a scikit-learn object at runtime. |
+| **Its current cost** | Effectively zero — unmeasurable against the 5 MB working set. |
+| **What ONNX Runtime would add** | Tens of MB of runtime library, a new native dependency chain on aarch64, and a graph executor. |
+
+ONNX exists to make **neural network graphs** portable and fast. Applying it to a 7-parameter linear
+model imports an execution engine to do arithmetic that is already free. It would consume budget in
+exactly the dimension that is already tight (memory), to accelerate the one component that costs
+nothing.
+
+**Verdict: reject for physiology.** Not a close call.
+
+### Where ONNX *is* relevant to RTDMS
+
+The two vision models ([[Models Index]]) are a genuinely different case — real CNNs where graph
+optimisation and quantisation matter. But note the target: those run on the **Hailo AI HAT+**, whose
+runtime consumes compiled `.hef` files, not ONNX. There ONNX is a **conversion format on the path**
+(PyTorch/TF → ONNX → Hailo Dataflow Compiler → `.hef`), not the thing executing on-device. Worth
+recording now so nobody later installs `onnxruntime` on the Pi expecting it to drive the accelerator.
+
+### The optimisation that actually pays — WP-14
+
+The real inefficiency is not the model, it is a **library import**:
+
+| Import set | RSS |
+|---|---:|
+| Bare Python 3.13 | 8.9 MB |
+| + numpy | 22.6 MB |
+| **+ scipy.signal** | **99.6 MB** |
+| + bleak (full runtime) | 103.1 MB |
+
+**scipy costs 77 MB for exactly three function calls** — `butter`, `sosfilt`, `find_peaks` — all in
+`signal.py`. The service's own working set is about 5 MB. Removing scipy takes the floor from
+~103 MB to ~26 MB, turning a gate we barely pass into one we pass four times over.
+
+> [!warning] Guarded by an equivalence proof, not by hope
+> Peak detection is where the documented 0.50 bpm BIDMC accuracy comes from. WP-14 is therefore
+> gated on a hard proof: the numpy filter must match `scipy.signal.sosfilt` to 1e-6 across batch
+> boundaries, and the numpy peak detector must return **identical index arrays** to
+> `scipy.signal.find_peaks` on five varied signals. If the detector cannot be made to match exactly,
+> the instruction is to **stop and keep scipy**. A memory saving bought with accuracy is not a
+> saving.
+
+### Options considered and rejected
+
+- **ONNX Runtime** — rejected above.
+- **Quantisation / INT8** — meaningless for 7 float coefficients.
+- **TFLite / tflite-runtime** — same objection as ONNX, plus another dependency.
+- **Hailo offload for physiology** — the accelerator is for vision; a linear model would not benefit,
+  and the PCIe slot is contested ([[Pi Setup Plan#Blocker 2 — The PCIe contention problem]]).
+- **numpy replacement of the three scipy calls** — **selected.** Largest measured win, no new
+  dependency, and verifiable by direct equivalence against the thing it replaces.
