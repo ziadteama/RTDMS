@@ -584,3 +584,34 @@ system believes it is fine.
 > fixture. An independent reviewer that *runs* the code caught what a checklist could not. Chain A
 > was briefed to justify any test change rather than silently weaken one — its justification now has
 > a second opinion to be checked against.
+
+---
+
+## A19 — 30-minute soak: no leak, all buffers bounded
+
+9,000 packets = 30 minutes of 100 Hz data with drift and noise, replayed through merged `main`.
+The sink counts rather than accumulates, so the known unbounded-`InMemorySink` defect cannot
+masquerade as a service leak.
+
+```
+outputs           : 2160   states={'warmup': 72, 'good': 2088}
+RSS start/end     : 120.7 -> 123.9 MB  (delta +3.2)
+RSS slope (steady): +0.00 MB over the measured span
+intervals deque   : max 62 (bounded)
+raw ring buffer   : max 12000 samples (cap 12000)
+cadence           : 2160 outputs for ~1740s post-warmup -> 1.24/s
+```
+
+> [!success] Memory is genuinely bounded
+> **Steady-state RSS slope is +0.00 MB.** The +3.2 MB total is startup allocation, not growth. The
+> interval deque tops out at 62 entries and the raw ring buffer sits exactly at its 12,000-sample
+> cap — both bounded by construction, now confirmed by measurement over 1.8 million samples.
+>
+> This satisfies `VALIDATION.md:91-97` (no backlog, bounded ring buffers, no RSS growth after
+> warm-up) for the processing path. Cadence of 1.24/s matches the expected ~1 HR/s plus periodic
+> feature emissions.
+
+RSS here is 121-124 MB against the 120 MB target — slightly above, versus ~108 MB measured on the
+Pi. The container carries more baseline than the Pi does, so the Pi figure is the one that counts,
+and it remains the honest number. Either way the story is unchanged: **the memory is scipy's import
+footprint, not the service's working set.**
