@@ -894,3 +894,39 @@ measured here) will cost more than this TCP-rig lower bound, but with headroom t
 state. **Nothing here required a second connectivity outage or a rebuild** — the sync-and-verify
 script written earlier in the campaign for exactly this scenario worked on the first try once the
 Pi answered SSH again.
+
+## Closing the last real gap — the live two-process rig, genuinely on the Pi
+
+Every prior "end-to-end" claim, including the "Milestone — the mock-ESP32 rig works end to end"
+section above and the first Pi resource measurements, actually fed pre-generated frames straight
+into `PhysiologyService` **in-process** (`ReplaySource` or a hand-built frame list) — never through
+an actual live socket, and never with `mock_wearable.py` running as a genuinely separate process.
+The one run that *did* use a real TCP connection between two processes was Docker-only and
+explicitly flagged "not hardware-verified." So despite the Pi runs above, the literal "we act as
+the ESP32, send it data, the Pi computes" loop had never been exercised on target.
+
+Closed it directly: launched `tools/mock_wearable.py` as an independent background process on the
+Pi (`--mtu 3`, realistic packet size, `--seconds 75`), and a second process constructing the real
+`SocketSampleSource` + `PhysiologyService` + `InMemorySink`, connecting to it over `127.0.0.1:8124`.
+
+```
+elapsed 60.03s
+health {'packets_received': 2500, 'decode_errors': 0, 'queue_depth': 0,
+        'queue_high_water': 2, 'dropped_frames': 0}
+outputs 88   state sequence: WARMUP -> VALID
+last mean_hr_bpm 60.0
+session {'packets_received': 2483, 'decode_errors': 0, 'duplicates': 0, 'reordered': 0,
+         'sequence_gaps': 0, 'dropped_outputs': 0}
+outputs with a real HR number: 18, e.g. [60.033, 60.033, 60.032, 60.031, 60.0]
+```
+
+2,500 packets over a live socket, zero decode errors, zero dropped frames, zero duplicates/
+reordered/gaps — and the state machine correctly held `WARMUP` for the full 60 s `feature_window`
+before transitioning to `VALID` with `mean_hr_bpm=60.0`, matching the transmitted signal exactly.
+(An earlier 30 s attempt correctly stayed in `WARMUP` the whole run and reported no HR — expected,
+not a bug: `feature_window_seconds=60.0` by design, so 30 s of transmission cannot leave warmup.)
+
+This is now genuinely proven on target: the wire protocol, the socket transport, the bounded queue,
+the packet tracker, the state machine, and the HR pipeline, all exercised together, live, on the
+Raspberry Pi's own CPU. `service:main` still has no `--source tcp` flag (WP-10, never implemented),
+so this remains a wiring script rather than the shipped CLI entrypoint — that gap is unchanged.
