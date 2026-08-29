@@ -473,3 +473,65 @@ Ground-truth beat counts are exactly right in every case (180 beats in 180 s at 
 > ~6× more `find_peaks` calls per second, and that CPU measurement needs the Pi.
 
 Note A2's 85.18 bpm is the correct answer, not an error: it is the mean of a linear 50→120 ramp.
+
+---
+
+## Fault matrix — one safety invariant holds, one new P0 found
+
+Eight fault types injected through the WP-6 generator on merged `main`:
+
+| Scenario | Output states | Quality reasons raised | Fatigue leak |
+|---|---|---|---|
+| A5 motion burst | warmup 72, good 45, **bad 99** | CLIPPING, ARTIFACTS, INSUFFICIENT_BEATS | **0** |
+| A6a clipping | warmup 216 | CLIPPING, ARTIFACTS, FLATLINE | **0** |
+| A6b flatline | warmup 216 | ARTIFACTS, FLATLINE | **0** |
+| A6c contact loss | warmup 216 | **SENSOR_FAULT**, CLIPPING, FLATLINE | **0** |
+| A6d saturation | warmup 72, **bad 144** | CLIPPING, ARTIFACTS | **0** |
+| A11 FIFO overflow | warmup 72, **bad 144** | **SENSOR_FAULT**, ARTIFACTS | **0** |
+| A7 packet loss 5% | warmup 216 | **PACKET_LOSS**, ARTIFACTS | **0** |
+| A9 sequence wraparound | warmup 72, **good 144** | ARTIFACTS | **0** |
+
+> [!success] The core safety invariant holds
+> **`fatigue_leak = 0` in every single scenario.** Not once did a fatigue probability escape while
+> quality was BAD. That is the invariant the whole "models report, fusion decides" boundary rests on
+> ([[Models Index#Architectural principles]]), and it is now tested against eight distinct fault
+> types rather than assumed.
+
+> [!success] A9 — sequence wraparound is clean
+> 144 good outputs across the 65535 → 0 boundary with **no PACKET_LOSS reason raised**. No false
+> loss event, exactly as `VALIDATION.md:36` requires.
+
+### P0-C (NEW) — any packet loss wipes the entire 60-second interval history
+
+**A7 is the alarming row.** With 5% packet loss the service produced **no heart rate at all** — 216
+outputs, every one stuck in `warmup`. Root cause, confirmed at `service.py:69-71`:
+
+```python
+if observation.sample_gap or observation.reset_detected:
+    self._lost_samples += observation.sample_gap
+    self._reset_signal_state()      # -> self._intervals.clear()
+```
+
+**Any** gap, however small, clears the *entire* accumulated interval deque. At batch 20 a 5% loss is
+a gap roughly every 4 seconds, so a 60-second feature window can never fill. PRV becomes permanently
+unobtainable.
+
+This violates the subsystem's own specification. `ARCHITECTURE.md:116` requires: *"reset only
+affected detector state when needed, and degrade or reject the affected window"* — not discard all
+history. And `ARCHITECTURE.md:108` lists packet loss as a **normal operating condition**, which BLE
+guarantees will occur.
+
+**Severity: P0.** Alongside P0-A and P0-B this is the third way the subsystem fails under conditions
+its own documentation calls normal. Unlike those two it was found by *measurement*, not by reading —
+no amount of code review had surfaced it.
+
+**Fix direction:** on a gap, reset the filter/detector continuity (correct — the waveform really is
+discontinuous) but *retain* intervals outside the gap, marking only the spanning interval invalid.
+Tracked as **WP-15**.
+
+> [!note] Why A6a-c sit in `warmup` rather than `bad`
+> Clipping, flatline, and contact loss destroy the signal so completely that no valid intervals ever
+> form, so `extract_features` returns `None` and the state string stays `warmup`. The quality reasons
+> are raised correctly and fatigue is correctly suppressed, so this is not a safety failure — but it
+> is the `WARMUP`/`BAD` vocabulary confusion that WP-4 exists to fix. A consumer cannot currently
+> distinguish "still starting up" from "sensor destroyed".
