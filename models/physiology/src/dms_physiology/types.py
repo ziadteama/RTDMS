@@ -42,6 +42,7 @@ class QualityReason(IntFlag):
     ARTIFACTS = 8
     INSUFFICIENT_BEATS = 16
     FLATLINE = 32
+    MODEL_INPUT = 64
 
 
 @dataclass(frozen=True, slots=True)

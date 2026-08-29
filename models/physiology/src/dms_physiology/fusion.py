@@ -6,6 +6,7 @@ import asyncio
 import json
 import socket
 from collections.abc import Mapping
+from contextlib import suppress
 from pathlib import Path
 from typing import Protocol
 
@@ -41,3 +42,61 @@ class UnixDatagramSink:
 
     def close(self) -> None:
         self._socket.close()
+
+
+class BoundedOutputSink:
+    """Isolate acquisition from a slow, absent, or failing downstream sink.
+
+    Publishing only ever enqueues. When the queue is full the newest output is
+    dropped and counted, and every exception raised by the wrapped sink -- an
+    unbound Unix socket, a serialization failure -- is counted rather than
+    propagated back into the acquisition loop.
+    """
+
+    def __init__(self, sink: OutputSink, *, maxsize: int = 64) -> None:
+        if maxsize <= 0:
+            raise ValueError("maxsize must be positive")
+        self._sink = sink
+        self._queue: asyncio.Queue[Mapping[str, object]] = asyncio.Queue(maxsize=maxsize)
+        self._writer: asyncio.Task[None] | None = None
+        self.dropped_outputs = 0
+        self.sink_errors = 0
+
+    @property
+    def queue_depth(self) -> int:
+        """Return the number of outputs still waiting to reach the wrapped sink."""
+
+        return self._queue.qsize()
+
+    async def publish(self, output: Mapping[str, object]) -> None:
+        """Enqueue one output, dropping and counting it when the queue is full."""
+
+        if self._writer is None or self._writer.done():
+            self._writer = asyncio.create_task(self._write_forever())
+        try:
+            self._queue.put_nowait(output)
+        except asyncio.QueueFull:
+            self.dropped_outputs += 1
+
+    async def aclose(self) -> None:
+        """Stop the writer task; queued outputs are abandoned."""
+
+        writer = self._writer
+        self._writer = None
+        if writer is None:
+            return
+        writer.cancel()
+        with suppress(asyncio.CancelledError):
+            await writer
+
+    async def _write_forever(self) -> None:
+        while True:
+            output = await self._queue.get()
+            try:
+                await self._sink.publish(output)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                self.sink_errors += 1
+            finally:
+                self._queue.task_done()
