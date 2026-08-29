@@ -17,7 +17,7 @@ import numpy as np
 from dms_physiology.acquisition import ReplaySource
 from dms_physiology.config import RuntimeConfig
 from dms_physiology.fusion import InMemorySink
-from dms_physiology.service import PhysiologyService
+from dms_physiology.service import STATE_DEGRADED, STATE_VALID, PhysiologyService
 from dms_physiology.types import Channel, PpgFrame, PpgPacket, SensorStatus
 
 
@@ -59,7 +59,7 @@ async def validate(signals: Path, numerics: Path) -> dict[str, float | int]:
     errors: list[float] = []
     for output in sink.outputs:
         estimated = output["mean_hr_bpm"]
-        if output["state"] not in {"good", "degraded"} or estimated is None:
+        if output["state"] not in {STATE_VALID, STATE_DEGRADED} or estimated is None:
             continue
         end_second = int(output["window_end_sample_index"]) // sample_rate_hz
         second = min(end_second, len(reference_hr) - 1)

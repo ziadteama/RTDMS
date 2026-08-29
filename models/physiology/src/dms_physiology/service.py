@@ -215,7 +215,11 @@ class PhysiologyService:
         if self._session_origin is None:
             self._session_origin = packet.first_sample_index
         if observation.sample_gap or observation.reset_detected:
-            self._reset_signal_state()
+            self._filter.reset()
+            self._detector.reset()
+            self._rejector.reset()
+            if observation.reset_detected:
+                self._intervals.clear()
             self._rebase_emit_indices(packet.first_sample_index)
         if observation.reset_detected:
             self._session_origin = packet.first_sample_index
