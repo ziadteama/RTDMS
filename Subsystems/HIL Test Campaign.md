@@ -297,3 +297,37 @@ the wrist-motion 80%-usable-windows risk.
 > A ~500 EGP MAX30102 breakout wired to the Pi's I2C (which [[Pi Setup Plan]] already proposes
 > enabling) would give **real optical data through the real signal path** — the only thing that
 > touches the sensor-domain-shift risk. Different gate from this campaign, but cheap and high value.
+
+---
+
+## Resume here (2026-08-28, end of session)
+
+### State
+`main` is **clean and fully verified on the Pi** at commit `241a7de`: 54 tests, ruff clean, mypy
+clean, BIDMC `hr_mae_bpm` 0.5049918437361341. Nothing unverified was merged.
+
+Branch **`wp2345-chain-a-wip`** holds Chain A (WP-2..5) — schema v2, the
+`WARMUP/VALID/DEGRADED/STALE` states, injectable clock + `FrameWaiter`, `SourceHealth` protocol,
+`BoundedOutputSink`, and virtual-time helpers in `conftest.py`.
+**It is UNVERIFIED** — the agent was killed by a session rate limit mid-task and the Pi went
+unreachable before the gate could run. Do not merge until the full gate passes on hardware.
+
+### Why work stopped
+1. Both delegated agents died on `rate_limit` (session limit, resets 00:00 Africa/Cairo).
+2. The Pi dropped off the network — absent from ARP, `tailscale` shows it offline. The laptop had
+   also fallen back to an APIPA `169.254.x.x` address, and the gateway ping was ~1.3 s, so the local
+   network was degraded generally. Not something the campaign caused.
+
+### First three things to do next session
+1. Reach the Pi (`ssh -i ~/.ssh/id_ed25519 khalifa@192.168.100.181`). If it does not answer, a
+   power-cycle is safe — nothing was mid-write to its filesystem.
+2. Run the gate on `wp2345-chain-a-wip`, then verify against ledger items 2.1-2.5, 3.1-3.5,
+   4.1-4.9, 5.1-5.9 **against the plan, not the agent's report**.
+3. Dispatch WP-7/WP-8 (Chain B) — briefed but never started. `acquisition.py` and
+   `tools/mock_wearable.py` are disjoint from Chain A's files, so they can run in parallel.
+
+### Delegation lesson for next time
+Claude-model subagents burn the same session quota as the main loop, so a long campaign exhausts it.
+Route implementation to **agy** (`gemini-3.1-pro-high` is the strongest available; `agy models`
+lists the rest) and use **codex** for review — both draw on separate quotas. Keep orchestration
+turns short.
