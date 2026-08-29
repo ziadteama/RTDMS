@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator, Mapping
+from contextlib import suppress
 from dataclasses import replace
 
 import pytest
@@ -82,7 +83,7 @@ async def test_valid_degrades_on_loss_then_recovers() -> None:
     sink = InMemorySink()
     # Drop five frames (100 samples) at t=120 s, then replay long enough for the
     # loss to age out of the rolling 60 s window.
-    await build(ReplaySource(frames_with_gap(200, 6000, 5)), sink).run()
+    await build(ReplaySource(frames_with_gap(200, 600, 5)), sink).run()
 
     observed = states(sink)
     first_valid = observed.index(STATE_VALID)
@@ -139,7 +140,7 @@ async def test_sensor_fault_marks_the_whole_window_not_one_packet() -> None:
     frames = synthetic_frames(90)
     faulted = tuple(
         replace(frame, packet=replace(frame.packet, status=SensorStatus.CONTACT_LOST))
-        if frame.packet.first_sample_index == 7000
+        if frame.packet.first_sample_index == 2000
         else frame
         for frame in frames
     )
@@ -173,7 +174,7 @@ async def test_reset_emits_again_within_one_second_of_sample_time() -> None:
 
 async def test_packet_loss_fraction_is_a_rolling_window() -> None:
     sink = InMemorySink()
-    await build(ReplaySource(frames_with_gap(200, 6000, 5)), sink).run()
+    await build(ReplaySource(frames_with_gap(200, 600, 5)), sink).run()
 
     losses = [float(output["quality"]["packet_loss_fraction"]) for output in sink.outputs]  # type: ignore[index]
     assert max(losses) > 0.0
@@ -253,7 +254,23 @@ async def test_frame_driven_path_matches_the_time_driven_path() -> None:
     await legacy.run()
     await build(ReplaySource(synthetic_frames(90)), time_sink, clock=clock).run()
 
-    assert frame_sink.outputs == time_sink.outputs
+    # The frame-driven path has no ingest queue, so queue occupancy is the one
+    # field that legitimately differs. Exclude it explicitly on BOTH sides rather
+    # than overwriting one side's payload, so any other divergence still fails.
+    queue_fields = {"queue_depth", "queue_high_water"}
+
+    def comparable(outputs: list[dict[str, object]]) -> list[dict[str, object]]:
+        stripped = []
+        for output in outputs:
+            copy = dict(output)
+            block = dict(copy["session"])  # type: ignore[arg-type]
+            for field in queue_fields:
+                block.pop(field, None)
+            copy["session"] = block
+            stripped.append(copy)
+        return stripped
+
+    assert comparable(frame_sink.outputs) == comparable(time_sink.outputs)
 
 
 # --- WP-5 robustness ------------------------------------------------------------
@@ -345,7 +362,7 @@ async def test_source_generator_is_closed_when_the_loop_fails() -> None:
 
 async def test_session_block_reports_all_ten_fields() -> None:
     sink = InMemorySink()
-    await build(ReplaySource(frames_with_gap(90, 3000, 5)), sink).run()
+    await build(ReplaySource(frames_with_gap(90, 300, 5)), sink).run()
 
     block = session(sink.outputs[-1])
     assert set(block) == {
@@ -393,3 +410,73 @@ async def test_dropped_outputs_are_read_from_the_sink() -> None:
     await build(ReplaySource(synthetic_frames(70)), sink).run()
 
     assert session(sink.outputs[-1])["dropped_outputs"] == 11
+
+
+async def test_sensor_that_never_connects_reports_stale_not_warmup() -> None:
+    """A wearable that never sends must escalate, not sit in WARMUP forever.
+
+    Regression for a defect where the timeout path only reported STALE once a
+    frame had already arrived, so a sensor that was never plugged in looked
+    indistinguishable from one that was still warming up.
+    """
+
+    class SilentSource:
+        """Stay connected but never deliver a frame, like a dead wearable."""
+
+        async def frames(self) -> AsyncIterator[PpgFrame]:
+            while True:
+                await asyncio.sleep(0)
+            yield  # type: ignore[unreachable]  # pragma: no cover
+
+    sink = InMemorySink()
+    service = build(SilentSource(), sink)
+    task = asyncio.ensure_future(service.run())
+    for _ in range(40):
+        await asyncio.sleep(0)
+        if sink.outputs:
+            break
+    task.cancel()
+    with suppress(asyncio.CancelledError):
+        await task
+
+    assert sink.outputs, "a silent source must still produce a state, not silence"
+    assert sink.outputs[0]["state"] == STATE_STALE
+
+
+async def test_wrong_rate_frames_do_not_refresh_frame_age() -> None:
+    """A source at the wrong rate must not mask staleness.
+
+    Regression for a defect where the freshness timestamp was stamped before the
+    sample-rate check, so a misconfigured source held last_frame_age_seconds near
+    zero while every packet was discarded.
+    """
+
+    wrong = tuple(replace(frame, sample_rate_hz=250) for frame in synthetic_frames(5))
+
+    class WrongRateThenSilent:
+        """Deliver only wrong-rate frames, then stay open so a stale tick fires."""
+
+        async def frames(self) -> AsyncIterator[PpgFrame]:
+            for frame in wrong:
+                yield frame
+            while True:
+                await asyncio.sleep(0)
+
+    sink = InMemorySink()
+    service = build(WrongRateThenSilent(), sink)
+    task = asyncio.ensure_future(service.run())
+    for _ in range(60):
+        await asyncio.sleep(0)
+        if sink.outputs:
+            break
+    task.cancel()
+    with suppress(asyncio.CancelledError):
+        await task
+
+    assert sink.outputs, "the loop must still tick while dropping every frame"
+    block = session(sink.outputs[-1])
+    assert int(block["packets_received"]) == 0  # type: ignore[call-overload]
+    assert block["last_frame_age_seconds"] is None, (
+        "a discarded frame must not count as freshness"
+    )
+    assert sink.outputs[-1]["state"] == STATE_STALE

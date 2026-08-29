@@ -159,7 +159,7 @@ class PhysiologyService:
                 try:
                     frame = await self._wait_for(queue.get(), self._stale_after_seconds)
                 except TimeoutError:
-                    await self._emit_tick(stale=self._last_frame_ns is not None)
+                    await self._emit_tick(stale=True)
                     continue
                 if frame is None:
                     break
@@ -198,10 +198,10 @@ class PhysiologyService:
 
     async def _process_frame(self, frame: PpgFrame) -> None:
         packet = frame.packet
-        self._last_frame_ns = self._clock()
         if frame.sample_rate_hz != round(self._config.sample_rate_hz):
             self._sample_rate_mismatches += 1
             return
+        self._last_frame_ns = self._clock()
         self._packets_received += 1
         observation = self._tracker.observe(packet)
         self._session_id = observation.session_id
