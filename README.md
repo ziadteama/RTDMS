@@ -12,6 +12,7 @@ it describes.
 RTDMS/
 ├─ Home.md                  Obsidian entry point (vault map)
 ├─ CLAUDE.md                Project context for AI agents
+├─ Agent Guide.md           How to gather context, structure, and process conventions
 ├─ Report/                  Project 1 final report, transcribed section-by-section
 ├─ Subsystems/              Implementation notes, one per subsystem
 ├─ bases/                   Obsidian .base database views

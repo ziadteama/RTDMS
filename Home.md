@@ -20,6 +20,7 @@ Project 2 (the build phase this repo is for).
 
 ## Implementation (Project 2)
 
+- [[Agent Guide]] — **start here if you're an agent about to dev, explore, or delegate work**
 - [[Models Index]] — status of all three models + fusion/alert/firmware
   - [[Physiology Subsystem]] — HR/PRV fatigue inference · `models/physiology/` · **implemented**
 - [[Raspberry Pi 5 Target]] — the deployment device, surveyed live over SSH

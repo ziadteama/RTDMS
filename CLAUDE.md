@@ -1,5 +1,9 @@
 # RTDMS — Real-Time Driver Monitoring System
 
+> **New agent, about to dev or explore options?** Read [Agent Guide.md](Agent%20Guide.md) first —
+> how to gather context, this repo's structure/conventions, and how to handle delegation,
+> verification, and Pi access without repeating mistakes already paid for once.
+
 B.Sc. Final Year Project, Arab Academy for Science, Technology and Maritime Transport,
 College of Engineering and Technology, Computer Engineering Department. Report dated May 2026
 (Project 1 complete; this repo starts Project 2 — the implementation phase).
