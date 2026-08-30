@@ -20,11 +20,14 @@ Research-backed setup for the [[Raspberry Pi 5 Target]], written **2026-08-28**.
 contradicts [[5.2 Phase Two Plan|the report]], the better option wins and the divergence is recorded
 here.
 
-> [!abstract] The three decisions that actually matter
+> [!abstract] The decisions that actually matter
 > 1. **Python 3.13 on Trixie breaks MediaPipe** — the report's primary vision approach. Must choose
 >    an OS/runtime strategy before any vision work starts.
 > 2. **One PCIe connector, two things want it** — AI HAT+ and NVMe are mutually exclusive.
 > 3. **The AI HAT+ and camera do not exist yet** — every CV performance claim is unvalidated.
+> 4. **Open as of 2026-08-30: the AI HAT+ may not be strictly necessary at all** if both vision
+>    models run CPU-only with disciplined process/thread management — see
+>    [[#Open question — does the AI HAT+ turn out to be optional]]. Unmeasured; not a decision yet.
 
 ---
 
@@ -129,6 +132,74 @@ are:
 **This is the critical path.** Order the AI HAT+ 26 TOPS and the Pi IR camera 5MP 160° now; every
 downstream validation gate is behind them.
 
+> [!info] Revisited 2026-08-30
+> Procurement no longer has to block *starting* vision work — see
+> [[#Open question — does the AI HAT+ turn out to be optional|the section below]]. A camera (even a
+> cheap USB webcam) still unblocks real capture immediately; the accelerator itself may turn out to
+> be a headroom upgrade rather than a hard prerequisite. Not yet measured — still recorded here as
+> the honest critical path until it is.
+
+---
+
+## Open question — does the AI HAT+ turn out to be optional?
+
+Raised 2026-08-30, working from [[Physiology Subsystem|physiology's]] real Pi numbers rather than
+from the report's assumptions. **Not measured — a projection, flagged as such throughout.**
+
+### The case for "maybe we don't need it"
+
+Physiology's actual measured cost on this Pi ([[HIL Test Campaign]]): **1.31% of one core, 108.5 MB
+RAM** at the realistic Bluetooth packet size. That leaves roughly **3.97 of 4 cores** and **7.9 GB**
+untouched. The question is whether the two vision models can fit in that headroom on CPU alone:
+
+- **MediaPipe Face Mesh** was built for CPU/mobile-class hardware in the first place — that's the
+  whole point of the library. [[#Blocker 1 — The Python version conflict|Blocker 1]] is a *packaging*
+  problem (no Python 3.13 wheel), not a compute problem. And the report's actual requirement —
+  detecting eye closure sustained past 2–3 s, gaze deviation past 2 s — tolerates running inference
+  at a reduced rate (5–10 fps is enough to catch a multi-second event) rather than chasing full video
+  frame rate, which eases the CPU cost considerably.
+- **YOLOv5**, specifically the **nano (YOLOv5n)** variant via ONNX Runtime or ncnn at reduced input
+  resolution (320 px, not 640 px), is exactly the shape of model people run on Pi-class ARM CPUs.
+  Same logic on the latency side: the requirement is "alert within 1 s of phone use," not real-time
+  throughput — a handful of inferences per second clears that bar.
+- If both hold, all three models (physiology + 2 vision) could plausibly fit on 4 cores with real
+  headroom left, **provided the same thread-discipline already forced onto physiology's own
+  numpy/scipy calls** (`OPENBLAS_NUM_THREADS=1` etc.) is applied project-wide — three independent
+  Python processes each silently oversubscribing threads is a much more likely bottleneck than the
+  raw arithmetic load.
+
+### Why this isn't a decision yet
+
+- **Every number above is a general benchmark projection for similar models on similar-class ARM
+  hardware — not measured on this Pi, with these exact model configurations.** The same rule this
+  whole campaign has followed applies here: don't trust an unmeasured number just because the
+  reasoning sounds right.
+- **Accuracy, not just speed, is what a nano/small model trades away.** The report's ≥85–90% accuracy
+  targets need checking against the CPU-friendly variant specifically — they do not automatically
+  carry over from a larger model's published accuracy.
+- **Sustained thermal load in a vehicle is a different regime than a benchmark burst.** The report's
+  −10 °C to 50 °C operating range is exactly the scenario where continuous CPU-bound inference is
+  more likely to throttle than an NPU offload (typically more power/heat-efficient per operation).
+  This needs the real thermal-soak test this campaign already established the method for
+  ([[HIL Test Campaign#A19 — 30-minute soak|pattern to reuse]]), not a guess.
+- **This is a business call, not only an engineering one.** Dropping the AI HAT+ removes ~8,750 EGP
+  from [[4.5 Cost Calculation and BOM|the BOM]] — genuinely good news — but the 26 TOPS accelerator
+  is also a named differentiator in the report's own SWOT/positioning. That trade should be a
+  deliberate team decision, not a default outcome of an engineering shortcut.
+- **Less headroom for anything added later** (higher resolution, a smarter fusion stage, a future
+  sensor) if all three models are already load-bearing on the CPU with no accelerator to grow into.
+
+### Recommendation
+
+Don't decide either way yet. [[#Blocker 1 — The Python version conflict|Building the CPU-only path
+first]] is already the plan regardless of the eventual answer — it unblocks real logic and accuracy
+work immediately instead of sitting fully stalled behind procurement. Once both vision models exist
+and can run concurrently with physiology, measure the real numbers ([[HIL Test Campaign]]'s
+methodology — in-process CPU/RSS sampling, then a live two-process rig, then a thermal soak — is the
+template) and make the AI HAT+ call from evidence: **is it load-bearing, or is it a performance and
+future-headroom upgrade on top of a system that already works without it?** Either answer is a
+legitimate outcome; only an unmeasured one isn't.
+
 ---
 
 ## Configuration changes to apply
@@ -230,6 +301,9 @@ All three should be reflected in the final report, or defended explicitly in the
 
 ## Open questions
 
+- **Does the whole system actually need the AI HAT+, or does CPU-only + disciplined process
+  management cover it?** See
+  [[#Open question — does the AI HAT+ turn out to be optional]] — genuinely open, not decided.
 - **Is the AI HAT+ actually ordered?** Nothing on the Pi suggests it has ever been attached.
 - **Cooling solution?** The `performance` governor plus sustained triple-model inference plus a
   thermal soak requirement means passive cooling is likely insufficient. Not costed in

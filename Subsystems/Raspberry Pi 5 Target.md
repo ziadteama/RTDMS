@@ -120,6 +120,13 @@ Everything in [[5.2 Phase Two Plan]] Phase 1 and Phase 2 that depends on the acc
 is therefore **entirely unvalidated on real hardware**. The 26 TOPS figure and all CV latency
 budgets in [[3.2 Technical Description]] are, at present, assumptions.
 
+> [!info] Open question, 2026-08-30
+> Whether the accelerator is strictly required at all — as opposed to a CPU-only vision path with
+> disciplined process management — is now an open question, not an assumption either way. See
+> [[Pi Setup Plan#Open question — does the AI HAT+ turn out to be optional]]. The camera gap is
+> unaffected by this — something has to feed frames in either case, and a USB webcam unblocks that
+> immediately without waiting on the IR camera specifically.
+
 ## Interface readiness
 
 | Interface | State | Needed for |
