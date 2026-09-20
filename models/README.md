@@ -1,50 +1,71 @@
 # Models
 
-The three detection models described in the Project 1 report (§3.1 System Architecture), plus the
-fusion layer that combines them.
+The detection models described in the Project 1 report (§3.1 System Architecture), plus the
+fusion layer that will combine them.
 
 | Model | Directory | Detects | Approach | Status |
 |---|---|---|---|---|
-| Physiology | `physiology/` | Fatigue/stress from HR + PRV | Wrist PPG (MAX30102) → filter → peaks → features → logistic regression | **Implemented** (replay pipeline) |
-| Vision — drowsiness | *(pending)* | Eye closure, PERCLOS, blink rate, head pose | MediaPipe Face Mesh → EAR/PERCLOS | Planned |
-| Vision — distraction | *(pending)* | Phone usage, gaze deviation | YOLOv5 object detection + gaze/head-pose | Planned |
+| Physiology | `physiology/` | Fatigue/stress from HR + PRV | Wrist PPG → filter → peaks → features → logistic regression | **Implemented** (replay pipeline) |
+| Face (drowsiness + gaze) | `face/` | Eye closure, PERCLOS, blink, gaze, head pose | MediaPipe Face Landmarker → arithmetic channels → `StateReport` | **Implemented** (core + demo runner) |
+| Vision — phone | *(pending)* | Phone usage | YOLOv5 / Hailo object detection | Planned |
+| Decision fusion | *(pending)* | Combines all models → risk level | Consumes scores + quality; owns alerts | Planned (Phase 4) |
 
-Decision fusion consumes all three and owns the alert decision. No individual model emits an alert
-on its own — see the physiology subsystem's architecture doc for why that boundary matters.
+Decision fusion consumes model outputs and owns the alert decision. No individual model owns
+production cabin alerts — see each subsystem's architecture doc. Face's `run.py` may buzz for
+demos; that path is explicitly non-production.
 
 ## Naming note
 
-`physiology/models/` (nested) holds **trained model artifacts** (JSON), not subsystems. The outer
-`models/` directory here holds the subsystems. The nesting is inherited from the upstream project
-layout and its Dockerfile; renaming it would be churn for cosmetics.
+`physiology/models/` and `face/models/` (nested) hold **trained / vendor model artifacts**, not
+subsystems. The outer `models/` directory here holds the subsystems.
+
+## Ownership — parallel work
+
+Path ownership alone is not enough — **branching is mandatory**. Agents and humans follow
+trunk-based, zone-scoped short-lived branches defined in `.cursor/rules/git-branching.mdc`
+(always applied in Cursor; also summarised in `Agent Guide.md`).
+
+| Zone | Owner | Path | Branch prefix |
+|---|---|---|---|
+| Face vision | Youssef | `models/face/` | `face/` |
+| Physiology | Ziad | `models/physiology/` | `physio/` |
+| Phone detection | TBD | `models/phone/` (create when work starts) | `phone/` |
+| Fusion + production alerts | Joint / Phase 4 | not created yet | `fusion/` |
+| Shared status docs | Anyone, **tiny PRs only** | `models/README.md`, root `README.md`, `CLAUDE.md`, `Subsystems/Models Index.md` | `docs/` |
+
+Rules that keep merges clean:
+
+1. **One subsystem tree per PR.** Do not mix `face/` and `physiology/` edits.
+2. **Never commit model code on `main`** — branch first (`face/<topic>`, `physio/<topic>`, …).
+3. **Shared-doc bumps are separate** `docs/` PRs after the code PR merges.
+4. **New shared contracts** (JSON schemas, socket paths) are proposed under `Subsystems/` before
+   both sides implement.
+5. **Artifacts stay local to the package** (`face/models/*.task`, `physiology/models/*.json`).
+6. Rebase/sync onto `origin/main` before opening or updating a PR.
 
 ## Adding a new model
 
-Follow the shape `physiology/` already establishes:
+Follow the shape `physiology/` and `face/` already establish:
 
 ```
 models/<name>/
-├─ pyproject.toml       pinned runtime + dev/train extras
+├─ pyproject.toml       pinned runtime + dev extras
 ├─ Dockerfile           multi-stage: base → development → runtime
-├─ compose.yaml         `verify` (test+lint+typecheck) and a run/simulate service
+├─ compose.yaml         `verify` (test + lint) is mandatory
 ├─ configs/             tunable defaults, not hardcoded constants
 ├─ docs/
 │  ├─ ARCHITECTURE.md   contracts, data flow, failure policy
-│  └─ VALIDATION.md     what evidence gates a release
+│  ├─ VALIDATION.md     what evidence gates a release
+│  └─ EVIDENCE.md       what has actually been measured
 ├─ src/<package>/
 ├─ tests/
-└─ tools/               training, benchmarking, dataset validation scripts
+└─ tools/               training, benchmarking, hardware scripts (optional)
 ```
 
-Key conventions worth carrying over, because they are what make the physiology subsystem
-Pi-deployable:
+Key conventions:
 
-- **Runtime deps stay minimal.** Training-only dependencies (scikit-learn) must not enter the
-  runtime path. Export trained models as plain JSON/ONNX artifacts — never unpickle at runtime.
-- **Quality gating is not optional.** A model must be able to say "I don't know" (null output) when
-  its input is bad, rather than emitting a confident wrong number.
+- **Runtime deps stay minimal.** Training-only dependencies must not enter the runtime path.
+- **Quality gating is not optional.** Bad input → null / `UNAVAILABLE`, not a confident wrong number.
 - **Fusion owns thresholds and alerts.** Models emit continuous scores and quality state.
-- **Docker is the canonical environment**, so verification does not depend on the workstation's
-  Python version.
-- **Resource budgets are explicit** and validated on the actual Pi with the other models running
-  concurrently — a standalone benchmark proves nothing about contention.
+- **Docker is the canonical verify environment** where practical.
+- **Resource budgets are explicit** and eventually validated on the Pi with other models running.

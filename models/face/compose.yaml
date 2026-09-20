@@ -1,0 +1,30 @@
+services:
+  verify:
+    build:
+      context: .
+      target: development
+    # Unit tests only — no camera, no MediaPipe inference required for the
+    # deterministic core suite. Full live/Pi gates live in docs/VALIDATION.md.
+    command: >
+      sh -c "pytest && ruff check src tests"
+    volumes:
+      - .:/app
+    environment:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+
+  verify-py313:
+    build:
+      context: .
+      target: development
+      args:
+        PYTHON_VERSION: "3.13"
+    command: >
+      sh -c "pytest && ruff check src tests"
+    environment:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"

@@ -53,6 +53,9 @@ deleted 32 lines. Read it as "how to not re-pay for those," not as bureaucracy.
   `Report/` is the Project-1 final report, transcribed verbatim, section by section. `Subsystems/`
   is living implementation notes, one per subsystem, updated as work happens — not a one-time dump.
   `bases/` holds Obsidian database views over the vault.
+- **Git branching is mandatory for all agents** — trunk-based, zone-scoped short-lived branches so
+  face and physiology never collide. Full rule: `.cursor/rules/git-branching.mdc` (always applied).
+  Never commit model code on `main`; use `face/<topic>`, `physio/<topic>`, `docs/<topic>`, etc.
 - **Documentation convention** (don't violate it by duplicating): code-level docs — architecture,
   contracts, validation plans, evidence — live in each component's own `docs/`. Project-level notes,
   cross-subsystem context, and anything narrative (why a decision was made, what was tried and
@@ -166,10 +169,14 @@ These are cross-model architectural decisions, not one component's preference �
 | Project overview, objectives, hardware BOM | [[../CLAUDE.md\|CLAUDE.md]] |
 | Vault entry point | [[Home]] |
 | Cross-model architectural principles | [[Models Index]] |
+| Parallel-work ownership zones | `models/README.md` → Ownership |
 | Pi hardware facts + access | [[Raspberry Pi 5 Target]] |
 | Researched Pi configuration + open questions | [[Pi Setup Plan]] |
 | Physiology model contracts | `models/physiology/docs/ARCHITECTURE.md` |
 | Physiology model evidence (what's actually measured) | `models/physiology/docs/EVIDENCE.md` |
 | Physiology hardware-in-the-loop narrative log | [[HIL Test Campaign]] |
+| Face model contracts | `models/face/docs/ARCHITECTURE.md` |
+| Face model evidence | `models/face/docs/EVIDENCE.md` |
+| Face subsystem narrative | [[Face Subsystem]] |
 | New-model conventions | `models/README.md` |
 | Adopted agent skills | `.claude/skills/` |

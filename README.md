@@ -16,8 +16,9 @@ RTDMS/
 ├─ Report/                  Project 1 final report, transcribed section-by-section
 ├─ Subsystems/              Implementation notes, one per subsystem
 ├─ bases/                   Obsidian .base database views
-├─ models/                  The three DMS detection models
-│  └─ physiology/           HR/HRV fatigue inference from wrist PPG  [IMPLEMENTED]
+├─ models/                  DMS detection models (independent packages)
+│  ├─ physiology/           HR/PRV fatigue inference from wrist PPG  [IMPLEMENTED]
+│  └─ face/                 EAR/PERCLOS/gaze/head-pose (MediaPipe)   [IMPLEMENTED]
 └─ .claude/skills/          Agent skills adopted into this workspace
 ```
 
@@ -26,16 +27,16 @@ RTDMS/
 | Component | Path | Status |
 |---|---|---|
 | Physiology (HR/PRV, fatigue) | `models/physiology/` | Replay pipeline implemented; hardware + trained artifact pending |
-| Vision — drowsiness (PERCLOS/EAR) | `models/` *(not yet created)* | Planned — Phase 2 |
-| Vision — distraction (gaze, phone) | `models/` *(not yet created)* | Planned — Phase 2 |
+| Face (drowsiness + gaze) | `models/face/` | Core + demo runner; Pi throughput pending |
+| Vision — phone | `models/phone/` *(not yet created)* | Planned — Phase 2 |
 | Decision fusion | *(not yet created)* | Planned — Phase 4 |
 | Alert subsystem (buzzer/vibration) | *(not yet created)* | Planned — Phase 4 |
 | Wearable firmware (ESP32-C3) | *(not yet created)* | Planned — Phase 1 |
 | Application / dashboard | *(deferred)* | Scope not yet decided |
 
-New components follow the same shape as `models/physiology/`: a self-contained project with its own
-`pyproject.toml` (or equivalent), `src/`, `tests/`, `docs/`, and Docker-based verification, so each
-can be developed and tested independently before integration.
+Each model is a self-contained package (`pyproject.toml`, `src/`, `tests/`, `docs/`, Docker
+`verify`) so teammates can develop in parallel. Ownership and conflict-avoidance rules:
+[models/README.md](models/README.md#ownership--parallel-work).
 
 ## Quickstart — physiology
 
@@ -49,6 +50,19 @@ docker compose run --rm simulate   # 70s synthetic PPG replay
 
 See [models/physiology/README.md](models/physiology/README.md) and its
 [docs/ARCHITECTURE.md](models/physiology/docs/ARCHITECTURE.md).
+
+## Quickstart — face
+
+```bash
+cd models/face
+pip install -e ".[dev,bench]"
+pytest                             # no camera needed
+python run.py --calibrate          # live webcam / Pi camera
+docker compose run --rm verify     # canonical gate when Docker is available
+```
+
+See [models/face/README.md](models/face/README.md), [START-HERE.md](models/face/START-HERE.md),
+and [docs/ARCHITECTURE.md](models/face/docs/ARCHITECTURE.md).
 
 ## Documentation convention
 

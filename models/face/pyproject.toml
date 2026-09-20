@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dms-face"
+version = "0.1.0"
+description = "Face-based driver monitoring: EAR, blink, PERCLOS, gaze, and head pose from one MediaPipe inference per frame."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Youssef Medhat" },
+  { name = "DMS Graduation Project" },
+]
+dependencies = [
+  "mediapipe>=1.0.0",
+  "opencv-python>=4.8",
+  "numpy>=1.24,<3",
+]
+
+[project.optional-dependencies]
+bench = ["psutil>=5.9"]
+dev = [
+  "pytest>=8.3,<9",
+  "ruff>=0.8,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dms_face"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+# Upstream face code is intentionally lightly typed and uses short names in
+# hot paths; expand the rule set as the package is hardened, not on day one.
+ignore = ["E501"]

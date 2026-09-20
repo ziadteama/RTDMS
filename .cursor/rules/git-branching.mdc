@@ -1,0 +1,56 @@
+---
+description: Trunk-based git branching + path zones so parallel face/physiology work never collides
+alwaysApply: true
+---
+
+# Git branching (RTDMS)
+
+Trunk-based development with **short-lived, zone-scoped** branches. Do not use long-lived
+`develop`/`release` branches or commit subsystem work straight to `main`.
+
+## Before any edit
+
+1. `git status` + `git branch --show-current`
+2. If on `main` and the task changes code: create/switch to a zone branch first
+3. Touch only paths allowed for that zone (table below)
+
+## Branch names
+
+```
+<zone>/<short-topic>
+```
+
+| Zone prefix | Allowed paths | Typical owner |
+|---|---|---|
+| `face/` | `models/face/**` | Youssef |
+| `physio/` | `models/physiology/**` | Ziad |
+| `phone/` | `models/phone/**` | TBD |
+| `fusion/` | fusion/alert packages when they exist | Joint |
+| `docs/` | shared status only: root `README.md`, `CLAUDE.md`, `Agent Guide.md`, `Home.md`, `models/README.md`, `Subsystems/Models Index.md`, `Subsystems/*` narrative | Anyone |
+| `meta/` | `.cursor/rules/**`, `.github/**`, repo tooling | Anyone |
+
+Examples: `face/perclos-window`, `physio/ble-reconnect`, `docs/models-status`.
+
+## Hard rules for agents
+
+- **One zone per branch / PR.** Never mix `models/face/` and `models/physiology/` in the same change.
+- **No direct commits to `main`** for model code. Branch → commit → PR (or ask the user to PR).
+- **Shared-doc bumps are a separate `docs/` PR** after the code PR merges — not bundled with large code diffs.
+- **Sync before finishing:** `git fetch origin && git rebase origin/main` (or merge) on your zone branch so it is not stale.
+- **New cross-model contracts** (schemas, sockets): write a short note under `Subsystems/` on a `docs/` branch and get agreement before both sides implement.
+- Prefer **small, mergeable slices** over multi-day branches. Incomplete features stay behind flags / unused entrypoints, not on a divergent branch.
+
+## Conflict avoidance checklist
+
+```
+❌ edit face + physiology in one PR
+❌ commit WIP model code on main
+❌ put phone weights under models/face/
+❌ invent a fusion JSON shape only on one side
+
+✅ face/<topic> touching only models/face/
+✅ physio/<topic> touching only models/physiology/
+✅ docs/<topic> for one-line status table updates
+```
+
+Full ownership narrative: `models/README.md` → Ownership. Vault: `Subsystems/Models Index.md`.

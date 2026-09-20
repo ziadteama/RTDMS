@@ -1,0 +1,17 @@
+# CODEOWNERS — review routing for parallel zones
+# Matches models/README.md ownership. GitHub uses this when PRs are opened.
+
+# Default: either teammate can review shared/meta paths
+* @ziadteama @youssefmedhat4
+
+# Physiology — Ziad
+/models/physiology/ @ziadteama
+
+# Face vision — Youssef
+/models/face/ @youssefmedhat4
+
+# Shared status docs — either, keep PRs tiny
+/README.md @ziadteama @youssefmedhat4
+/CLAUDE.md @ziadteama @youssefmedhat4
+/models/README.md @ziadteama @youssefmedhat4
+/Subsystems/Models\ Index.md @ziadteama @youssefmedhat4
