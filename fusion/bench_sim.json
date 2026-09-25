@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "mode": "concurrent_no_hardware",
+  "wall_s": 31.04,
+  "host": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.10",
+    "logical_cores": 20,
+    "ram_gb": 16.8,
+    "note": "Laptop/host numbers \u2014 not Pi. Scale factor in assessment is heuristic only."
+  },
+  "models": [
+    {
+      "name": "fusion",
+      "ticks": 249,
+      "wall_s": 25.03,
+      "latency_ms_mean": 0.018,
+      "cpu_percent_mean": 0.1,
+      "rss_mb": 23.4
+    },
+    {
+      "name": "phone",
+      "publishes": 118,
+      "skipped_rate_limit": 375,
+      "wall_s": 25.03,
+      "target_hz": 5.0,
+      "achieved_hz": 4.72,
+      "latency_ms_mean": 7.61,
+      "latency_ms_p95": 7.88,
+      "cpu_percent_mean": 3.9,
+      "rss_mb": 83.9,
+      "last_top_class": "safe",
+      "backend": "Z:\\RTDMS\\models\\phone\\models\\phone_cls.onnx"
+    },
+    {
+      "name": "face",
+      "frames": 372,
+      "wall_s": 25.04,
+      "target_hz": 15.0,
+      "achieved_hz": 14.85,
+      "latency_ms_mean": 8.54,
+      "latency_ms_p95": 10.37,
+      "cpu_percent_mean": 13.5,
+      "rss_mb": 114.4,
+      "last_state": "alert"
+    },
+    {
+      "name": "physiology",
+      "outputs": 25,
+      "wall_s": 25.22,
+      "cpu_percent_mean": 0.6,
+      "rss_mb": 101.8,
+      "last_state": "WARMUP",
+      "last_hr": null
+    }
+  ],
+  "thread_env": {
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1"
+  },
+  "assessment": {
+    "host_cpu_percent_sum": 18.1,
+    "est_pi_cpu_percent_sum": 36.2,
+    "rss_mb_sum": 323.5,
+    "verdict": "likely_ok_on_pi5_cpu",
+    "notes": [
+      "Host concurrent process CPU% sum \u2248 18% of one logical core (face 13.5, phone 3.9, physio 0.6, fusion 0.1).",
+      "Naive Pi estimate \u00d72.0: ~36% of one Pi core equivalent (very rough \u2014 re-measure on device).",
+      "Combined RSS \u2248 324 MB on host (Pi RSS usually similar order).",
+      "Face p95 10.37 ms looks compatible with ~15 fps on this host.",
+      "Phone p95 7.88 ms OK for 5 Hz / <1 s alert."
+    ]
+  }
+}

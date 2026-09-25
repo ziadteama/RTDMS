@@ -15,5 +15,16 @@ Pi-first: keep this process tiny; no ML here.
 cd fusion
 pip install -e ".[dev]"
 pytest
-python -m dms_fusion.stub_demo
+python -c "from dms_fusion import stub_demo; stub_demo()"
 ```
+
+## Concurrent no-hardware simulation
+
+Assesses CPU/RSS/latency with face + phone + physiology + fusion together (still image,
+synthetic PPG, ONNX phone — no camera/ESP):
+
+```bash
+py -3.12 fusion/tools/sim_concurrent_pipeline.py --seconds 30 --json fusion/bench_sim.json
+```
+
+Write-up: [`docs/PIPELINE_SIM_ASSESSMENT.md`](docs/PIPELINE_SIM_ASSESSMENT.md).
