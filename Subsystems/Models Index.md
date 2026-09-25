@@ -20,8 +20,8 @@ consume them. Code lives in `models/`; see `models/README.md` for on-disk conven
 |---|---|---|---|---|
 | Physiology | [[Physiology Subsystem]] | `models/physiology/` | Fatigue/stress from HR + PRV | **Replay pipeline implemented** |
 | Face (drowsiness + gaze) | [[Face Subsystem]] | `models/face/` | Eye closure, PERCLOS, blink, gaze, head pose | **Core + demo runner** |
-| Vision — phone | *(pending)* | `models/phone/` *(not yet)* | Phone usage | Planned |
-| Decision fusion | *(pending)* | *(pending)* | Combines models → risk level | Planned (Phase 4) |
+| Phone / eating | [[Phone Subsystem]] | `models/phone/` | Phone + eating distraction scores | **ONNX wired** (Safe-Drive-TN) |
+| Decision fusion | *(stub)* | `fusion/` | Combines models → alert pattern | **Stub `decide()`** |
 | Alert subsystem | *(pending)* | *(pending)* | Buzzer + vibration patterns | Planned (Phase 4) |
 | Wearable firmware | *(pending)* | *(pending)* | ESP32-C3 + MAX30102, BLE only | Planned (Phase 1) |
 
@@ -38,10 +38,13 @@ consume them. Code lives in `models/`; see `models/README.md` for on-disk conven
 | Face | Youssef | `models/face/` | `face/<topic>` |
 | Physiology | Ziad | `models/physiology/` | `physio/<topic>` |
 | Phone | TBD | `models/phone/` | `phone/<topic>` |
+| Fusion | Joint | `fusion/` | `fusion/<topic>` |
 | Shared status docs | Tiny PRs only | root README, `models/README.md`, this note, `CLAUDE.md` | `docs/<topic>` |
 
-**Binding rule for every agent:** `.cursor/rules/git-branching.mdc` — trunk-based, one zone per
-branch/PR, no model commits on `main`. Narrative: `models/README.md` → Ownership.
+**Binding rules for every agent:**
+
+- `.cursor/rules/git-branching.mdc` — trunk-based, one zone per branch/PR
+- `.cursor/rules/pi-performance-pipeline.mdc` — prioritize concurrent Pi performance and pipeline
 
 ## Architectural principles
 

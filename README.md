@@ -18,7 +18,9 @@ RTDMS/
 ├─ bases/                   Obsidian .base database views
 ├─ models/                  DMS detection models (independent packages)
 │  ├─ physiology/           HR/PRV fatigue inference from wrist PPG  [IMPLEMENTED]
-│  └─ face/                 EAR/PERCLOS/gaze/head-pose (MediaPipe)   [IMPLEMENTED]
+│  ├─ face/                 EAR/PERCLOS/gaze/head-pose (MediaPipe)   [IMPLEMENTED]
+│  └─ phone/                phone + eating distraction (ONNX @ 5 Hz) [SCAFFOLDED]
+├─ fusion/                  Decision fusion stub (owns alerts)       [STUB]
 └─ .claude/skills/          Agent skills adopted into this workspace
 ```
 
@@ -28,9 +30,9 @@ RTDMS/
 |---|---|---|
 | Physiology (HR/PRV, fatigue) | `models/physiology/` | Replay pipeline implemented; hardware + trained artifact pending |
 | Face (drowsiness + gaze) | `models/face/` | Core + demo runner; Pi throughput pending |
-| Vision — phone | `models/phone/` *(not yet created)* | Planned — Phase 2 |
-| Decision fusion | *(not yet created)* | Planned — Phase 4 |
-| Alert subsystem (buzzer/vibration) | *(not yet created)* | Planned — Phase 4 |
+| Phone / eating distraction | `models/phone/` | ONNX wired from Safe-Drive-TN; Pi concurrent bench pending |
+| Decision fusion | `fusion/` | Stub `decide()` mapping scores → alert patterns |
+| Alert subsystem (buzzer/vibration) | *(GPIO from fusion later)* | Planned — Phase 4 |
 | Wearable firmware (ESP32-C3) | *(not yet created)* | Planned — Phase 1 |
 | Application / dashboard | *(deferred)* | Scope not yet decided |
 

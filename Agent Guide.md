@@ -56,6 +56,9 @@ deleted 32 lines. Read it as "how to not re-pay for those," not as bureaucracy.
 - **Git branching is mandatory for all agents** — trunk-based, zone-scoped short-lived branches so
   face and physiology never collide. Full rule: `.cursor/rules/git-branching.mdc` (always applied).
   Never commit model code on `main`; use `face/<topic>`, `physio/<topic>`, `docs/<topic>`, etc.
+- **Pi performance is mandatory for all agents** — optimize for the concurrent Raspberry Pi 5
+  pipeline (shared capture, rate limits, ONNX, thread caps), not laptop-only demos. Full rule:
+  `.cursor/rules/pi-performance-pipeline.mdc`.
 - **Documentation convention** (don't violate it by duplicating): code-level docs — architecture,
   contracts, validation plans, evidence — live in each component's own `docs/`. Project-level notes,
   cross-subsystem context, and anything narrative (why a decision was made, what was tried and
@@ -169,7 +172,8 @@ These are cross-model architectural decisions, not one component's preference �
 | Project overview, objectives, hardware BOM | [[../CLAUDE.md\|CLAUDE.md]] |
 | Vault entry point | [[Home]] |
 | Cross-model architectural principles | [[Models Index]] |
-| Parallel-work ownership zones | `models/README.md` → Ownership |
+| Parallel-work ownership zones | `models/README.md` → Ownership; `.cursor/rules/git-branching.mdc` |
+| Pi performance / pipeline priority | `.cursor/rules/pi-performance-pipeline.mdc` |
 | Pi hardware facts + access | [[Raspberry Pi 5 Target]] |
 | Researched Pi configuration + open questions | [[Pi Setup Plan]] |
 | Physiology model contracts | `models/physiology/docs/ARCHITECTURE.md` |
@@ -178,5 +182,8 @@ These are cross-model architectural decisions, not one component's preference �
 | Face model contracts | `models/face/docs/ARCHITECTURE.md` |
 | Face model evidence | `models/face/docs/EVIDENCE.md` |
 | Face subsystem narrative | [[Face Subsystem]] |
+| Phone model contracts | `models/phone/docs/ARCHITECTURE.md` |
+| Phone subsystem narrative | [[Phone Subsystem]] |
+| Fusion stub | `fusion/` |
 | New-model conventions | `models/README.md` |
 | Adopted agent skills | `.claude/skills/` |

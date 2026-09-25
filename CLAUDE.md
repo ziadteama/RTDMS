@@ -153,7 +153,10 @@ Monorepo. See [README.md](README.md) for the full map and `models/README.md` for
 new model must follow (including **ownership zones for parallel work**).
 
 **Branching (all agents):** trunk-based + zone prefixes — see `.cursor/rules/git-branching.mdc`
-(`face/<topic>`, `physio/<topic>`, `docs/<topic>`, …). Do not commit model code on `main`.
+(`face/<topic>`, `physio/<topic>`, `phone/<topic>`, `docs/<topic>`, …). Do not commit model code on `main`.
+
+**Pi performance (all agents):** always prioritize concurrent Raspberry Pi pipeline cost — see
+`.cursor/rules/pi-performance-pipeline.mdc`.
 
 - `models/physiology/` — HR/PRV fatigue inference from wrist PPG. **Implemented** (replay pipeline;
   hardware + trained artifact pending). Python 3.11, strict mypy, Docker-verified. Adopted
@@ -165,7 +168,11 @@ new model must follow (including **ownership zones for parallel work**).
   `github.com/youssefmedhat4/dms-face` commit `65e3afd`. Phone detection stays a future
   `models/phone/` so YOLO work does not collide with face work. Notes:
   [Subsystems/Face Subsystem.md](Subsystems/Face%20Subsystem.md).
-- Fusion, production alerts, wearable firmware, and the app: not yet created.
+- `models/phone/` — phone + eating distraction classifier for fusion. **ONNX wired** (Safe-Drive-TN
+  State Farm weights + 10→3 collapse; Pi concurrent bench pending; AUC deferred). Notes:
+  [Subsystems/Phone Subsystem.md](Subsystems/Phone%20Subsystem.md).
+- `fusion/` — decision stub (`decide()` → alert patterns). GPIO wiring still pending.
+- Wearable firmware and the app: not yet created.
 
 Verify physiology with `cd models/physiology && docker compose run --rm verify` (Docker is
 canonical — no Python 3.11 on this machine).

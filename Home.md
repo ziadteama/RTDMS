@@ -24,6 +24,7 @@ Project 2 (the build phase this repo is for).
 - [[Models Index]] — status of all models + fusion/alert/firmware
   - [[Physiology Subsystem]] — HR/PRV fatigue inference · `models/physiology/` · **implemented**
   - [[Face Subsystem]] — EAR/PERCLOS/gaze/head-pose · `models/face/` · **implemented (core)**
+  - [[Phone Subsystem]] — phone/eating distraction · `models/phone/` · **ONNX wired**
 - [[Raspberry Pi 5 Target]] — the deployment device, surveyed live over SSH
 - [[Pi Setup Plan]] — researched optimal configuration + the blockers to resolve first
 

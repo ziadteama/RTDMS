@@ -1,0 +1,48 @@
+---
+description: Always prioritize Raspberry Pi 5 performance and the live multi-model pipeline
+alwaysApply: true
+---
+
+# Pi performance and pipeline first
+
+RTDMS deploys to **one Raspberry Pi 5** running face + phone + physiology + fusion
+concurrently. Every design and code choice must optimize for that pipeline, not for
+laptop convenience or single-model demos.
+
+## Priority order (highest first)
+
+1. **Concurrent Pi budget** — CPU, RSS, latency, thermals with all models live
+2. **End-to-end alert latency** — report target under 500 ms system; phone alert under 1 s
+3. **Shared capture / rate control** — one camera reader; decimate heavy models (phone ~5 Hz)
+4. **Thread discipline** — `OPENBLAS_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, no BLAS oversubscribe
+5. **Exportable edge artifacts** — ONNX/INT8 (Hailo HEF later); no training stacks on the Pi
+6. **Laptop DX** — useful, but never at the cost of 1–5
+
+## Hard rules for agents
+
+- Prefer a change that is **slower to write but cheaper on the Pi** over a clever laptop-only path.
+- Do **not** merge face / phone / physiology into one neural net to “save” processes — optimize I/O
+  and scheduling instead (shared frame ring, decimation, separate sockets into fusion).
+- Do **not** add per-frame work to a model that fusion only needs at 1–5 Hz.
+- Do **not** claim a resource budget from a standalone bench; gate on **concurrent** measurement
+  (see `Subsystems/Pi Setup Plan.md`, `models/*/docs/EVIDENCE.md`).
+- Before proposing PyTorch/TF runtime on the Pi: require an ONNX (or Hailo) path.
+- When unsure between accuracy and Pi headroom: keep accuracy gates for the **graded metric**,
+  cut resolution / FPS / model size first (224–320 px, nano weights, 5 Hz phone).
+
+## Pipeline shape to protect
+
+```
+capture (1x) → face (~15 fps) + phone (~5 Hz)
+BLE/replay → physiology
+all three → fusion → GPIO alerts
+```
+
+Models **report** (scores + quality). Fusion **decides** alerts. Demo buzzers in model `run.py`
+files are not the production path.
+
+## References
+
+- Device facts: `Subsystems/Raspberry Pi 5 Target.md`
+- Budgets / HAT question: `Subsystems/Pi Setup Plan.md`
+- Branching zones: `.cursor/rules/git-branching.mdc`

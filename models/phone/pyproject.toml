@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dms-phone"
+version = "0.1.0"
+description = "Cabin distraction classifier (phone + eating) for RTDMS fusion on Raspberry Pi 5."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "DMS Graduation Project" }]
+dependencies = [
+  "numpy>=1.24,<3",
+]
+
+[project.optional-dependencies]
+runtime = [
+  "onnxruntime>=1.17,<2",
+  "opencv-python-headless>=4.8",
+]
+train = [
+  "ultralytics>=8.0",
+]
+dev = [
+  "pytest>=8.3,<9",
+  "ruff>=0.8,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dms_phone"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]

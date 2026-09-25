@@ -1,0 +1,14 @@
+services:
+  verify:
+    build:
+      context: .
+      target: development
+    command: >
+      sh -c "pytest && ruff check src tests"
+    volumes:
+      - .:/app
+    environment:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"

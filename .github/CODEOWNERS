@@ -10,6 +10,12 @@
 # Face vision — Youssef
 /models/face/ @youssefmedhat4
 
+# Phone / eating distraction
+/models/phone/ @ziadteama @youssefmedhat4
+
+# Decision fusion
+/fusion/ @ziadteama @youssefmedhat4
+
 # Shared status docs — either, keep PRs tiny
 /README.md @ziadteama @youssefmedhat4
 /CLAUDE.md @ziadteama @youssefmedhat4

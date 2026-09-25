@@ -12,19 +12,23 @@ aliases:
 status: bare-stock-install
 code_path: (deployment target)
 language: Debian 13 trixie / arm64
-surveyed: 2026-08-28
+surveyed: 2026-09-20
 ---
 
 # Raspberry Pi 5 — Target Device
 
 ↑ [[Home]] | [[Models Index]] | Setup plan: [[Pi Setup Plan]]
 
-The physical machine everything deploys to. Surveyed live over SSH on **2026-08-28**.
+The physical machine everything deploys to. First surveyed **2026-08-28**; re-checked over SSH on
+**2026-09-20** (LAN `192.168.100.181` and Tailscale `100.113.107.122` both answered).
 
 > [!warning] Current state: bare stock install
 > The Pi is a clean Raspberry Pi OS install with **no project dependencies, no AI accelerator, and
-> no camera attached**. Two of the four BOM'd hardware items are not present. See
-> [[#Hardware gaps]].
+> no camera attached**. Wearable not present either. See [[#Hardware gaps]].
+
+> [!important] Agent priority
+> All agents must optimize for **this** box and the concurrent face + phone + physiology + fusion
+> pipeline — see `.cursor/rules/pi-performance-pipeline.mdc`.
 
 ## Access
 
@@ -67,8 +71,8 @@ repo that may be pushed to GitHub. Use the SSH key.
 | Bluetooth | BlueZ 5.82, `hci0` UART, `2C:CF:67:B6:26:3B`, active + enabled |
 | Network | eth0 wired 192.168.100.181; wlan0 **down**; tailscale0 up |
 | Bootloader | Up to date (2026-05-26) |
-| Thermals | 43.9 °C idle, `throttled=0x0` — healthy |
-| Uptime at survey | 39 min, load 0.07 |
+| Thermals | 48.3 °C idle (2026-09-20), `throttled=0x0` — healthy |
+| Uptime at first survey | 39 min, load 0.07 (2026-08-28) |
 
 ## Software
 
@@ -140,17 +144,22 @@ budgets in [[3.2 Technical Description]] are, at present, assumptions.
 
 ## Health baseline
 
-Recorded 2026-08-28 for later comparison during the concurrent benchmark
-([[Physiology Subsystem#Resource budget Pi 5]]):
+| When | Idle temp | Throttled | RAM used | Notes |
+|---|---|---|---|---|
+| 2026-08-28 | 43.9 °C | `0x0` | ~582 MiB / 7.9 GiB | First survey |
+| 2026-09-20 | 48.3 °C | `0x0` | ~567 MiB / 7.9 GiB | Still no camera / no Hailo |
 
-- Idle temp **43.9 °C**, no throttling (`0x0`)
-- Idle load **0.07**, 582 MiB used of 7.9 GiB
-- ARM clock 2.4 GHz
+ARM clock 2.4 GHz both surveys. Re-measure under the full three-model workload — physiology gates
+are defined relative to a *concurrent* baseline, not an idle one.
 
-Re-measure these under the full three-model workload — the physiology subsystem's gates are defined
-relative to a *concurrent* baseline, not an idle one.
+## Access note (2026-09-20)
+
+Tailscale SSH to `100.113.107.122` answered `OK` interactively this session. Prefer **LAN + key**
+for automation anyway — Tailscale check-mode can still demand browser re-auth mid-script. See
+[[#Access]].
 
 ## Next steps
 
-See [[Pi Setup Plan]] for the researched, prioritised setup — including the Python version conflict
-that blocks MediaPipe, and the PCIe contention between the AI HAT+ and NVMe.
+See [[Pi Setup Plan]] and [[Phone Subsystem]]. Immediate software path without camera/wearable:
+phone ONNX still-image bench + shared video capture + fusion stub. Hardware still blocks live CV
+and real PPG.

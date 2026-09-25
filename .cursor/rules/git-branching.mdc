@@ -25,11 +25,13 @@ Trunk-based development with **short-lived, zone-scoped** branches. Do not use l
 | `face/` | `models/face/**` | Youssef |
 | `physio/` | `models/physiology/**` | Ziad |
 | `phone/` | `models/phone/**` | TBD |
-| `fusion/` | fusion/alert packages when they exist | Joint |
+| `fusion/` | `fusion/**` | Joint |
 | `docs/` | shared status only: root `README.md`, `CLAUDE.md`, `Agent Guide.md`, `Home.md`, `models/README.md`, `Subsystems/Models Index.md`, `Subsystems/*` narrative | Anyone |
 | `meta/` | `.cursor/rules/**`, `.github/**`, repo tooling | Anyone |
 
-Examples: `face/perclos-window`, `physio/ble-reconnect`, `docs/models-status`.
+Examples: `face/perclos-window`, `physio/ble-reconnect`, `phone/statefarm-train`, `docs/models-status`.
+
+Also always apply `.cursor/rules/pi-performance-pipeline.mdc` — Pi concurrent performance beats laptop DX.
 
 ## Hard rules for agents
 
