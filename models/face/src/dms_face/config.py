@@ -129,6 +129,11 @@ class CameraConfig:
 @dataclass
 class LandmarkerConfig:
     model_path: str = "models/face_landmarker.task"
+    # "mediapipe" = Tasks API (dev machines). "litert" = the same .tflite
+    # networks on the bare LiteRT runtime -- no MediaPipe install, ~3 ms/frame
+    # on one Pi 5 core, so it is the Pi default (see landmarker_litert.py).
+    backend: str = "mediapipe"
+    num_threads: int = 1  # litert only; 1 keeps cores free for the other models
     min_face_detection_confidence: float = 0.5
     min_face_presence_confidence: float = 0.5
     min_tracking_confidence: float = 0.5
