@@ -62,7 +62,12 @@ class FacePipeline:
         self.height = height or cfg.camera.height
         self.profile = profile or DriverProfile()
 
-        self.landmarker = FaceLandmarkerWrapper(cfg.landmarker, self.width, self.height)
+        if cfg.landmarker.backend == "litert":
+            from .landmarker_litert import LiteRTFaceLandmarker
+
+            self.landmarker = LiteRTFaceLandmarker(cfg.landmarker, self.width, self.height)
+        else:
+            self.landmarker = FaceLandmarkerWrapper(cfg.landmarker, self.width, self.height)
 
         if camera_calib:
             self.headpose = HeadPoseEstimator.from_calibration_file(

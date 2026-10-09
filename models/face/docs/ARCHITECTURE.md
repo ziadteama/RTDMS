@@ -13,7 +13,14 @@ drive the buzzer/vibration policy.
 ## Runtime constraints
 
 - Python ≥ 3.11 (Pi Bookworm 3.11 / Trixie 3.13 both supported).
-- Runtime deps: MediaPipe ≥ 1.0 (Tasks API), OpenCV, NumPy.
+- Runtime deps: OpenCV, NumPy, and one landmark backend
+  (`LandmarkerConfig.backend`):
+  - `mediapipe` — Tasks API, MediaPipe ≥ 1.0 (dev machines, `run.py` default).
+  - `litert` — `ai-edge-litert` running the same two `.tflite` networks read
+    straight out of `face_landmarker.task` (`landmarker_litert.py`). Pi default
+    via `stream.py`. Reproduces detect-then-track, the rotated 1.5× ROI and
+    MediaPipe's One Euro landmark smoothing; does not produce the facial
+    transformation matrix or blendshapes (both optional downstream).
 - No dlib, PyTorch, or TensorFlow.
 - Target: Raspberry Pi 5; laptop webcam for development.
 - CPU-only path is intentional — Hailo is not required for this landmark model
@@ -97,6 +104,8 @@ analogous to physiology turning PPG features into a fatigue probability. It is
 | Legacy MediaPipe `mp.solutions` | Tasks API (`mediapipe>=1.0`) | ARM64 packaging removed `solutions` |
 | Separate drowsiness vs distraction vision models | One package, two channels | Shared landmarks; phone stays separate |
 | AI HAT+ assumed for vision | CPU-only for face landmarks | Model is ~0.07 GOPS; measure before requiring Hailo |
+| MediaPipe framework on the Pi | LiteRT runtime on the bundle's `.tflite` files | 13.4 ms/frame on one Pi 5 core, no MediaPipe install; ONNX path kept open (see EVIDENCE) |
+| Pi camera via 16:9 `main` + 4:3 `lores` `RGB888` | One `main` stream at target size, `BGR888` | picamera2 `RGB888` is B,G,R in memory; mismatched aspect stretches the face and biases EAR |
 
 Record further divergences here as they appear.
 
