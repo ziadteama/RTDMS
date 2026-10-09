@@ -22,7 +22,9 @@ here.
 
 > [!abstract] The decisions that actually matter
 > 1. **Python 3.13 on Trixie breaks MediaPipe** — the report's primary vision approach. Must choose
->    an OS/runtime strategy before any vision work starts.
+>    an OS/runtime strategy before any vision work starts. → **Resolved for face, 2026-10-10:**
+>    the same `.tflite` networks run on the LiteRT runtime under 3.13, no MediaPipe install — see
+>    [[#Update 2026-10-10 — option E, LiteRT runtime]].
 > 2. **One PCIe connector, two things want it** — AI HAT+ and NVMe are mutually exclusive.
 > 3. **The AI HAT+ and camera do not exist yet** — every CV performance claim is unvalidated.
 > 4. **Open as of 2026-08-30: the AI HAT+ may not be strictly necessary at all** if both vision
@@ -70,6 +72,23 @@ So: the OS that best supports the accelerator is the OS that breaks the vision l
 - **D is a trap.** Never build an unsupported wheel for a graded deliverable.
 - **A stays viable** as the safe fallback if the Hailo port proves too slow to land before the
   deadline. Decide this at the point the HAT arrives, on measurements — not now.
+
+### Update 2026-10-10 — option E, LiteRT runtime
+
+> [!success] Face landmarks run natively on Trixie / Python 3.13 — no MediaPipe, no container
+> MediaPipe's `face_landmarker.task` is a zip of plain `.tflite` networks. `models/face` now has a
+> `litert` backend (`landmarker_litert.py`) that runs those two networks on `ai-edge-litert`
+> (XNNPACK), reproducing detect-then-track, the rotated ROI and MediaPipe's landmark smoothing, so
+> the EAR / PERCLOS / head-pose arithmetic is unchanged. Measured on this Pi: **13.4 ms per frame on
+> one core, 30 fps camera-bound, ~21 % of total CPU, `throttled=0x0`** — numbers in
+> [`models/face/docs/EVIDENCE.md`](../models/face/docs/EVIDENCE.md).
+>
+> | Option | Gets you | Costs you |
+> |---|---|---|
+> | **E. Stay on Trixie, keep the MediaPipe *models*, drop the MediaPipe *framework*** | No reflash, no container, no 3.12 pin; ~3 cores left free | Facial transformation matrix and blendshapes not produced (optional downstream) |
+>
+> This removes Blocker 1 **for face only**. Physiology's `<3.12` pin (below) is a separate question.
+> Branch `face/pi-litert-stream`; see [[Face Subsystem#Running on the Pi]].
 
 > [!warning] Do not relax the physiology `<3.12` pin casually
 > That pin exists because the package is verified under 3.11. Widening it is a real change requiring
@@ -167,6 +186,12 @@ untouched. The question is whether the two vision models can fit in that headroo
   numpy/scipy calls** (`OPENBLAS_NUM_THREADS=1` etc.) is applied project-wide — three independent
   Python processes each silently oversubscribing threads is a much more likely bottleneck than the
   raw arithmetic load.
+
+> [!info] First measured vision number on this Pi (2026-10-10)
+> Face, standalone, LiteRT backend, 1 inference thread, 640×480 @ 30 fps: **73 % of one core,
+> 133 MB RSS, ~21 % of the four cores**, SoC 48–51 °C, no throttling. Physiology + face together
+> therefore project to well under one core of four — but this is **still a standalone measurement**
+> (phone not yet running alongside, no thermal soak), so it informs the question without closing it.
 
 ### Why this isn't a decision yet
 
