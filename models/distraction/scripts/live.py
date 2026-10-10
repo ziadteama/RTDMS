@@ -227,9 +227,9 @@ def write_reports(rows, meta) -> Path:
     stem.with_suffix(".json").write_text(json.dumps({"meta": meta, "segments": rows}, indent=2),
                                          encoding="utf8", newline="\n")
     lines = [f"# Live webcam test {meta['utc']}", "",
-             f"model(s): {', '.join(meta['models_used'])} · conf {meta['conf_final']} · "
-             f"gray {meta['grayscale_final']} · flip {meta['flip']} · "
-             f"fps cap {meta['fps_cap']} · measured {meta['measured_fps']} fps", "",
+             f"model(s): {', '.join(meta['models_used'])} | conf {meta['conf_final']} | "
+             f"gray {meta['grayscale_final']} | flip {meta['flip']} | "
+             f"fps cap {meta['fps_cap']} | measured {meta['measured_fps']} fps", "",
              "| segment | hit rate | raw rate | alerts | false alarms | time-to-alert s |",
              "|---|---|---|---|---|---|"]
     for r in rows:
