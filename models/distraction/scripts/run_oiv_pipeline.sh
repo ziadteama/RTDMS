@@ -37,8 +37,10 @@ $PY scripts/build_dataset.py --name "$NAME" --fixed "$CONV"
 for sz in 416 512; do
   if [ ! -f "$DATA/runs/${NAME}_${sz}/weights/best.pt" ]; then
     step "train imgsz $sz"
+    # WORKERS: dataloader processes. 8 crashed the 512 run with Windows error 1455 (paging file
+    # too small: each worker maps shared memory); 3 is safe on this laptop.
     $PY scripts/train.py --data "$DATA/datasets/$NAME/data.yaml" --imgsz "$sz" \
-        --name "${NAME}_${sz}"
+        --name "${NAME}_${sz}" --workers "${WORKERS:-8}"
   fi
   step "export NCNN imgsz $sz"
   $PY scripts/export_ncnn.py --weights "$DATA/runs/${NAME}_${sz}/weights/best.pt" \

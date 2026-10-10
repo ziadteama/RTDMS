@@ -120,6 +120,7 @@ def main() -> int:
     p.add_argument("--slack", type=float, default=1.0)
     p.add_argument("--hands", choices=["mediapipe", "detector", "off"])
     p.add_argument("--imgsz", type=int, help="detector input size (default from pipeline.yaml)")
+    p.add_argument("--conf", type=float, help="one detector threshold for every class")
     p.add_argument("--json")
     args = p.parse_args()
 
@@ -135,6 +136,8 @@ def main() -> int:
         pcfg.hands.source = args.hands
     if args.imgsz:
         pcfg.detector.imgsz = args.imgsz
+    if args.conf is not None:
+        pcfg.detector.conf = dict.fromkeys(pcfg.detector.conf, args.conf)
 
     if args.dataset == "s01":
         segments = s01_segments(Path(args.src))
