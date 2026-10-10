@@ -94,6 +94,16 @@ python scripts/run.py --video syndd_rear.mp4 --no-rectify --roi full --driver-si
 Keys in the overlay window: `q`/`Esc` quit, `space` pause, `b` restart the baseline.
 Never mirror the input (webcam "selfie" views): mirroring swaps the driver's ears.
 
+## Live test on a laptop webcam
+
+```bash
+python scripts/live.py --profile laptop_webcam            # keys: q r g m [ ] d
+python scripts/live.py --profile laptop_webcam --guided   # scored prompt sequence -> reports/
+```
+
+How to sit, what the keys do, and what webcam results can and cannot tell us:
+[docs/LAPTOP_TESTING.md](docs/LAPTOP_TESTING.md).
+
 ## Training data and evaluation
 
 The detector is fine-tuned on **public data only** (Open Images now; SynDD, 100-Driver, DMD and

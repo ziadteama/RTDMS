@@ -27,7 +27,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from rtdms_distraction.calibration import FisheyeCalibration  # noqa: E402
 from rtdms_distraction.capture import open_source, to_gray  # noqa: E402
-from rtdms_distraction.config import load_pipeline_config, resolve_path, save_roi_rect  # noqa: E402
+from rtdms_distraction.config import (  # noqa: E402
+    load_pipeline_config,
+    profile_path,
+    resolve_path,
+    save_roi_rect,
+)
 from rtdms_distraction.roi import DriverROI  # noqa: E402
 
 
@@ -41,7 +46,9 @@ def parse_args():
     p.add_argument("--rect", help="x,y,w,h instead of drawing")
     p.add_argument("--no-rectify", action="store_true")
     p.add_argument("--preview", help="write raw+ROI and the driver view side by side here")
-    p.add_argument("--no-save", action="store_true", help="do not modify pipeline.yaml")
+    p.add_argument("--no-save", action="store_true", help="do not modify the config")
+    p.add_argument("--profile", help="e.g. laptop_webcam: preview with it and save roi.rect "
+                                     "into configs/profiles/<profile>.yaml")
     return p.parse_args()
 
 
@@ -59,7 +66,8 @@ def load_frame(args, pcfg) -> np.ndarray:
             raise SystemExit(f"cannot read frame {args.frame} of {args.video}")
         return to_gray(frame)
     c = pcfg.capture
-    with open_source(c.width, c.height, c.fps, camera_index=args.camera_index) as src:
+    with open_source(c.width, c.height, c.fps, camera_index=args.camera_index,
+                     flip=c.flip_horizontal, backend=c.backend) as src:
         for _ in range(10):  # let exposure settle
             gray, _ = src.read()
         return gray.copy()
@@ -67,7 +75,7 @@ def load_frame(args, pcfg) -> np.ndarray:
 
 def main() -> int:
     args = parse_args()
-    pcfg = load_pipeline_config()
+    pcfg = load_pipeline_config(profile=args.profile)
     raw = load_frame(args, pcfg)
     if args.grab:
         Path(args.grab).parent.mkdir(parents=True, exist_ok=True)
@@ -127,8 +135,9 @@ def main() -> int:
     print(f"roi.rect = {rect}  -> driver view {roi.out_w}x{roi.out_h} "
           f"({'rectified' if roi.rectified else 'crop'})")
     if not args.no_save:
-        save_roi_rect(rect)
-        print("saved to configs/pipeline.yaml")
+        target = profile_path(args.profile) if args.profile else None
+        save_roi_rect(rect, target)
+        print(f"saved to {target or 'configs/pipeline.yaml'}")
     return 0
 
 

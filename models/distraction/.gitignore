@@ -23,3 +23,9 @@ configs/camera_fisheye.yaml
 
 # Text encoder Ultralytics downloads into the working dir for YOLOE prompts.
 /mobileclip*.ts
+
+# Ultralytics download cache (CLIP text encoder, AMP-check weights) written to the working dir.
+/weights/
+
+# Live-test summaries (scripts/live.py --guided): local results, not shared by default.
+reports/

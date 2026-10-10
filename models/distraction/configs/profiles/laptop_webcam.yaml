@@ -1,0 +1,38 @@
+# Live testing on a Windows laptop webcam until the Pi camera arrives.
+#   python scripts/live.py --profile laptop_webcam [--guided] [--fps-cap 10]
+# Deep-merged over configs/pipeline.yaml: only the keys below change.
+
+capture:
+  width: 1280
+  height: 720
+  fps: 30
+  backend: auto          # MSMF first, then DSHOW
+  grayscale: true        # like the IR camera; 'g' toggles it live
+  flip_horizontal: false # the startup side check corrects this if the webcam is mirrored
+
+rectify:
+  enabled: false         # not a fisheye lens
+
+roi:
+  rect: null             # whole frame; narrow it with scripts/select_roi.py --profile laptop_webcam
+
+detector:
+  backend: ncnn
+  weights: models/yolo26n_coco_416_ncnn_model
+  imgsz: 416
+
+hands:
+  source: mediapipe
+
+live:
+  fps_cap: null          # e.g. 10 to mimic the Pi (smoothing windows are in seconds, so the
+                         # number of frames per decision drops the way it will on the Pi)
+  side_check: true
+  side_check_s: 5.0
+  conf_step: 0.05
+  # 'm' cycles through these, then any other models/*_ncnn_model folder found.
+  models:
+    - {name: stock yolo26n, weights: models/yolo26n_coco_416_ncnn_model, imgsz: 416,
+       hands: mediapipe}
+    - {name: v1_416, weights: models/v1_416_ncnn_model, imgsz: 416, hands: detector}
+    - {name: v1_512, weights: models/v1_512_ncnn_model, imgsz: 512, hands: detector}

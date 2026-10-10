@@ -125,6 +125,12 @@ class Detector:
         if not self._map:
             raise ValueError(f"class_map matches none of the model's classes: {names[:10]}...")
 
+    def set_conf(self, value: float) -> None:
+        """One threshold for every class (live tuning)."""
+        self.cfg.conf = dict.fromkeys(self.cfg.conf or {"phone": 0, "drink": 0, "food": 0,
+                                                         "hand": 0}, value)
+        self._min_conf = value
+
     def _infer(self, img: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 

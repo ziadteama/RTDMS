@@ -38,6 +38,10 @@ class CaptureConfig:
     height: int = 972
     fps: int = 30
     flip_horizontal: bool = False
+    # OpenCV webcam backend: auto (MSMF, then DSHOW on Windows) | msmf | dshow | any
+    backend: str = "auto"
+    # Detector / face mesh see grayscale (matches the IR camera). Live mode can toggle it.
+    grayscale: bool = True
 
 
 @dataclass
@@ -103,6 +107,30 @@ class ThreadsConfig:
 
 
 @dataclass
+class LiveModel:
+    name: str
+    weights: str
+    backend: str = "ncnn"
+    imgsz: int = 416
+    # mediapipe for COCO models (no hand class); detector for fine-tuned ones.
+    hands: str = "mediapipe"
+
+
+@dataclass
+class LiveConfig:
+    """scripts/live.py only."""
+
+    # Process at most this many frames per second (mimic the Pi). None = as fast as possible.
+    fps_cap: float | None = None
+    # At startup: "touch your RIGHT ear" for side_check_s seconds; flips the image if the
+    # face-side mapping comes out reversed (mirrored webcam).
+    side_check: bool = False
+    side_check_s: float = 5.0
+    conf_step: float = 0.05
+    models: list[LiveModel] = field(default_factory=list)
+
+
+@dataclass
 class PipelineConfig:
     driver_side: str = "right"
     capture: CaptureConfig = field(default_factory=CaptureConfig)
@@ -113,6 +141,7 @@ class PipelineConfig:
     hands: HandsConfig = field(default_factory=HandsConfig)
     eventlog: EventLogConfig = field(default_factory=EventLogConfig)
     threads: ThreadsConfig = field(default_factory=ThreadsConfig)
+    live: LiveConfig = field(default_factory=LiveConfig)
 
     def __post_init__(self) -> None:
         if self.driver_side not in ("right", "left"):
@@ -249,7 +278,13 @@ def _build(cls: type, data: Any, where: str) -> Any:
     for key, value in data.items():
         hint = hints[key]
         target = _dataclass_in(hint)
-        kwargs[key] = _build(target, value, f"{where}.{key}") if target else value
+        item = _list_item_dataclass(hint)
+        if target:
+            kwargs[key] = _build(target, value, f"{where}.{key}")
+        elif item and isinstance(value, list):
+            kwargs[key] = [_build(item, v, f"{where}.{key}[{i}]") for i, v in enumerate(value)]
+        else:
+            kwargs[key] = value
     return cls(**kwargs)
 
 
@@ -263,14 +298,44 @@ def _dataclass_in(hint: Any) -> type | None:
     return None
 
 
+def _list_item_dataclass(hint: Any) -> type | None:
+    if typing.get_origin(hint) is list:
+        (arg,) = typing.get_args(hint) or (None,)
+        if dataclasses.is_dataclass(arg):
+            return arg
+    return None
+
+
 def _read_yaml(path: str | Path) -> dict:
     with open(path, encoding="utf8") as f:
         return yaml.safe_load(f) or {}
 
 
-def load_pipeline_config(path: str | Path | None = None) -> PipelineConfig:
+def deep_merge(base: dict, over: dict) -> dict:
+    out = dict(base)
+    for k, v in over.items():
+        both = isinstance(v, dict) and isinstance(out.get(k), dict)
+        out[k] = deep_merge(out[k], v) if both else v
+    return out
+
+
+def profile_path(profile: str | Path) -> Path:
+    """A profile name (configs/profiles/<name>.yaml) or a path."""
+    p = Path(profile)
+    return p if p.suffix in (".yaml", ".yml") else CONFIG_DIR / "profiles" / f"{profile}.yaml"
+
+
+def load_pipeline_config(path: str | Path | None = None,
+                         profile: str | Path | None = None) -> PipelineConfig:
+    """pipeline.yaml (or `path`), with an optional profile deep-merged over it."""
     path = Path(path) if path else CONFIG_DIR / "pipeline.yaml"
-    return _build(PipelineConfig, _read_yaml(path), path.name)
+    data = _read_yaml(path)
+    name = path.name
+    if profile:
+        pp = profile_path(profile)
+        data = deep_merge(data, _read_yaml(pp))
+        name = f"{path.name}+{pp.name}"
+    return _build(PipelineConfig, data, name)
 
 
 def load_rules_config(path: str | Path | None = None) -> RulesConfig:

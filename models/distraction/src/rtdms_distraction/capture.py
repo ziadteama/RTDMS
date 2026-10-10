@@ -150,18 +150,39 @@ class PiCameraSource(_Threaded):
         return f"picamera2 YUV420/Y {self.size[0]}x{self.size[1]}"
 
 
+BACKENDS = {"msmf": cv2.CAP_MSMF, "dshow": cv2.CAP_DSHOW, "any": cv2.CAP_ANY}
+
+
 class WebcamSource(_Threaded):
-    def __init__(self, index: int, width: int, height: int, fps: int, flip: bool = False):
+    """OpenCV webcam. backend auto = MSMF then DSHOW on Windows (MSMF usually gives the
+    requested 1280x720 @ 30; DSHOW is the fallback when MSMF fails to open or to deliver).
+    gray=False returns BGR frames (live mode toggles grayscale itself); `flip` is settable at
+    run time (live mode's side check)."""
+
+    def __init__(self, index: int, width: int, height: int, fps: int, flip: bool = False,
+                 backend: str = "auto", gray: bool = True):
         super().__init__()
-        backend = cv2.CAP_DSHOW if platform.system() == "Windows" else cv2.CAP_ANY
-        self._cap = cv2.VideoCapture(index, backend)
-        if not self._cap.isOpened():
-            raise RuntimeError(f"could not open camera index {index}")
-        self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        self._cap.set(cv2.CAP_PROP_FPS, fps)
-        self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        self._flip = flip
+        if backend == "auto":
+            order = ["msmf", "dshow"] if platform.system() == "Windows" else ["any"]
+        else:
+            order = [backend]
+        self._cap = None
+        for name in order:
+            cap = cv2.VideoCapture(index, BACKENDS[name])
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+                cap.set(cv2.CAP_PROP_FPS, fps)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                ok, _ = cap.read()
+                if ok:
+                    self._cap, self.backend = cap, name
+                    break
+            cap.release()
+        if self._cap is None:
+            raise RuntimeError(f"could not open camera index {index} with {order}")
+        self.flip = flip
+        self.gray = gray
         self._index = index
         self.size = (int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
                      int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
@@ -170,15 +191,15 @@ class WebcamSource(_Threaded):
         ok, bgr = self._cap.read()
         if not ok:
             return None
-        gray = to_gray(bgr)
-        return cv2.flip(gray, 1) if self._flip else gray
+        img = to_gray(bgr) if self.gray else bgr
+        return cv2.flip(img, 1) if self.flip else img
 
     def stop(self) -> None:
         super().stop()
         self._cap.release()
 
     def describe(self) -> str:
-        return f"webcam #{self._index} {self.size[0]}x{self.size[1]}"
+        return f"webcam #{self._index} {self.size[0]}x{self.size[1]} ({self.backend})"
 
 
 class VideoFileSource(FrameSource):
@@ -234,11 +255,11 @@ class VideoFileSource(FrameSource):
 
 def open_source(
     width: int, height: int, fps: int, video: str | None = None, camera_index: int | None = None,
-    flip: bool = False, realtime: bool = False,
+    flip: bool = False, realtime: bool = False, backend: str = "auto", gray: bool = True,
 ) -> FrameSource:
     """Video file if given; else picamera2 on a Pi; else an OpenCV webcam."""
     if video is not None:
         return VideoFileSource(video, realtime=realtime)
     if camera_index is None and is_raspberry_pi():
         return PiCameraSource(width, height, fps, flip)
-    return WebcamSource(camera_index or 0, width, height, fps, flip)
+    return WebcamSource(camera_index or 0, width, height, fps, flip, backend, gray)

@@ -21,7 +21,7 @@ import numpy as np
 from .calibration import FisheyeCalibration
 from .config import BEHAVIOURS, PipelineConfig, RulesConfig, resolve_path
 from .roi import DriverROI
-from .rules import FrameEvidence, RuleEngine
+from .rules import Baseline, FrameEvidence, RuleEngine
 from .smoothing import BehaviourSmoother
 from .types import Detection, FaceObservation
 
@@ -31,7 +31,7 @@ LEVEL_RANK = {"none": 0, "warning": 1, "alert": 2}
 @dataclass
 class FrameResult:
     t: float
-    view: np.ndarray  # gray driver view (for the overlay; never logged)
+    view: np.ndarray  # driver view, gray or BGR (for the overlay; never logged)
     face: FaceObservation | None
     detections: list[Detection]
     evidence: FrameEvidence
@@ -112,28 +112,50 @@ class DistractionPipeline:
         self._dets: list[Detection] = []
         self._hands: list[Detection] = []
 
-    def process(self, gray: np.ndarray, t: float) -> FrameResult:
+    # -- live controls (scripts/live.py) ---------------------------------------
+
+    def set_detector(self, detector, hands_source: str) -> None:
+        """Swap the detector at run time. hands_source: mediapipe (COCO models) | detector
+        (models with a hand class)."""
+        self.detector = detector
+        self.pcfg.hands.source = hands_source
+        if hands_source == "mediapipe" and self.hands is None:
+            from .hands import MediaPipeHands
+            self.hands = MediaPipeHands(self.pcfg.hands)
+        self._dets, self._hands = [], []
+
+    def reset_baseline(self) -> None:
+        b = self.rcfg.baseline
+        self.rules.baseline = Baseline(b.duration_s, b.min_samples)
+
+    # -- per frame -------------------------------------------------------------
+
+    def process(self, frame: np.ndarray, t: float) -> FrameResult:
+        """frame: grayscale (H, W) as on the IR camera, or BGR (H, W, 3) (live colour mode)."""
         tm: dict[str, float] = {}
         p = self.pcfg
 
         t0 = time.perf_counter()
-        view = self.roi.apply(gray)
-        view3 = cv2.cvtColor(view, cv2.COLOR_GRAY2RGB)
+        view = self.roi.apply(frame)
+        if view.ndim == 2:  # gray x3: channel order is irrelevant
+            det_in = face_in = cv2.cvtColor(view, cv2.COLOR_GRAY2RGB)
+        else:  # detector takes BGR (Ultralytics convention), MediaPipe takes RGB
+            det_in, face_in = view, cv2.cvtColor(view, cv2.COLOR_BGR2RGB)
         tm["rectify"] = (time.perf_counter() - t0) * 1000
 
         ran = self._i % max(1, p.detector.every_n) == 0
         t0 = time.perf_counter()
         if ran:
-            self._dets = self.detector.detect(view3)
+            self._dets = self.detector.detect(det_in)
         tm["detect"] = (time.perf_counter() - t0) * 1000
 
         t0 = time.perf_counter()
-        face = self.facemesh.process(view3, t)
+        face = self.facemesh.process(face_in, t)
         tm["facemesh"] = (time.perf_counter() - t0) * 1000
 
         t0 = time.perf_counter()
         if self.hands is not None and self._i % max(1, p.hands.every_n) == 0:
-            self._hands = self.hands.detect(view3, t)
+            self._hands = self.hands.detect(face_in, t)
         tm["hands"] = (time.perf_counter() - t0) * 1000
 
         t0 = time.perf_counter()
