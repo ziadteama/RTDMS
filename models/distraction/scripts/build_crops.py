@@ -12,7 +12,9 @@ Sources (adapters in rtdms_distraction.datasets; front / windshield views only):
   EBDD (windshield camera): talking on the phone -> phone at the ear where the pose wrist is;
     eating -> mouth food while the wrist is at the mouth; cautious / texting / cabin
     equipment -> none.
-  Open Images (optional): hand-at-face crops -> ear hand_no_phone.
+  Open Images (optional): hand-at-face crops -> ear hand_no_phone; food touching the lips ->
+    mouth food (contact-sheet check: ~30/36 someone eating), with as many no-food faces ->
+    mouth none so "photo" does not become a shortcut for "food".
 Crops whose label depends on the wrist are skipped when the wrist is not where it should be
 (the clip label covers the whole action, including reaching for the cup).
 Split BY DRIVER within each dataset (70/15/15), so every split has drivers of both.
@@ -177,6 +179,7 @@ def main() -> int:
 
     if not args.no_openimages:
         rows += openimages_hand_crops(dcfg, ec, out)
+        rows += openimages_mouth_crops(dcfg, mc, out)
 
     # balance 'none' per kind and split, then write manifests
     rng = random.Random(7)
@@ -209,6 +212,79 @@ def main() -> int:
         print("  by source:", dict(Counter((r["source"], r["label"]) for r in kr)))
     print(f"-> {out}")
     return 0
+
+
+def lip_dist(b, w, h, mx, my) -> tuple[float, float]:
+    """Pixel distance from the mouth centre to a normalised YOLO box, and the box width."""
+    x1, y1 = (b[1] - b[3] / 2) * w, (b[2] - b[4] / 2) * h
+    x2, y2 = (b[1] + b[3] / 2) * w, (b[2] + b[4] / 2) * h
+    return float(np.hypot(max(x1 - mx, 0, mx - x2), max(y1 - my, 0, my - y2))), x2 - x1
+
+
+def openimages_mouth_crops(dcfg, mc, out) -> list[dict]:
+    """Open Images (ground-truth boxes only, its own splits): a food box touching the lips
+    (within 0.15 fw of the mouth centre, narrower than 3 fw) -> mouth food. A contact-sheet
+    check on 36 random crops: ~30 show someone eating (misfits: a juice box, a gift box,
+    bubble gum). To keep 'photo' from becoming a shortcut for 'food', the same number of
+    Open Images faces with no food / drink within 1 fw of the mouth -> mouth none."""
+    import mediapipe as mp
+    from mediapipe.tasks import python as mpp
+    from mediapipe.tasks.python import vision
+
+    from rtdms_distraction.types import FaceObservation
+
+    pcfg = load_pipeline_config(profile="laptop_webcam")
+    lmk = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
+        base_options=mpp.BaseOptions(model_asset_path=str((ROOT / pcfg.facemesh.model_path)
+                                                          .resolve())),
+        running_mode=vision.RunningMode.IMAGE, num_faces=1))
+    oi = Path(dcfg["root"]) / "openimages"
+    rows, n_food = [], Counter()
+
+    def write(split, label, stem, crop):
+        d = out / "mouth" / split / label
+        d.mkdir(parents=True, exist_ok=True)
+        fn = f"openimages__{stem}.jpg"
+        cv2.imwrite(str(d / fn), crop, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        rows.append({"kind": "mouth", "file": f"{split}/{label}/{fn}", "split": split,
+                     "label": label, "source": "openimages", "driver": stem,
+                     "action": "photo"})
+
+    for split in ("train", "val", "test"):
+        faces = json.loads((oi / "meta" / f"{split}_faces.json").read_text(encoding="utf8"))
+        n_none = 0
+        for lab_p in sorted((oi / "labels_gt" / split).glob("*.txt")):
+            if not faces.get(lab_p.stem):
+                continue
+            boxes = [(int(r[0]), *map(float, r[1:])) for r in
+                     (ln.split() for ln in lab_p.read_text(encoding="utf8").split("\n")
+                      if ln.strip())]
+            has_food = any(b[0] == 2 for b in boxes)
+            if not has_food and n_none >= n_food[split]:
+                continue  # 'none' only as many as 'food' so far
+            img = cv2.imread(str(oi / "images" / split / f"{lab_p.stem}.jpg"))
+            if img is None:
+                continue
+            res = lmk.detect(mp.Image(image_format=mp.ImageFormat.SRGB,
+                                      data=cv2.cvtColor(img, cv2.COLOR_BGR2RGB)))
+            if not res.face_landmarks:
+                continue
+            h, w = img.shape[:2]
+            lm = np.array([(q.x * w, q.y * h) for q in res.face_landmarks[0]])
+            fw = face_scale(FaceObservation(lm, None, None, None, "none", None, "geometric", 0))
+            mx, my = lm[[13, 14, 61, 291]].mean(0)
+
+            near = [(b[0], *lip_dist(b, w, h, mx, my)) for b in boxes if b[0] in (1, 2)]
+            crop = crop_mouth(img, lm, mc.imgsz, mc.scale, mc.down, fw, mc.grayscale)
+            if any(c == 2 and d <= 0.15 * fw and bw < 3 * fw for c, d, bw in near):
+                write(split, "food", lab_p.stem, crop)
+                n_food[split] += 1
+            elif all(d > 1.0 * fw for _, d, _ in near) and n_none < n_food[split]:
+                write(split, "none", lab_p.stem, crop)
+                n_none += 1
+    lmk.close()
+    print(f"[openimages] mouth food {dict(n_food)}, plus as many 'none' faces")
+    return rows
 
 
 def openimages_hand_crops(dcfg, ec, out) -> list[dict]:
