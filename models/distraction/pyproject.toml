@@ -46,3 +46,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Verbatim dataset annotation rows used as fixtures.
+"tests/test_datasets.py" = ["E501"]
