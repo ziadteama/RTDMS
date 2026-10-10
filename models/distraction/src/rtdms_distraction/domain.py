@@ -195,45 +195,81 @@ def ir_look(img: np.ndarray, rng, strength: float = 1.0) -> np.ndarray:
 # --------------------------------------------------------------------------- occlusion
 
 
-def occlude(img: np.ndarray, boxes: list[Box], rng, p: float = 0.5,
-            classes=(0, 1, 2)) -> np.ndarray:
-    """Hand-sized blobs partly covering phones / drinks / food (fingers around a phone, a hand
-    around a cup). Covers 15-55 % of the box, so the label stays valid. Bright, low-texture
-    tone, like skin under IR."""
-    out = img.copy()
+def _covered(alpha: np.ndarray, box) -> float:
+    _, x1, y1, x2, y2 = box
+    sub = alpha[max(0, int(y1)):int(y2), max(0, int(x1)):int(x2)]
+    return float((sub > 0.5).mean()) if sub.size else 0.0
+
+
+def occlude(img: np.ndarray, boxes: list[Box], rng, p: float = 0.5, classes=(0, 1, 2),
+            hand_bank: list[np.ndarray] | None = None, max_cover: float = 0.6) -> np.ndarray:
+    """Partly cover phones / drinks / food with a hand, entering from one side of the box the way
+    fingers wrap a phone or a cup.
+
+    With `hand_bank` (grayscale crops of real hands, see domain_convert.py) a real hand texture
+    is pasted through a feathered elliptical mask; without it a smaller textured blob is used.
+    A first version pasted flat grey ellipses: on a contact sheet they were obviously synthetic
+    and large, which a detector can learn as a shortcut ("grey oval = phone"). Coverage of the
+    object box is kept below `max_cover` so the label stays valid."""
+    out = img.astype(np.float32)
     h, w = img.shape[:2]
-    for c, x1, y1, x2, y2 in boxes:
+    for box in boxes:
+        c, x1, y1, x2, y2 = box
         if c not in classes or rng.random() > p:
             continue
         bw, bh = x2 - x1, y2 - y1
-        frac = rng.uniform(0.15, 0.55)
-        # Blob enters from a random side of the box, like fingers wrapping it.
         side = int(rng.integers(4))
-        ax, ay = (bw * rng.uniform(0.35, 0.8), bh * math.sqrt(frac)) if side < 2 else \
-            (bw * math.sqrt(frac), bh * rng.uniform(0.35, 0.8))
-        cx = {0: (x1 + x2) / 2, 1: (x1 + x2) / 2, 2: x1, 3: x2}[side] + rng.normal(0, 0.1) * bw
-        cy = {0: y1, 1: y2, 2: (y1 + y2) / 2, 3: (y1 + y2) / 2}[side] + rng.normal(0, 0.1) * bh
-        mask = np.zeros((h, w), np.uint8)
-        cv2.ellipse(mask, (int(cx), int(cy)), (max(2, int(ax)), max(2, int(ay))),
-                    rng.uniform(-30, 30), 0, 360, 255, -1)
-        mask = cv2.GaussianBlur(mask, (7, 7), 0).astype(np.float32)[..., None] / 255.0
-        tone = rng.uniform(140, 235)
-        tex = np.clip(tone + rng.normal(0, 6, (h, w, 1)), 0, 255).astype(np.float32)
-        tex = np.repeat(tex, 3, axis=2)
-        out = (out.astype(np.float32) * (1 - mask) + tex * mask).astype(np.uint8)
-    return out
+        for _ in range(3):  # shrink until coverage is acceptable
+            scale = rng.uniform(0.5, 0.9)
+            pw = max(4, int(max(bw, bh) * scale * rng.uniform(0.8, 1.2)))
+            ph = max(4, int(max(bw, bh) * scale))
+            cx = {0: (x1 + x2) / 2, 1: (x1 + x2) / 2, 2: x1, 3: x2}[side] + rng.normal(0, .15) * bw
+            cy = {0: y1, 1: y2, 2: (y1 + y2) / 2, 3: (y1 + y2) / 2}[side] + rng.normal(0, .15) * bh
+            px0, py0 = int(cx - pw / 2), int(cy - ph / 2)
+            if hand_bank:
+                tex = cv2.resize(hand_bank[int(rng.integers(len(hand_bank)))], (pw, ph))
+                tex = tex.astype(np.float32) * rng.uniform(0.9, 1.3)  # IR: skin reads bright
+            else:
+                tex = np.clip(rng.uniform(130, 220) + rng.normal(0, 10, (ph, pw)), 0, 255)
+                tex = cv2.GaussianBlur(tex.astype(np.float32), (0, 0), 2)
+            m = np.zeros((ph, pw), np.float32)
+            cv2.ellipse(m, (pw // 2, ph // 2), (max(1, int(pw * 0.45)), max(1, int(ph * 0.45))),
+                        rng.uniform(0, 180), 0, 360, 1.0, -1)
+            m = cv2.GaussianBlur(m, (0, 0), max(1.0, min(pw, ph) * 0.08))
+            alpha = np.zeros((h, w), np.float32)
+            full = np.zeros((h, w), np.float32)
+            ax0, ay0 = max(0, px0), max(0, py0)
+            ax1, ay1 = min(w, px0 + pw), min(h, py0 + ph)
+            if ax1 <= ax0 or ay1 <= ay0:
+                break
+            alpha[ay0:ay1, ax0:ax1] = m[ay0 - py0:ay1 - py0, ax0 - px0:ax1 - px0]
+            full[ay0:ay1, ax0:ax1] = np.clip(tex, 0, 255)[ay0 - py0:ay1 - py0,
+                                                           ax0 - px0:ax1 - px0]
+            if _covered(alpha, box) <= max_cover:
+                out = out * (1 - alpha[..., None]) + full[..., None] * alpha[..., None]
+                break
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
+def is_product_shot(boxes: list[Box], w: int, h: int, has_person: bool,
+                    classes=(0, 1, 2), max_area: float = 0.5) -> bool:
+    """An object filling most of the frame with no person in it (catalogue photo, screenshot):
+    nothing like a phone in a driver's hand. 27 % of Open Images' train phone images."""
+    big = any(c in classes and (x2 - x1) * (y2 - y1) > max_area * w * h
+              for c, x1, y1, x2, y2 in boxes)
+    return big and not has_person
 
 
 def convert(img: np.ndarray, boxes: list[Box], faces: list[tuple], rng, *,
             out_size: int = 640, crop: bool = True, p_barrel: float = 0.5,
-            p_occlude: float = 0.5, calib: FisheyeCalibration | None = None
-            ) -> tuple[np.ndarray, list[Box]]:
+            p_occlude: float = 0.5, calib: FisheyeCalibration | None = None,
+            hand_bank: list[np.ndarray] | None = None) -> tuple[np.ndarray, list[Box]]:
     """Full offline conversion of one image."""
     if crop:
         img, boxes = head_shoulders_crop(img, boxes, faces, rng)
     if rng.random() < p_barrel:
         img, boxes = barrel(img, boxes, rng, calib=calib)
-    img = occlude(img, boxes, rng, p=p_occlude)
+    img = occlude(img, boxes, rng, p=p_occlude, hand_bank=hand_bank)
     img = ir_look(img, rng)
     h, w = img.shape[:2]
     s = out_size / max(h, w)

@@ -27,7 +27,7 @@ for split in train val test; do
   if [ ! -d "$CONV/images/$split" ]; then
     step "convert to our camera: $split"
     $PY scripts/domain_convert.py --src "$OIV" --split "$split" --out "$CONV" \
-        --faces "$OIV/meta/${split}_faces.json" --variants 1
+        --faces "$OIV/meta/${split}_faces.json" --variants 1 --hand-bank-from "$OIV"
   fi
 done
 

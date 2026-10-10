@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from rtdms_distraction.calibration import FisheyeCalibration  # noqa: E402
-from rtdms_distraction.domain import convert  # noqa: E402
+from rtdms_distraction.domain import convert, is_product_shot  # noqa: E402
 
 
 def read_labels(p: Path, w: int, h: int):
@@ -51,6 +51,42 @@ def write_labels(p: Path, boxes, w: int, h: int) -> None:
         f.write("\n".join(lines) + ("\n" if lines else ""))
 
 
+HAND_BANK: list[np.ndarray] | None = None
+
+
+def build_hand_bank(src: Path, cache: Path, max_crops: int = 3000, min_side: int = 40):
+    """Grayscale crops of real hands from the TRAIN split's ground-truth hand boxes (class 3).
+    Used as occluders; train-only so no val/test pixels leak into training images."""
+    if cache.is_file():
+        return list(np.load(cache, allow_pickle=True)["crops"])
+    crops = []
+    for lab in sorted((src / "labels_gt" / "train").glob("*.txt")):
+        rows = [r.split() for r in lab.read_text(encoding="utf8").split("\n") if r.strip()]
+        hands = [r for r in rows if r[0] == "3"]
+        if not hands:
+            continue
+        img = cv2.imread(str(src / "images" / "train" / f"{lab.stem}.jpg"), cv2.IMREAD_GRAYSCALE)
+        if img is None:
+            continue
+        h, w = img.shape
+        for _, cx, cy, bw, bh in hands:
+            x1, y1 = int((float(cx) - float(bw) / 2) * w), int((float(cy) - float(bh) / 2) * h)
+            x2, y2 = int((float(cx) + float(bw) / 2) * w), int((float(cy) + float(bh) / 2) * h)
+            if min(x2 - x1, y2 - y1) >= min_side:
+                crops.append(img[max(0, y1):y2, max(0, x1):x2].copy())
+        if len(crops) >= max_crops:
+            break
+    arr = np.empty(len(crops), dtype=object)
+    arr[:] = crops
+    np.savez(cache, crops=arr)
+    return crops
+
+
+def _init_worker(bank_path):
+    global HAND_BANK
+    HAND_BANK = list(np.load(bank_path, allow_pickle=True)["crops"]) if bank_path else None
+
+
 def work(job):
     img_path, lab_path, out_img, out_lab, faces, variants, seed, opts = job
     img = cv2.imread(str(img_path))
@@ -58,12 +94,16 @@ def work(job):
         return 0
     h, w = img.shape[:2]
     boxes = read_labels(lab_path, w, h)
+    if opts["skip_product"] and is_product_shot(boxes, w, h, bool(faces) or
+                                                any(b[0] == 3 for b in boxes)):
+        return 0
     calib = FisheyeCalibration.load(opts["calib"]) if opts["calib"] else None
     n = 0
     for k in range(variants):
         rng = np.random.default_rng(seed + k)
         o, b = convert(img, boxes, faces, rng, out_size=opts["size"], crop=opts["crop"],
-                       p_barrel=opts["p_barrel"], p_occlude=opts["p_occlude"], calib=calib)
+                       p_barrel=opts["p_barrel"], p_occlude=opts["p_occlude"], calib=calib,
+                       hand_bank=HAND_BANK)
         stem = f"{img_path.stem}_v{k}"
         cv2.imwrite(str(out_img / f"{stem}.jpg"), o, [cv2.IMWRITE_JPEG_QUALITY, 90])
         write_labels(out_lab / f"{stem}.txt", b, o.shape[1], o.shape[0])
@@ -86,13 +126,22 @@ def main() -> int:
     p.add_argument("--p-occlude", type=float, default=0.5)
     p.add_argument("--calib", help="our fisheye calibration YAML (K, D)")
     p.add_argument("--workers", type=int, default=8)
+    p.add_argument("--hand-bank-from", help="Open Images root: real hand crops as occluders")
+    p.add_argument("--keep-product-shots", action="store_true",
+                   help="keep images where an object fills > 50 %% of the frame, no person")
     args = p.parse_args()
 
     src, out = Path(args.src), Path(args.out)
     splits = [args.split]
     faces = json.loads(Path(args.faces).read_text(encoding="utf8")) if args.faces else {}
     opts = {"size": args.size, "crop": not args.no_crop, "p_barrel": args.p_barrel,
-            "p_occlude": args.p_occlude, "calib": args.calib}
+            "p_occlude": args.p_occlude, "calib": args.calib,
+            "skip_product": not args.keep_product_shots}
+    bank_path = None
+    if args.hand_bank_from:
+        bank_path = Path(args.hand_bank_from) / "meta" / "hand_bank.npz"
+        bank = build_hand_bank(Path(args.hand_bank_from), bank_path)
+        print(f"hand bank: {len(bank)} real hand crops ({bank_path})")
     for split in splits:
         img_dir = src / "images" / split
         if not img_dir.is_dir():
@@ -108,9 +157,11 @@ def main() -> int:
             seed = zlib.crc32(im.stem.encode()) * 7 + (0 if split == "train" else 10_000)
             jobs.append((im, src / args.labels_dir / split / f"{im.stem}.txt", oi, ol,
                          faces.get(im.stem, []), variants, seed, opts))
-        with ProcessPoolExecutor(args.workers) as ex:
+        with ProcessPoolExecutor(args.workers, initializer=_init_worker,
+                                 initargs=(str(bank_path) if bank_path else None,)) as ex:
             n = sum(ex.map(work, jobs, chunksize=32))
-        print(f"{split}: {len(jobs)} images -> {n} converted into {oi}")
+        print(f"{split}: {len(jobs)} images -> {n} converted into {oi} "
+              f"({len(jobs) - n // max(1, variants)} skipped as product shots / unreadable)")
     return 0
 
 
