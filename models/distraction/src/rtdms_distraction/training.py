@@ -44,3 +44,18 @@ class IRTrainer(DetectionTrainer):
             ds.__class__ = IRDataset
             ds.transforms = ds.build_transforms(hyp=self.args)
         return ds
+
+    def get_dataloader(self, dataset_path, batch_size=16, rank=0, mode="train"):
+        """Ultralytics' loader always pins memory. On this Windows + CUDA 13 machine that crashed
+        epoch 1 of the first run ('CUDA error: resource already mapped' in the pin-memory
+        thread), so pinning is turned off. Single-GPU only (no DDP barrier)."""
+        from ultralytics.data import build_dataloader
+
+        dataset = self.build_dataset(dataset_path, mode, batch_size)
+        return build_dataloader(
+            dataset, batch=batch_size,
+            workers=self.args.workers if mode == "train" else self.args.workers * 2,
+            shuffle=mode == "train", rank=rank,
+            drop_last=self.args.compile and mode == "train", device=self.device,
+            pin_memory=False,
+        )

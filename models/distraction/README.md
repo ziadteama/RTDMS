@@ -94,6 +94,21 @@ python scripts/run.py --video syndd_rear.mp4 --no-rectify --roi full --driver-si
 Keys in the overlay window: `q`/`Esc` quit, `space` pause, `b` restart the baseline.
 Never mirror the input (webcam "selfie" views): mirroring swaps the driver's ears.
 
+## Training data and evaluation
+
+The detector is fine-tuned on **public data only** (Open Images now; SynDD, 100-Driver, DMD and
+YawDD as they arrive), converted to look like our camera. Our own clips are test data. Details,
+sources, licences, teacher labelling and caveats: [docs/DATA.md](docs/DATA.md). One-time in-car
+test session: [docs/IN_CAR_TEST_PROTOCOL.md](docs/IN_CAR_TEST_PROTOCOL.md).
+
+```bash
+python scripts/build_openimages.py                     # download + balanced subset (D:/rtdms-data)
+PY=python bash scripts/run_oiv_pipeline.sh v1          # teacher -> convert -> train 416/512 -> eval
+python scripts/review_sample.py make --labels <root>/openimages/labels_meta/train \
+    --images <root>/openimages/images/train            # label-quality review page
+python scripts/eval_events.py s01 --src data/recordings/S01_guided_<utc>.mp4 --weights <ncnn dir>
+```
+
 ## Verify
 
 ```bash
