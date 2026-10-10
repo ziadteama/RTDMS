@@ -1,0 +1,100 @@
+# Rule engine thresholds. Distances are in FACE WIDTHS (fw = |landmark 234 - landmark 454| in the
+# rectified driver view), so they do not depend on seat position, driver size or mount distance.
+# Angles are degrees RELATIVE to the per-drive baseline. Times are seconds.
+
+baseline:
+  # Median pitch/yaw/gaze over the first `duration_s` seconds that have a face.
+  duration_s: 10.0
+  min_samples: 30
+
+head_down:
+  # Head pitched down (positive = chin toward chest) beyond the baseline by this much.
+  pitch_deg: 15.0
+  # Gaze-down score above baseline (blendshape eyeLookDown, or iris ratio when blendshapes
+  # are unavailable).
+  gaze_down: 0.25
+  gaze_down_iris: 0.12
+
+ears:
+  # The ear nearer the camera (driver's right in a LHD car) is fully visible: needs a phone box.
+  near:
+    # Zone centre = ear landmark + outward * fw (away from the face centre), + down * fw.
+    outward: 0.30
+    down: 0.15
+    half_width: 0.45
+    half_height: 0.65
+  # The far ear (driver's left in a LHD car) is partly hidden behind the head. The zone also
+  # extends inward behind the head, and a hand alone counts (lower confidence) because the
+  # phone itself is often not visible.
+  far:
+    outward: 0.20
+    down: 0.15
+    half_width: 0.50
+    half_height: 0.65
+    inward: 0.35
+    hand_only: true
+    hand_only_confidence: 0.6
+  # Overlap = intersection / min(box area, zone area).
+  min_overlap: 0.25
+
+phone_in_hand:
+  # Phone centre must be below chin_y + this many face widths ... (negative = slightly above)
+  below_chin: -0.10
+  # ... and within this distance of a hand box (box-to-box gap, in fw). Ignored when hands are off.
+  hand_max_gap: 0.30
+  require_hand: true
+  # A phone in these zones is in a holder: ignored. Normalised rectified-ROI coords [x, y, w, h].
+  holder_zones: []
+  # WARNING escalates to ALERT once the head/gaze has been down for this long.
+  alert_after_down_s: 2.0
+
+drinking:
+  # Mouth region: centred on the lips (13, 14, 61, 291), half sizes in fw.
+  mouth_half_width: 0.40
+  mouth_half_height: 0.35
+  min_overlap: 0.15
+  # Head tilted back (pitch above baseline) multiplies confidence by this.
+  pitch_up_deg: 8.0
+  pitch_up_bonus: 1.25
+
+eating:
+  # Food box within this distance of the mouth centre (fw) counts as a bite ...
+  food_mouth_max_dist: 0.80
+  # ... and stays relevant for this long.
+  food_memory_s: 5.0
+  chewing:
+    window_s: 3.0
+    min_span_s: 2.0
+    resample_hz: 15.0
+    band_hz: [0.8, 2.5]
+    # Share of 0.3-7 Hz power that must fall inside band_hz.
+    min_band_fraction: 0.45
+    # Std of the detrended jaw signal. Blendshape jawOpen is 0..1; the geometric fallback is
+    # chin-to-nose distance in fw.
+    min_amplitude_blendshape: 0.02
+    min_amplitude_geometric: 0.008
+    # Lips count as closed when inner-lip gap / mouth width is below this ...
+    lips_closed_ratio: 0.10
+    # ... and must be closed in at least this share of the window. This is what rejects talking
+    # and singing: their jaw moves with the lips apart.
+    min_lips_closed_fraction: 0.6
+
+smoothing:
+  window_s: 1.75
+  # Activate when >= on_ratio of the frames in the window are positive; clear at <= off_ratio.
+  on_ratio: 0.70
+  off_ratio: 0.30
+  # The window must hold samples for at least this share of its length before it can activate
+  # (prevents a 2-frame "window" at start-up or after a gap).
+  min_coverage: 0.6
+  # Face lost or occluded: face-based behaviours freeze for up to this long, then clear.
+  face_lost_hold_s: 5.0
+
+# Recommended level per behaviour. Fusion owns the actual cabin alert (repo invariant);
+# these are what this module reports.
+levels:
+  phone_right_ear: alert
+  phone_left_ear: alert
+  phone_in_hand: warning   # -> alert after alert_after_down_s of head/gaze down
+  drinking: warning
+  eating: warning

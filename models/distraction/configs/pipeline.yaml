@@ -1,0 +1,116 @@
+# Pipeline configuration: capture, rectification, detector, face mesh, hands, logging.
+# Behaviour thresholds live in rules.yaml. Relative paths resolve against models/distraction/.
+
+# Which side of the image the driver sits on.
+#   right = left-hand-drive car (camera at the centre mirror sees the driver on image-right)
+#   left  = right-hand-drive car
+driver_side: right
+
+capture:
+  # Full-FOV 2x2-binned OV5647 mode. Do NOT use 1920x1080: on OV5647 that is a centre crop.
+  width: 1296
+  height: 972
+  fps: 30
+  # Pi: request YUV420 and keep only the Y plane, so grayscale costs nothing.
+  # Never mirror the image: mirroring swaps the driver's ears.
+  flip_horizontal: false
+
+rectify:
+  # false for non-fisheye sources (laptop webcam, SynDD, YawDD, DMD): the ROI becomes a plain crop.
+  enabled: true
+  # Written by scripts/calibrate_fisheye.py. Must match the capture resolution (K is rescaled
+  # automatically if only the resolution differs, not the aspect ratio).
+  calibration_file: configs/camera_fisheye.yaml
+
+roi:
+  # Driver region in RAW image pixels [x, y, w, h], drawn by scripts/select_roi.py.
+  # null = whole frame.
+  rect: null
+  # Rectified driver view handed to the detector and the face mesh.
+  output_width: 640
+  output_height: 640
+  # Polygons blanked before inference, in normalised output coordinates (0..1).
+  # Use them for whatever part of the passenger seat still falls inside the ROI.
+  mask_polygons: []
+
+detector:
+  # ultralytics (.pt, PC only) | ncnn (Pi) | onnx
+  backend: ncnn
+  weights: models/yolo26n_coco_416_ncnn_model
+  imgsz: 416
+  num_threads: 2
+  # Run the network on every Nth frame and reuse its boxes in between (Phase 4 fallback: 2).
+  every_n: 1
+  # Model class name -> behaviour class. Unlisted names are ignored.
+  class_map:
+    # COCO baseline
+    cell phone: phone
+    cup: drink
+    bottle: drink
+    wine glass: drink
+    banana: food
+    apple: food
+    sandwich: food
+    orange: food
+    hot dog: food
+    pizza: food
+    donut: food
+    cake: food
+    # Fine-tuned model (Phase 3)
+    phone: phone
+    drink: drink
+    food: food
+    hand: hand
+  # Per-class minimum confidence after mapping.
+  conf:
+    phone: 0.25
+    drink: 0.25
+    food: 0.25
+    hand: 0.30
+  nms_iou: 0.5
+
+facemesh:
+  # mediapipe = MediaPipe Tasks Face Landmarker (478 points, blendshapes, transform matrix).
+  # dms_face  = reuse models/face's landmarker backend (LiteRT on the Pi; no blendshapes,
+  #             so jaw movement falls back to landmark geometry).
+  backend: mediapipe
+  # Used only when backend is dms_face: litert | mediapipe (models/face's own backends).
+  dms_face_backend: litert
+  model_path: ../face/models/face_landmarker.task
+  min_face_detection_confidence: 0.5
+  min_face_presence_confidence: 0.5
+  min_tracking_confidence: 0.5
+  # The mesh runs on a square crop around the face (the face is ~100 px in the driver view,
+  # too small for MediaPipe's 128 px detector on the whole view). Crop side = crop_scale x face
+  # size, resized to crop_size.
+  crop_size: 256
+  crop_scale: 2.2
+  # While no face is tracked, the mesh cycles through overlapping square tiles of this region
+  # (normalised driver-view [x, y, w, h]), one tile per frame. Tile side = search_tile x view
+  # size: ~3x the expected face width, so the face is large enough for the detector.
+  search_region: [0.0, 0.0, 1.0, 0.7]
+  search_tile: 0.45
+  # Frames without a face before falling back to the search region.
+  lost_reset_frames: 5
+
+hands:
+  # COCO has no hand class. Baseline: MediaPipe hands. Once the fine-tuned detector has a
+  # 'hand' class, set source: detector and the extra network goes away.
+  # source: mediapipe | detector | off
+  source: mediapipe
+  model_path: models/hand_landmarker.task
+  num_hands: 2
+  min_detection_confidence: 0.5
+  # Hands are re-detected every Nth frame; boxes are held in between.
+  every_n: 2
+  # Box padding around the landmark hull, as a fraction of its size.
+  pad: 0.25
+
+eventlog:
+  dir: logs
+  # Also write one line per frame (needed for event-level evaluation; large files).
+  per_frame: false
+
+threads:
+  # Thread caps for the concurrent Pi pipeline (face + phone + physiology share 4 cores).
+  opencv: 1
