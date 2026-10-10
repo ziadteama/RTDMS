@@ -153,6 +153,52 @@ class ChewingDetector:
 # --------------------------------------------------------------------------- engine
 
 
+# Hand-at-ear evidence sets compared in guided mode. Every variant sees the same frames; the
+# pipeline reports the one matching what is enabled.
+EAR_VARIANTS = ("hands", "hands+pose", "hands+pose+clf")
+# Eye line / jaw line landmarks per face side: outer eye corner, jaw angle.
+EYE_OF = {DRIVER_RIGHT_EAR: 33, DRIVER_LEFT_EAR: 263}
+JAW_OF = {DRIVER_RIGHT_EAR: 172, DRIVER_LEFT_EAR: 397}
+
+
+@dataclass
+class HandEpisode:
+    """One ear, one evidence variant: how long a hand has been at the ear (tolerating short
+    misses), and whether a phone was seen during that time."""
+
+    gap_s: float
+    start: float | None = None
+    last: float | None = None
+    phone_seen: bool = False
+
+    def update(self, t: float, hand: bool | None, phone: bool) -> None:
+        if hand is None:  # cannot judge (face lost too long): hold
+            return
+        if hand:
+            if self.last is None or t - self.last > self.gap_s:
+                self.start, self.phone_seen = t, False
+            self.last = t
+        elif self.last is not None and t - self.last > self.gap_s:
+            self.start = self.last = None
+            self.phone_seen = False
+        if phone and self.start is not None:
+            self.phone_seen = True
+
+    def dwell(self, t: float) -> float:
+        return t - self.start if self.start is not None else 0.0
+
+
+@dataclass
+class EarEvidence:
+    """Per ear, this frame."""
+
+    hand_box: bool | None = None  # a hand box centred in the ear zone
+    pose: bool | None = None  # pose wrist rule
+    phone_box: bool = False  # a phone box overlapping the ear zone
+    clf_p: float | None = None  # ear-crop classifier, smoothed P(phone)
+    variants: dict[str, tuple[float, bool]] = field(default_factory=dict)  # dwell_s, phone_seen
+
+
 @dataclass
 class FrameEvidence:
     behaviours: dict[str, Evidence]
@@ -162,6 +208,9 @@ class FrameEvidence:
     # Geometry the overlay draws; all in driver-view pixels.
     zones: dict[str, Box] = field(default_factory=dict)
     scale: float | None = None
+    ears: dict[str, EarEvidence] = field(default_factory=dict)
+    stale_face: bool = False  # face lost; zones come from the last face (item 4)
+    wrists: list[tuple[float, float]] = field(default_factory=list)  # pose wrists (overlay)
 
 
 class RuleEngine:
@@ -171,25 +220,26 @@ class RuleEngine:
         self.hands_available = hands_available
         self.view_w, self.view_h = view_size
         # LHD (driver on image-right): camera is to the driver's right, so the right ear faces it.
-        near, far = (DRIVER_RIGHT_EAR, DRIVER_LEFT_EAR) if driver_side == "right" \
-            else (DRIVER_LEFT_EAR, DRIVER_RIGHT_EAR)
+        near = DRIVER_RIGHT_EAR if driver_side == "right" else DRIVER_LEFT_EAR
         self.ears = {
             "phone_right_ear": (DRIVER_RIGHT_EAR, cfg.ears.near if near == DRIVER_RIGHT_EAR
                                 else cfg.ears.far),
             "phone_left_ear": (DRIVER_LEFT_EAR, cfg.ears.near if near == DRIVER_LEFT_EAR
                                else cfg.ears.far),
         }
-        self.far_ear_behaviour = "phone_left_ear" if far == DRIVER_LEFT_EAR else "phone_right_ear"
         self.baseline = Baseline(cfg.baseline.duration_s, cfg.baseline.min_samples)
         self.chewing = ChewingDetector(cfg.eating.chewing)
         self._last_food_t: float | None = None
         self._last_food_conf = 0.0
         self._down_since: float | None = None
+        self._last_face: FaceObservation | None = None
+        self._last_face_t = -1e9
+        gap = cfg.hand_at_ear.gap_s
+        self.episodes = {v: {b: HandEpisode(gap) for b in self.ears} for v in EAR_VARIANTS}
 
     # -- geometry -------------------------------------------------------------
 
-    @staticmethod
-    def ear_zone(face: FaceObservation, ear: int, z: EarZoneConfig, s: float) -> Box:
+    def ear_zone(self, face: FaceObservation, ear: int, z: EarZoneConfig, s: float) -> Box:
         lm = face.landmarks
         p = lm[ear]
         c = 0.5 * (lm[DRIVER_RIGHT_EAR] + lm[DRIVER_LEFT_EAR])
@@ -206,6 +256,12 @@ class RuleEngine:
                 box = Box(min(box.x1, p[0] - z.inward * s), box.y1, box.x2, box.y2)
             else:
                 box = Box(box.x1, box.y1, max(box.x2, p[0] + z.inward * s), box.y2)
+        e = self.cfg.ears
+        if e.eye_to_jaw:  # vertical extent: eye line .. jaw line
+            y1 = lm[EYE_OF[ear]][1] - e.eye_margin * s
+            y2 = lm[JAW_OF[ear]][1] + e.jaw_margin * s
+            if y2 > y1:
+                box = Box(box.x1, y1, box.x2, y2)
         return box
 
     def mouth_zone(self, face: FaceObservation, s: float) -> Box:
@@ -220,27 +276,72 @@ class RuleEngine:
                 return True
         return False
 
+    def _pose_wrist_ears(self, face: FaceObservation, s: float, person) -> tuple[set, list]:
+        """Ears (landmark ids) a raised wrist is at, per the pose wrist rule; wrist points."""
+        if person is None:
+            return set(), []
+        from .pose import ARMS
+
+        h = self.cfg.hand_at_ear
+        lm = face.landmarks
+        k = person.kpts
+        hit, wrists = set(), []
+        for sh, el, wr in ARMS:
+            if k[wr, 2] < h.kpt_conf:
+                continue
+            w = k[wr, :2]
+            wrists.append((float(w[0]), float(w[1])))
+            ear = min((DRIVER_RIGHT_EAR, DRIVER_LEFT_EAR),
+                      key=lambda e, w=w: float(np.linalg.norm(w - lm[e])))
+            if np.linalg.norm(w - lm[ear]) > h.wrist_ear_max * s:
+                continue
+            if w[1] < lm[EYE_OF[ear]][1] - self.cfg.ears.eye_margin * s:
+                continue  # above the eye line: hand on the head, not a call
+            if k[el, 2] >= h.kpt_conf and k[sh, 2] >= h.kpt_conf:
+                if k[el, 1] > k[sh, 1] + h.elbow_max_below_shoulder * s:
+                    continue  # elbow hanging down by the body
+            elif not h.elbow_unseen_ok:
+                continue
+            hit.add(ear)
+        return hit, wrists
+
     # -- per frame ------------------------------------------------------------
 
-    def evaluate(self, t: float, face: FaceObservation | None,
-                 dets: list[Detection]) -> FrameEvidence:
+    def evaluate(self, t: float, face: FaceObservation | None, dets: list[Detection],
+                 person=None, clf: dict[str, float] | None = None) -> FrameEvidence:
+        """person: the driver's pose (pose.Person) or None; clf: per ear behaviour, the ear-crop
+        classifier's smoothed P(phone), or None when the classifier is off."""
+        stale = False
         if face is None:
-            # Hold: no new face-based decision. The head-down timer pauses rather than resets,
-            # so a phone glance that briefly loses the face does not restart the 2 s count.
-            unknown = {b: Evidence(None, why="no face") for b in BEHAVIOURS}
-            down_s = t - self._down_since if self._down_since is not None else 0.0
-            return FrameEvidence(unknown, None, down_s, None)
+            # Item 4: within face_geometry_hold_s, keep the last face's zones so a phone or cup
+            # hiding the face still counts from the detector alone. Face-only signals (chewing,
+            # head pose, phone below the chin) pause.
+            if self._last_face is not None and \
+                    t - self._last_face_t <= self.cfg.smoothing.face_geometry_hold_s:
+                face, stale = self._last_face, True
+            else:
+                unknown = {b: Evidence(None, why="no face") for b in BEHAVIOURS}
+                down_s = t - self._down_since if self._down_since is not None else 0.0
+                ears = {b: EarEvidence() for b in self.ears}
+                for v in EAR_VARIANTS:
+                    for b, ep in self.episodes[v].items():
+                        ep.update(t, None, False)
+                        ears[b].variants[v] = (ep.dwell(t), ep.phone_seen)
+                return FrameEvidence(unknown, None, down_s, None, ears=ears)
+        else:
+            self._last_face, self._last_face_t = face, t
+            self.baseline.update(t, face)
+            self.chewing.update(t, face.jaw_open, face.jaw_source, face.lip_ratio)
 
-        self.baseline.update(t, face)
-        self.chewing.update(t, face.jaw_open, face.jaw_source, face.lip_ratio)
         s = face_scale(face)
         lm = face.landmarks
         phones = [d for d in dets if d.cls == "phone"]
         hands = [d for d in dets if d.cls == "hand"]
+        held = [d.box for d in dets if d.cls in ("drink", "food")]
         out: dict[str, Evidence] = {}
         zones: dict[str, Box] = {}
 
-        # Phone at an ear. Each phone goes to the ear zone it overlaps most.
+        # Phone at an ear: each phone box goes to the ear zone it overlaps most.
         ear_zones = {b: self.ear_zone(face, idx, z, s) for b, (idx, z) in self.ears.items()}
         zones.update(ear_zones)
         at_ear: dict[str, Evidence] = {b: Evidence(False) for b in ear_zones}
@@ -252,38 +353,48 @@ class RuleEngine:
                 used.add(i)
                 if ph.conf > at_ear[best].confidence:
                     at_ear[best] = Evidence(True, ph.conf, f"phone at ear, overlap {ov:.2f}")
-        far = self.far_ear_behaviour
-        far_cfg = self.ears[far][1]
-        if not at_ear[far].active and far_cfg.hand_only:
-            # The phone is often hidden behind the head; a hand there is the evidence. Its centre
-            # must be inside the zone (a hand at the mouth only grazes it), and a hand holding a
-            # cup or food is not holding a phone.
-            zone = ear_zones[far]
-            held = [d.box for d in dets if d.cls in ("drink", "food")]
-            for h in hands:
-                b = h.box
-                if not (zone.x1 <= b.cx <= zone.x2 and zone.y1 <= b.cy <= zone.y2):
-                    continue
-                if any(overlap_min(b, o) > 0.3 for o in held):
-                    continue
-                conf = far_cfg.hand_only_confidence * h.conf
-                if conf > at_ear[far].confidence:
-                    at_ear[far] = Evidence(True, conf, "hand at far ear (phone hidden)")
         out.update(at_ear)
 
-        # Head / gaze down relative to the baseline.
-        head_down = self._head_down(face)
-        if head_down:
-            self._down_since = t if self._down_since is None else self._down_since
+        # Hand at an ear (both ears): hand box centred in the zone, or the pose wrist rule. A
+        # hand holding a cup or food is not holding a phone.
+        pose_ears, wrists = self._pose_wrist_ears(face, s, person)
+        ears: dict[str, EarEvidence] = {}
+        for b, (idx, _) in self.ears.items():
+            z = ear_zones[b]
+            box_hit = any(z.x1 <= h.box.cx <= z.x2 and z.y1 <= h.box.cy <= z.y2 and
+                          not any(overlap_min(h.box, o) > 0.3 for o in held) for h in hands)
+            p_clf = clf.get(b) if clf else None
+            ev = EarEvidence(hand_box=box_hit if self.hands_available else None,
+                             pose=(idx in pose_ears) if person is not None else None,
+                             phone_box=bool(at_ear[b].active), clf_p=p_clf)
+            clf_phone = p_clf is not None and p_clf >= self.cfg.hand_at_ear.classifier_phone
+            hand = {"hands": ev.hand_box,
+                    "hands+pose": bool(ev.hand_box) or bool(ev.pose),
+                    "hands+pose+clf": bool(ev.hand_box) or bool(ev.pose)}
+            phone = {"hands": ev.phone_box, "hands+pose": ev.phone_box,
+                     "hands+pose+clf": ev.phone_box or clf_phone}
+            for v in EAR_VARIANTS:
+                ep = self.episodes[v][b]
+                ep.update(t, hand[v], phone[v])
+                ev.variants[v] = (ep.dwell(t), ep.phone_seen)
+            ears[b] = ev
+
+        # Head / gaze down relative to the baseline (needs a live face).
+        if stale:
+            head_down = None
         else:
-            self._down_since = None
+            head_down = self._head_down(face)
+            if head_down:
+                self._down_since = t if self._down_since is None else self._down_since
+            else:
+                self._down_since = None
         down_s = t - self._down_since if self._down_since is not None else 0.0
 
-        # Phone held low, in a hand, not in a holder.
+        # Phone held low, in a hand, not in a holder (needs a live face: chin position).
         pih = self.cfg.phone_in_hand
         chin_y = lm[CHIN][1]
-        out["phone_in_hand"] = Evidence(False)
-        for i, ph in enumerate(phones):
+        out["phone_in_hand"] = Evidence(None, why="face lost") if stale else Evidence(False)
+        for i, ph in enumerate(phones if not stale else []):
             if i in used or ph.box.cy < chin_y + pih.below_chin * s or self._in_holder(ph.box):
                 continue
             if self.hands_available and pih.require_hand:
@@ -307,21 +418,24 @@ class RuleEngine:
             ov = overlap_min(d.box, mouth)
             if ov >= dk.min_overlap:
                 conf = d.conf
-                if self._pitch_delta(face) is not None and \
-                        -self._pitch_delta(face) >= dk.pitch_up_deg:
+                dp = None if stale else self._pitch_delta(face)
+                if dp is not None and -dp >= dk.pitch_up_deg:
                     conf = min(1.0, conf * dk.pitch_up_bonus)
                 if conf > out["drinking"].confidence:
-                    out["drinking"] = Evidence(True, conf, f"drink at mouth, overlap {ov:.2f}")
+                    why = f"drink at mouth, overlap {ov:.2f}" + (" (last face)" if stale else "")
+                    out["drinking"] = Evidence(True, conf, why)
 
-        # Eating: food near the mouth recently AND chewing now.
+        # Eating: food near the mouth recently AND chewing now (chewing needs a live face).
         ea = self.cfg.eating
         mx, my = face.mouth_center
         for d in dets:
             if d.cls == "food" and point_box_dist(mx, my, d.box) <= ea.food_mouth_max_dist * s:
                 self._last_food_t, self._last_food_conf = t, d.conf
-        chew = self.chewing.analyze()
+        chew = None if stale else self.chewing.analyze()
         recent = self._last_food_t is not None and t - self._last_food_t <= ea.food_memory_s
-        if recent and chew.chewing:
+        if stale:
+            out["eating"] = Evidence(None, why="face lost")
+        elif recent and chew.chewing:
             out["eating"] = Evidence(True, self._last_food_conf,
                                      f"food {t - self._last_food_t:.1f}s ago + chewing "
                                      f"{chew.dominant_hz:.1f}Hz")
@@ -329,7 +443,7 @@ class RuleEngine:
             why = "no food at mouth recently" if not recent else f"not chewing ({chew.why})"
             out["eating"] = Evidence(False, why=why)
 
-        return FrameEvidence(out, head_down, down_s, chew, zones, s)
+        return FrameEvidence(out, head_down, down_s, chew, zones, s, ears, stale, wrists)
 
     def _pitch_delta(self, face: FaceObservation) -> float | None:
         if not self.baseline.ready or face.pitch_deg is None:

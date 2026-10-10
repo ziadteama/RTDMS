@@ -86,6 +86,31 @@ class FaceMeshConfig:
 
 
 @dataclass
+class PoseConfig:
+    enabled: bool = True
+    weights: str = "models/yolo26n_pose_320_ncnn_model"
+    imgsz: int = 320
+    every_n: int = 3
+    conf: float = 0.3
+    num_threads: int = 2
+
+
+@dataclass
+class EarClassifierConfig:
+    """Crops beside landmarks 234 / 454 -> phone / hand_no_phone / none."""
+
+    enabled: bool = False  # on once a model is trained (scripts/train_ear_classifier.py)
+    weights: str = "models/ear_cls_128_ncnn_model"
+    imgsz: int = 128
+    # Crop: square of side `scale` face widths, centred `outward` fw beyond the ear landmark.
+    scale: float = 1.2
+    outward: float = 0.25
+    grayscale: bool = False  # must match how the model was trained
+    ema: float = 0.4  # smoothing of P(phone) per ear (weight of the newest frame)
+    num_threads: int = 1
+
+
+@dataclass
 class HandsConfig:
     source: str = "mediapipe"
     model_path: str = "models/hand_landmarker.task"
@@ -139,6 +164,8 @@ class PipelineConfig:
     detector: DetectorConfig = field(default_factory=DetectorConfig)
     facemesh: FaceMeshConfig = field(default_factory=FaceMeshConfig)
     hands: HandsConfig = field(default_factory=HandsConfig)
+    pose: PoseConfig = field(default_factory=PoseConfig)
+    ear_classifier: EarClassifierConfig = field(default_factory=EarClassifierConfig)
     eventlog: EventLogConfig = field(default_factory=EventLogConfig)
     threads: ThreadsConfig = field(default_factory=ThreadsConfig)
     live: LiveConfig = field(default_factory=LiveConfig)
@@ -171,8 +198,6 @@ class EarZoneConfig:
     half_width: float = 0.45
     half_height: float = 0.65
     inward: float = 0.0
-    hand_only: bool = False
-    hand_only_confidence: float = 0.6
 
 
 @dataclass
@@ -180,10 +205,32 @@ class EarsConfig:
     near: EarZoneConfig = field(default_factory=EarZoneConfig)
     far: EarZoneConfig = field(
         default_factory=lambda: EarZoneConfig(
-            outward=0.20, half_width=0.50, inward=0.35, hand_only=True
+            outward=0.20, half_width=0.50, inward=0.35
         )
     )
     min_overlap: float = 0.25
+    # Vertical extent of both ear zones = eye line (outer eye corner) .. jaw line (jaw angle),
+    # widened by these margins. A hand above the eye line (temple, top of the head: the
+    # elbow-on-door posture) does not count.
+    eye_to_jaw: bool = True
+    eye_margin: float = 0.0
+    jaw_margin: float = 0.10
+
+
+@dataclass
+class HandAtEarConfig:
+    """Phone call when the phone itself is not seen: a hand held at an ear."""
+
+    dwell_s: float = 3.0  # hand at the ear this long -> WARNING (scratching is shorter)
+    gap_s: float = 0.7  # misses shorter than this do not end the episode
+    # Pose wrist rule: wrist within this many face widths of the ear landmark, not above the
+    # eye line, elbow raised (not hanging by the body).
+    wrist_ear_max: float = 0.5
+    elbow_max_below_shoulder: float = 1.0  # elbow y <= shoulder y + this * fw
+    elbow_unseen_ok: bool = True  # webcam framing often cuts the elbows off
+    kpt_conf: float = 0.3
+    # Ear-crop classifier: smoothed P(phone) at or above this during the episode -> ALERT.
+    classifier_phone: float = 0.6
 
 
 @dataclass
@@ -231,6 +278,9 @@ class SmoothingConfig:
     off_ratio: float = 0.30
     min_coverage: float = 0.6
     face_lost_hold_s: float = 5.0
+    # Face lost: keep using the last face box this long for ear / mouth zone geometry, so a
+    # phone or cup hiding the face still counts from detector evidence alone.
+    face_geometry_hold_s: float = 5.0
 
 
 @dataclass
@@ -238,6 +288,7 @@ class RulesConfig:
     baseline: BaselineConfig = field(default_factory=BaselineConfig)
     head_down: HeadDownConfig = field(default_factory=HeadDownConfig)
     ears: EarsConfig = field(default_factory=EarsConfig)
+    hand_at_ear: HandAtEarConfig = field(default_factory=HandAtEarConfig)
     phone_in_hand: PhoneInHandConfig = field(default_factory=PhoneInHandConfig)
     drinking: DrinkingConfig = field(default_factory=DrinkingConfig)
     eating: EatingConfig = field(default_factory=EatingConfig)

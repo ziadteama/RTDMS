@@ -6,6 +6,7 @@ Face: centre (320, 260), width 120 px. Driver's right ear (234) at x=260 (image-
 
 import math
 
+import numpy as np
 import pytest
 from helpers import det, engine, make_face
 
@@ -34,45 +35,136 @@ def test_phone_at_left_ear_lhd_full_and_partial():
         assert active(ev, "phone_right_ear") is False
 
 
-def test_hand_only_counts_at_far_ear_only():
-    hand = det("hand", 410, 250, 60, 70, conf=0.9)
-    ev = engine("right").evaluate(0.0, make_face(), [hand])
-    assert active(ev, "phone_left_ear") is True
-    assert ev.behaviours["phone_left_ear"].confidence == pytest.approx(0.6 * 0.9)
-
-    near_hand = det("hand", 215, 250, 60, 70)
-    ev = engine("right").evaluate(0.0, make_face(), [near_hand])
-    assert active(ev, "phone_right_ear") is False  # near ear is visible: needs the phone itself
-
-
-def test_driver_side_left_swaps_near_and_far():
-    # RHD: camera to the driver's left; the driver's RIGHT ear (image-left) is now the far one.
-    e = engine("left")
-    ev = e.evaluate(0.0, make_face(), [det("hand", 225, 250, 60, 70)])
-    assert active(ev, "phone_right_ear") is True
-    ev = engine("left").evaluate(0.0, make_face(), [det("hand", 410, 250, 60, 70)])
-    assert active(ev, "phone_left_ear") is False
+def run_hand(e, seconds, hand_fn, t0=0.0, fps=30, person_fn=None, clf_fn=None, extra=()):
+    """Feed frames; hand_fn(t) -> hand box tuple or None. Returns the last FrameEvidence."""
+    ev = None
+    for i in range(int(seconds * fps)):
+        t = t0 + i / fps
+        h = hand_fn(t)
+        dets = ([det("hand", *h)] if h else []) + list(extra)
+        ev = e.evaluate(t, make_face(), dets, person=person_fn(t) if person_fn else None,
+                        clf=clf_fn(t) if clf_fn else None)
+    return ev
 
 
-def test_hand_holding_cup_at_mouth_is_not_a_far_ear_call():
-    hand = det("hand", 345, 300, 60, 60)
-    cup = det("drink", 335, 295, 40, 60)
-    ev = engine("right").evaluate(0.0, make_face(), [hand, cup])
-    assert active(ev, "phone_left_ear") is False
-    assert active(ev, "drinking") is True
+RIGHT_EAR_HAND = (215, 270, 50, 50)  # centred in the near (driver's right) ear zone
+LEFT_EAR_HAND = (410, 270, 50, 50)
 
 
-def test_hand_on_chin_is_not_a_far_ear_call():
-    ev = engine("right").evaluate(0.0, make_face(), [det("hand", 320, 330, 70, 60)])
-    assert active(ev, "phone_left_ear") is False
+def dwell(ev, ear="phone_right_ear", variant="hands"):
+    return ev.ears[ear].variants[variant]
 
 
-def test_hand_only_can_be_disabled():
-    cfg = RulesConfig()
-    cfg.ears.far.hand_only = False
-    e = engine("right", cfg=cfg)
-    ev = e.evaluate(0.0, make_face(), [det("hand", 410, 250, 60, 70)])
-    assert active(ev, "phone_left_ear") is False
+def test_hand_at_either_ear_builds_dwell():
+    for ear, box in (("phone_right_ear", RIGHT_EAR_HAND), ("phone_left_ear", LEFT_EAR_HAND)):
+        ev = run_hand(engine(), 3.5, lambda t, box=box: box)
+        d, seen = dwell(ev, ear)
+        assert d >= 3.0 and not seen, ear
+
+
+def test_scratching_under_dwell_never_reaches_warning():
+    e = engine()
+    ev = run_hand(e, 1.5, lambda t: RIGHT_EAR_HAND)
+    assert dwell(ev)[0] < 3.0
+    ev = run_hand(e, 2.0, lambda t: None, t0=1.5)  # hand away > gap: episode ends
+    assert dwell(ev)[0] == 0.0
+    ev = run_hand(e, 1.5, lambda t: RIGHT_EAR_HAND, t0=3.5)  # scratch again: counts from 0
+    assert dwell(ev)[0] < 1.6
+
+
+def test_short_detection_misses_do_not_reset_the_episode():
+    # hand box missing for 0.4 s every second (< gap_s 0.7)
+    ev = run_hand(engine(), 4.0, lambda t: RIGHT_EAR_HAND if (t % 1.0) < 0.6 else None)
+    assert dwell(ev)[0] >= 3.0
+
+
+def test_hand_above_the_eye_line_is_not_at_the_ear():
+    # temple / top of the head: the elbow-on-door posture
+    ev = run_hand(engine(), 4.0, lambda t: (215, 200, 50, 40))
+    assert dwell(ev, "phone_right_ear")[0] == 0.0
+
+
+def test_hand_holding_cup_at_ear_height_is_not_a_call():
+    cup = det("drink", 410, 275, 40, 50)
+    ev = run_hand(engine(), 4.0, lambda t: LEFT_EAR_HAND, extra=[cup])
+    assert dwell(ev, "phone_left_ear")[0] == 0.0
+
+
+def test_hand_on_chin_is_not_at_an_ear():
+    ev = run_hand(engine(), 4.0, lambda t: (320, 335, 70, 60))
+    assert dwell(ev, "phone_right_ear")[0] == 0.0 and dwell(ev, "phone_left_ear")[0] == 0.0
+
+
+def person(wrist, elbow=None, shoulder=(220, 420), vis=0.9):
+    from rtdms_distraction.pose import Person
+    from rtdms_distraction.types import Box
+
+    k = np.zeros((17, 3))
+    # driver's right arm = COCO right (6 shoulder, 8 elbow, 10 wrist)
+    k[6] = (*shoulder, vis)
+    k[10] = (*wrist, vis)
+    if elbow is not None:
+        k[8] = (*elbow, vis)
+    return Person(Box(100, 100, 540, 640), 0.9, k)
+
+
+def test_pose_wrist_rule():
+    e = engine()
+    ear = (260, 260)  # landmark 234
+    cases = {
+        "raised elbow": (person((ear[0] - 10, ear[1] + 30), elbow=(200, 380)), True),
+        "elbow hanging by the body": (person((ear[0] - 10, ear[1] + 30), elbow=(230, 600)),
+                                      False),
+        "wrist above the eye line": (person((ear[0], ear[1] - 60), elbow=(200, 380)), False),
+        "wrist far from the ear": (person((ear[0] - 120, ear[1] + 30), elbow=(200, 380)), False),
+        "elbow out of frame": (person((ear[0] - 10, ear[1] + 30)), True),
+    }
+    for name, (p, want) in cases.items():
+        ev = e.evaluate(0.0, make_face(), [], person=p)
+        assert ev.ears["phone_right_ear"].pose is want, name
+
+
+def test_pose_adds_hand_at_ear_only_in_pose_variants():
+    p = person((250, 290), elbow=(200, 380))
+    ev = run_hand(engine(), 3.5, lambda t: None, person_fn=lambda t: p)
+    assert dwell(ev, variant="hands")[0] == 0.0
+    assert dwell(ev, variant="hands+pose")[0] >= 3.0
+
+
+def test_classifier_phone_upgrades_only_the_clf_variant():
+    p = person((250, 290), elbow=(200, 380))
+    ev = run_hand(engine(), 3.5, lambda t: RIGHT_EAR_HAND, person_fn=lambda t: p,
+                  clf_fn=lambda t: {"phone_right_ear": 0.8, "phone_left_ear": 0.1})
+    assert dwell(ev, variant="hands+pose")[1] is False
+    assert dwell(ev, variant="hands+pose+clf")[1] is True
+    ev = run_hand(engine(), 3.5, lambda t: RIGHT_EAR_HAND,
+                  clf_fn=lambda t: {"phone_right_ear": 0.4, "phone_left_ear": 0.1})
+    assert dwell(ev, variant="hands+pose+clf")[1] is False  # below classifier_phone 0.6
+
+
+def test_phone_box_in_zone_during_episode_marks_phone_seen():
+    phone = det("phone", 215, 265, 35, 70)
+    ev = run_hand(engine(), 3.5, lambda t: RIGHT_EAR_HAND, extra=[phone])
+    assert dwell(ev)[1] is True
+
+
+def test_driver_side_sets_which_ear_zone_reaches_behind_the_head():
+    lhd = engine("right").evaluate(0.0, make_face(), [])
+    rhd = engine("left").evaluate(0.0, make_face(), [])
+    # far ear zone extends inward past its landmark (inward 0.35 fw = 42 px)
+    assert lhd.zones["phone_left_ear"].x1 <= 380 - 42 + 1
+    assert rhd.zones["phone_right_ear"].x2 >= 260 + 42 - 1
+
+
+def test_face_lost_reuses_last_face_geometry_for_detector_evidence():
+    e = engine()
+    e.evaluate(0.0, make_face(), [])
+    cup = det("drink", 320, 300, 50, 70)
+    ev = e.evaluate(2.0, None, [cup])  # face hidden behind the cup
+    assert ev.stale_face and active(ev, "drinking") is True
+    assert active(ev, "eating") is None and active(ev, "phone_in_hand") is None
+    ev = e.evaluate(6.0, None, [cup])  # beyond face_geometry_hold_s (5 s)
+    assert not ev.stale_face and active(ev, "drinking") is None
 
 
 def test_ear_zones_scale_with_face_size():

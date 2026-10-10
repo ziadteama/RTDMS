@@ -45,6 +45,7 @@ def build(fn):
     p = PipelineConfig()
     p.rectify.enabled = False
     p.hands.source = "detector"
+    p.pose.enabled = False  # unit tests never load model files
     r = RulesConfig()
     r.baseline.duration_s = 1.0
     r.baseline.min_samples = 10
@@ -90,3 +91,30 @@ def test_no_detections_never_alerts():
         res = pipe.process(frame, i / FPS)
         assert res.level == "none"
     assert res.baseline["ready"]
+
+
+def test_hand_at_ear_warning_after_dwell_then_alert_with_phone():
+    hand = det("hand", 215, 270, 50, 50)  # centred in the driver's right ear zone
+    phone = det("phone", 215, 265, 35, 70)
+
+    def scene(t):
+        if t < 1.0:
+            return {"pitch": 0.0}, []
+        if t < 5.0:
+            return {"pitch": 0.0}, [hand]            # hand only: warning from ~4.0 s
+        return {"pitch": 0.0}, [hand, phone]          # phone appears: alert
+
+    pipe, s = build(scene)
+    frame = np.zeros((640, 640), np.uint8)
+    levels = {}
+    for i in range(int(7 * FPS)):
+        t = i / FPS
+        s.t = t
+        res = pipe.process(frame, t)
+        levels[round(t, 2)] = res.behaviours["phone_right_ear"]["level"]
+        assert res.variant == "hands"  # no pose / classifier loaded
+        assert set(res.ear_levels) == {"hands", "hands+pose", "hands+pose+clf"}
+    first_warn = min(t for t, lv in levels.items() if lv == "warning")
+    assert 3.9 <= first_warn <= 4.1, first_warn
+    assert levels[4.9] == "warning"
+    assert levels[6.9] == "alert"

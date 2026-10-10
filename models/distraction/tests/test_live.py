@@ -43,6 +43,7 @@ def build(dets=()):
     p = PipelineConfig()
     p.rectify.enabled = False
     p.hands.source = "detector"
+    p.pose.enabled = False  # unit tests never load model files
     r = RulesConfig()
     r.baseline.duration_s = 0.0
     r.baseline.min_samples = 1

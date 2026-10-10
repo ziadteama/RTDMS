@@ -21,7 +21,7 @@ import numpy as np
 from .calibration import FisheyeCalibration
 from .config import BEHAVIOURS, PipelineConfig, RulesConfig, resolve_path
 from .roi import DriverROI
-from .rules import Baseline, FrameEvidence, RuleEngine
+from .rules import EAR_VARIANTS, Baseline, FrameEvidence, RuleEngine, face_scale
 from .smoothing import BehaviourSmoother
 from .types import Detection, FaceObservation
 
@@ -40,6 +40,12 @@ class FrameResult:
     baseline: dict[str, Any]
     timings_ms: dict[str, float] = field(default_factory=dict)
     detector_ran: bool = False
+    # Ear behaviours' level under each hand-at-ear evidence set (guided-mode comparison), and
+    # the set this result reports.
+    ear_levels: dict[str, dict[str, str]] = field(default_factory=dict)
+    variant: str = "hands"
+    person: Any = None  # driver's pose (pose.Person) or None
+    clf: dict[str, float] | None = None  # ear-crop classifier, smoothed P(phone) per ear
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-safe per-frame output (no image, no landmarks)."""
@@ -75,7 +81,7 @@ def _r(v: float | None, n: int = 3) -> float | None:
 
 class DistractionPipeline:
     def __init__(self, pcfg: PipelineConfig, rcfg: RulesConfig, frame_size: tuple[int, int],
-                 detector=None, facemesh=None, hands=None):
+                 detector=None, facemesh=None, hands=None, pose=None, ear_clf=None):
         """frame_size = (w, h) of the raw frames. detector / facemesh / hands may be injected
         (tests, replay); otherwise they are built from the config."""
         self.pcfg, self.rcfg = pcfg, rcfg
@@ -104,6 +110,23 @@ class DistractionPipeline:
             from .hands import MediaPipeHands
             hands = MediaPipeHands(pcfg.hands)
         self.detector, self.facemesh, self.hands = detector, facemesh, hands
+        if pose is None and pcfg.pose.enabled:
+            try:
+                from .pose import PoseEstimator
+                pose = PoseEstimator(pcfg.pose)
+            except (FileNotFoundError, ImportError) as e:
+                print(f"[pipeline] pose disabled: {e}")
+        if ear_clf is None and pcfg.ear_classifier.enabled:
+            try:
+                from .ear_clf import EarClassifier
+                ear_clf = EarClassifier(pcfg.ear_classifier)
+            except (FileNotFoundError, ImportError) as e:
+                print(f"[pipeline] ear classifier disabled: {e}")
+        self.pose, self.ear_clf = pose, ear_clf
+        # Run-time switches (live.py keys p / c). A stage that is not loaded stays off.
+        self.pose_on = pose is not None
+        self.clf_on = ear_clf is not None
+        self._person = None
 
         hands_available = pcfg.hands.source != "off"
         self.rules = RuleEngine(rcfg, pcfg.driver_side, hands_available, (vw, vh))
@@ -158,21 +181,53 @@ class DistractionPipeline:
             self._hands = self.hands.detect(face_in, t)
         tm["hands"] = (time.perf_counter() - t0) * 1000
 
+        # Pose (every Nth frame) and the ear-crop classifier feed the hand-at-ear rule.
+        t0 = time.perf_counter()
+        if self.pose is not None and self._i % max(1, p.pose.every_n) == 0:
+            from .pose import driver_person
+            self._person = driver_person(self.pose.detect(det_in),
+                                         face.center if face is not None else None)
+        tm["pose"] = (time.perf_counter() - t0) * 1000
+        t0 = time.perf_counter()
+        clf = None
+        if self.ear_clf is not None and face is not None:
+            clf = self.ear_clf.update(det_in, face, face_scale(face))
+        tm["ear_clf"] = (time.perf_counter() - t0) * 1000
+
         t0 = time.perf_counter()
         dets = [d for d in self._dets if d.cls != "hand" or p.hands.source == "detector"]
         dets += self._hands if p.hands.source == "mediapipe" else []
-        ev = self.rules.evaluate(t, face, dets)
+        ev = self.rules.evaluate(t, face, dets, person=self._person if self.pose else None,
+                                 clf=clf)
+        variant = self.variant
+        dwell = self.rcfg.hand_at_ear.dwell_s
         behaviours = {}
+        ear_levels: dict[str, dict[str, str]] = {v: {} for v in EAR_VARIANTS}
         for b in BEHAVIOURS:
             e = ev.behaviours[b]
             s = self.smoothers[b].update(t, e.active, e.confidence)
             level = self.rcfg.levels[b] if s.active else "none"
+            extra = {}
             if b == "phone_in_hand" and s.active and \
                     ev.head_down_s >= self.rcfg.phone_in_hand.alert_after_down_s:
                 level = "alert"
+            if b in ev.ears:
+                # Phone at an ear: a smoothed phone box -> ALERT; else a hand held at the ear
+                # >= dwell -> WARNING, ALERT if a phone (box or classifier) was seen meanwhile.
+                for v in EAR_VARIANTS:
+                    d_s, seen = ev.ears[b].variants.get(v, (0.0, False))
+                    lv = "alert" if s.active else (("alert" if seen else "warning")
+                                                   if d_s >= dwell else "none")
+                    ear_levels[v][b] = lv
+                level = ear_levels[variant][b]
+                ee = ev.ears[b]
+                extra = {"hand_s": round(ee.variants.get(variant, (0.0, False))[0], 2),
+                         "hand_box": ee.hand_box, "pose": ee.pose,
+                         "clf_p": None if ee.clf_p is None else round(ee.clf_p, 3)}
             behaviours[b] = {
-                "active": s.active, "level": level, "confidence": round(s.confidence, 3),
-                "ratio": round(s.ratio, 2), "raw": e.active, "holding": s.holding, "why": e.why,
+                "active": level != "none", "level": level,
+                "confidence": round(s.confidence, 3), "ratio": round(s.ratio, 2),
+                "raw": e.active, "holding": s.holding, "why": e.why, **extra,
             }
         level = max((v["level"] for v in behaviours.values()), key=LEVEL_RANK.__getitem__)
         tm["rules"] = (time.perf_counter() - t0) * 1000
@@ -181,7 +236,14 @@ class DistractionPipeline:
         baseline = {"ready": bl.ready, "progress": round(bl.progress(t), 2),
                     "pitch": _r(bl.pitch, 2), "yaw": _r(bl.yaw, 2), "gaze": _r(bl.gaze)}
         self._i += 1
-        return FrameResult(t, view, face, dets, ev, behaviours, level, baseline, tm, ran)
+        return FrameResult(t, view, face, dets, ev, behaviours, level, baseline, tm, ran,
+                           ear_levels, variant, self._person if self.pose_on else None, clf)
+
+    @property
+    def variant(self) -> str:
+        if self.pose_on and self.clf_on:
+            return "hands+pose+clf"
+        return "hands+pose" if self.pose_on else "hands"
 
     def close(self) -> None:
         for part in (self.facemesh, self.hands):

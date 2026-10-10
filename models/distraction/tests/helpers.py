@@ -28,7 +28,8 @@ def make_face(cx: float = 320.0, cy: float = 260.0, fw: float = 120.0, *, pitch:
     lm[14] = (cx, mouth_y + lip * mw / 2)
     lm[1] = (cx, cy + 0.05 * fw)
     for i, (x, y) in {33: (-0.32, -0.15), 133: (-0.12, -0.15), 362: (0.12, -0.15),
-                      263: (0.32, -0.15), 468: (-0.22, -0.15), 473: (0.22, -0.15)}.items():
+                      263: (0.32, -0.15), 468: (-0.22, -0.15), 473: (0.22, -0.15),
+                      172: (-0.38, 0.35), 397: (0.38, 0.35)}.items():
         lm[i] = (cx + x * fw, cy + y * fw)
     return FaceObservation(landmarks=lm, pitch_deg=pitch, yaw_deg=yaw, gaze_down=gaze,
                            gaze_source="blendshape", jaw_open=jaw, jaw_source=jaw_source,

@@ -16,26 +16,43 @@ head_down:
   gaze_down_iris: 0.12
 
 ears:
-  # The ear nearer the camera (driver's right in a LHD car) is fully visible: needs a phone box.
+  # The ear nearer the camera (driver's right in a LHD car / laptop at the front-right).
   near:
     # Zone centre = ear landmark + outward * fw (away from the face centre), + down * fw.
     outward: 0.30
     down: 0.15
     half_width: 0.45
     half_height: 0.65
-  # The far ear (driver's left in a LHD car) is partly hidden behind the head. The zone also
-  # extends inward behind the head, and a hand alone counts (lower confidence) because the
-  # phone itself is often not visible.
+  # The far ear is partly hidden behind the head: the zone also reaches inward behind it.
   far:
     outward: 0.20
     down: 0.15
     half_width: 0.50
     half_height: 0.65
     inward: 0.35
-    hand_only: true
-    hand_only_confidence: 0.6
   # Overlap = intersection / min(box area, zone area).
   min_overlap: 0.25
+  # Vertical extent of both zones = eye line .. jaw line (+ margins, in fw). A hand above the
+  # eye line (temple, top of the head = elbow-on-door posture) is outside the zone.
+  eye_to_jaw: true
+  eye_margin: 0.0
+  jaw_margin: 0.10
+
+# Phone call without a visible phone, either ear:
+#   hand at the ear >= dwell_s           -> WARNING
+#   ... and during that episode a phone box in the ear zone, or the ear-crop classifier's
+#   smoothed P(phone) >= classifier_phone -> ALERT
+# A phone box in the zone on its own (smoothed) is an ALERT as before.
+# "Hand at ear" = a hand box (MediaPipe Hands or the detector's hand class) with its centre in
+# the ear zone, OR the pose wrist rule below.
+hand_at_ear:
+  dwell_s: 3.0           # scratching / adjusting glasses is usually shorter
+  gap_s: 0.7             # brief detection misses do not end the episode
+  wrist_ear_max: 0.5     # pose wrist within this many fw of the ear landmark ...
+  elbow_max_below_shoulder: 1.0   # ... with the elbow raised (elbow y <= shoulder y + 1.0 fw)
+  elbow_unseen_ok: true  # elbows are often out of a webcam's frame
+  kpt_conf: 0.3
+  classifier_phone: 0.6
 
 phone_in_hand:
   # Phone centre must be below chin_y + this many face widths ... (negative = slightly above)
@@ -89,6 +106,9 @@ smoothing:
   min_coverage: 0.6
   # Face lost or occluded: face-based behaviours freeze for up to this long, then clear.
   face_lost_hold_s: 5.0
+  # Face lost: reuse the last face box this long for ear / mouth zone geometry, so a phone
+  # or cup hiding the face still counts from detector evidence alone.
+  face_geometry_hold_s: 5.0
 
 # Recommended level per behaviour. Fusion owns the actual cabin alert (repo invariant);
 # these are what this module reports.
