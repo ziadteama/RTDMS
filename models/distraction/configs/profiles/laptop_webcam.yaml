@@ -7,7 +7,7 @@ capture:
   height: 720
   fps: 30
   backend: auto          # MSMF first, then DSHOW
-  grayscale: true        # like the IR camera; 'g' toggles it live
+  grayscale: false       # colour: the current target. true = IR-camera-like; 'g' toggles
   flip_horizontal: false # the startup side check corrects this if the webcam is mirrored
 
 rectify:
@@ -36,3 +36,10 @@ live:
        hands: mediapipe}
     - {name: v1_416, weights: models/v1_416_ncnn_model, imgsz: 416, hands: detector}
     - {name: v1_512, weights: models/v1_512_ncnn_model, imgsz: 512, hands: detector}
+
+pose:
+  enabled: true          # wrist-at-ear evidence (yolo26n-pose @320, every 3rd frame); 'p' toggles
+
+ear_classifier:
+  enabled: true          # loads models/ear_cls_128_ncnn_model once trained; 'c' toggles
+  grayscale: false       # colour crops (current target); must match training

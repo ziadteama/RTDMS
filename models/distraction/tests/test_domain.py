@@ -79,3 +79,15 @@ def test_convert_end_to_end_resizes_and_keeps_labels():
     boxes = [(0, 832.0, 480.0, 960.0, 672.0)]
     out, nb = convert(img, boxes, [], np.random.default_rng(0), out_size=640)
     assert max(out.shape[:2]) <= 640 and len(nb) == 1
+
+
+def test_color_look_keeps_colour_and_convert_defaults_to_it():
+    from rtdms_distraction.domain import color_look
+
+    img = np.zeros((200, 300, 3), np.uint8)
+    img[:, :, 2] = 200  # red
+    out = color_look(img, np.random.default_rng(0))
+    assert out.shape == img.shape
+    assert out[:, :, 2].mean() > out[:, :, 0].mean() + 50  # still red, not gray
+    conv, _ = convert(img, [], [], np.random.default_rng(1), crop=False, p_barrel=0.0)
+    assert conv[:, :, 2].mean() > conv[:, :, 0].mean() + 50

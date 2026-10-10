@@ -65,7 +65,8 @@ detect-then-track sees a steady image.
 | Behaviour | Frame evidence |
 |---|---|
 | phone at near ear | phone box overlaps (∩ / min area ≥ 0.25) the near-ear zone |
-| phone at far ear | same with the far-ear zone, **or** a hand whose centre is inside it and that is not holding a drink/food box |
+| phone at far ear | same with the far-ear zone (reaches `inward` behind the head) |
+| hand at either ear | hand box (MediaPipe or detector) centred in the ear zone, or a pose wrist within 0.5 fw of the ear landmark, not above the eye line, elbow raised or unseen; held >= 3 s (gap-tolerant) -> WARNING; a phone box in the zone or ear-crop classifier P(phone) >= 0.6 during the episode -> ALERT. Ear zones span eye line .. jaw line |
 | phone in hand | phone not at an ear, centre below chin − 0.1 fw, within 0.3 fw of a hand box (skipped when hands are off), outside holder zones. Level escalates to `alert` after head pitch ≥ 15° or gaze-down above baseline for ≥ 2 s |
 | drinking | drink box overlaps the mouth region (lips 13/14, corners 61/291; 0.40 x 0.35 fw half-sizes); pitch-up ≥ 8° multiplies confidence by 1.25 |
 | eating | food box within 0.8 fw of the mouth in the last 5 s **and** chewing: over a 3 s window the detrended jaw signal has enough amplitude, ≥ 45 % of its 0.3–7 Hz power in 0.8–2.5 Hz with the peak there, and lips closed (gap/width < 0.10) in ≥ 60 % of frames. Talking (jaw ~4–5 Hz, lips apart) and singing (mouth held open) fail the last two tests |
@@ -98,7 +99,7 @@ one `frame` record per frame for event-level evaluation. No images, no landmarks
 
 | Condition | Behaviour |
 |---|---|
-| No face / face occluded | every behaviour's evidence is `None`: smoothed states **hold**, nothing new can activate; after `face_lost_hold_s` (5 s) states clear |
+| No face / face occluded | for up to `face_geometry_hold_s` (5 s) the last face's zones are reused, so detector evidence (phone at an ear, cup at the mouth) still counts; face-only signals (chewing, head pose, phone below the chin) pause. Beyond that every behaviour's evidence is `None`: states **hold**, then clear after `face_lost_hold_s` |
 | Baseline not ready (first ~10 s) | head-down escalation and the pitch-up drinking bonus are off; `baseline.ready=false` in the output |
 | No hand source (`hands.source: off`) | phone-in-hand no longer requires a hand; far-ear hand-only evidence is impossible |
 | Missing calibration file with `rectify.enabled` | refuses to start (say `--no-rectify` explicitly) |

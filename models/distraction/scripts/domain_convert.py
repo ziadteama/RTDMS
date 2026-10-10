@@ -25,6 +25,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -103,7 +104,7 @@ def work(job):
         rng = np.random.default_rng(seed + k)
         o, b = convert(img, boxes, faces, rng, out_size=opts["size"], crop=opts["crop"],
                        p_barrel=opts["p_barrel"], p_occlude=opts["p_occlude"], calib=calib,
-                       hand_bank=HAND_BANK)
+                       hand_bank=HAND_BANK, look=opts["look"])
         stem = f"{img_path.stem}_v{k}"
         cv2.imwrite(str(out_img / f"{stem}.jpg"), o, [cv2.IMWRITE_JPEG_QUALITY, 90])
         write_labels(out_lab / f"{stem}.txt", b, o.shape[1], o.shape[0])
@@ -122,7 +123,10 @@ def main() -> int:
     p.add_argument("--variants", type=int, default=1, help="variants per TRAIN image")
     p.add_argument("--size", type=int, default=640)
     p.add_argument("--no-crop", action="store_true")
-    p.add_argument("--p-barrel", type=float, default=0.5)
+    p.add_argument("--look", choices=["color", "ir"], default=None,
+                   help="target camera look (default: configs/data.yaml look)")
+    p.add_argument("--p-barrel", type=float, default=None,
+                   help="fisheye geometry share (default 0 for color, 0.5 for ir)")
     p.add_argument("--p-occlude", type=float, default=0.5)
     p.add_argument("--calib", help="our fisheye calibration YAML (K, D)")
     p.add_argument("--workers", type=int, default=8)
@@ -134,8 +138,12 @@ def main() -> int:
     src, out = Path(args.src), Path(args.out)
     splits = [args.split]
     faces = json.loads(Path(args.faces).read_text(encoding="utf8")) if args.faces else {}
+    dcfg = yaml.safe_load((ROOT / "configs" / "data.yaml").read_text(encoding="utf8"))
+    look = args.look or dcfg.get("look", "color")
+    if args.p_barrel is None:  # fisheye geometry only for the IR / fisheye target
+        args.p_barrel = 0.5 if look == "ir" else 0.0
     opts = {"size": args.size, "crop": not args.no_crop, "p_barrel": args.p_barrel,
-            "p_occlude": args.p_occlude, "calib": args.calib,
+            "p_occlude": args.p_occlude, "calib": args.calib, "look": look,
             "skip_product": not args.keep_product_shots}
     bank_path = None
     if args.hand_bank_from:

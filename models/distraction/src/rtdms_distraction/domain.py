@@ -153,6 +153,33 @@ def barrel(img: np.ndarray, boxes: list[Box], rng, fov_deg: float | None = None,
 # --------------------------------------------------------------------------- IR look
 
 
+def color_look(img: np.ndarray, rng, strength: float = 1.0) -> np.ndarray:
+    """Laptop-webcam degradations, in COLOUR: blur, brightness / contrast, sensor noise and
+    JPEG artefacts. No grayscale, no IR skin lift, no vignetting (the current target is a
+    daylight / indoor webcam; ir_look stays for the IR camera)."""
+    out = img.astype(np.float32)
+    s = strength
+    out = (out - out.mean()) * rng.uniform(1 - 0.35 * s, 1 + 0.2 * s) + out.mean() \
+        + rng.uniform(-30, 30) * s
+    if rng.random() < 0.5:
+        k = int(rng.integers(1, 3)) * 2 + 1
+        out = cv2.GaussianBlur(out, (k, k), 0)
+    if rng.random() < 0.2:  # motion blur
+        k = int(rng.integers(3, 8))
+        kern = np.zeros((k, k), np.float32)
+        kern[k // 2, :] = 1.0 / k
+        out = cv2.filter2D(out, -1, kern)
+    out = out + rng.normal(0, rng.uniform(0, 8) * s, out.shape).astype(np.float32)
+    out = np.clip(out, 0, 255).astype(np.uint8)
+    if rng.random() < 0.5:
+        _, enc = cv2.imencode(".jpg", out, [cv2.IMWRITE_JPEG_QUALITY, int(rng.integers(40, 90))])
+        out = cv2.imdecode(enc, cv2.IMREAD_COLOR)
+    return out
+
+
+LOOKS = {"color": color_look}  # filled below with ir_look
+
+
 def ir_look(img: np.ndarray, rng, strength: float = 1.0) -> np.ndarray:
     """Grayscale NoIR/IR appearance. Photometric only: boxes are unchanged."""
     g = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
@@ -193,6 +220,9 @@ def ir_look(img: np.ndarray, rng, strength: float = 1.0) -> np.ndarray:
 
 
 # --------------------------------------------------------------------------- occlusion
+
+
+LOOKS["ir"] = ir_look
 
 
 def _covered(alpha: np.ndarray, box) -> float:
@@ -263,14 +293,16 @@ def is_product_shot(boxes: list[Box], w: int, h: int, has_person: bool,
 def convert(img: np.ndarray, boxes: list[Box], faces: list[tuple], rng, *,
             out_size: int = 640, crop: bool = True, p_barrel: float = 0.5,
             p_occlude: float = 0.5, calib: FisheyeCalibration | None = None,
-            hand_bank: list[np.ndarray] | None = None) -> tuple[np.ndarray, list[Box]]:
-    """Full offline conversion of one image."""
+            hand_bank: list[np.ndarray] | None = None, look: str = "color"
+            ) -> tuple[np.ndarray, list[Box]]:
+    """Full offline conversion of one image. look: color (laptop webcam, current target) or
+    ir (grayscale IR camera). Fisheye geometry (p_barrel) belongs to the IR / fisheye target."""
     if crop:
         img, boxes = head_shoulders_crop(img, boxes, faces, rng)
     if rng.random() < p_barrel:
         img, boxes = barrel(img, boxes, rng, calib=calib)
     img = occlude(img, boxes, rng, p=p_occlude, hand_bank=hand_bank)
-    img = ir_look(img, rng)
+    img = LOOKS[look](img, rng)
     h, w = img.shape[:2]
     s = out_size / max(h, w)
     if s < 1:

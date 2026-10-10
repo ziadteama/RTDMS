@@ -7,6 +7,13 @@ webcam clip, and the one-time in-car session (`IN_CAR_TEST_PROTOCOL.md`).
 All datasets and derived images live under `configs/data.yaml -> root` (`D:/rtdms-data`, C: is
 nearly full), never in git.
 
+> **2026-10-11: current target is the laptop webcam in colour** (`configs/data.yaml: look:
+> color`). New conversions and fine-tunes use colour; fisheye geometry and the IR look are off
+> (blur, brightness / contrast, noise, JPEG and occlusion stay). The v1 models below were
+> trained before this change, on the grayscale IR look. The ear-crop classifier
+> (`build_ear_crops.py` / `train_ear_classifier.py`) uses State Farm (phone / none, split by
+> driver) plus Open Images hand-at-face crops (hand_no_phone), in colour.
+
 ## Sources
 
 | Source | Status | Role | Licence / access |

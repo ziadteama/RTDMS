@@ -1,11 +1,17 @@
 # rtdms-distraction
 
-Driver distraction from the mirror-mounted fisheye IR cabin camera, on a Raspberry Pi 5 CPU:
+> **Current target (2026-10-11): laptop webcam, colour, daylight / indoor lighting only.**
+> The mirror-mounted fisheye IR Pi camera is parked; its settings (fisheye rectification,
+> grayscale, IR-look training) stay as config switches. See
+> [docs/LAPTOP_TESTING.md](docs/LAPTOP_TESTING.md).
+
+Driver distraction (originally designed for the mirror-mounted fisheye IR cabin camera on a
+Raspberry Pi 5 CPU):
 
 | Behaviour | Evidence |
 |---|---|
-| `phone_right_ear` | phone box in a zone beside landmark 234 (driver's right ear) |
-| `phone_left_ear` | phone box (possibly partial) **or a hand** beside / behind landmark 454 |
+| `phone_right_ear` | phone box in the ear zone beside landmark 234 (eye line to jaw line) → ALERT; or a hand at that ear ≥ 3 s → WARNING, ALERT if a phone box / the ear-crop classifier says phone meanwhile |
+| `phone_left_ear` | same at landmark 454 (the far ear, zone reaching behind the head) |
 | `phone_in_hand` | phone below the face, next to a hand, not in a holder → WARNING; head/gaze down > 2 s → ALERT |
 | `drinking` | drink box over the mouth region; head tilted back raises confidence |
 | `eating` | food at the mouth in the last 5 s **and** chewing (jaw at 0.8–2.5 Hz, lips mostly closed) |
@@ -97,11 +103,13 @@ Never mirror the input (webcam "selfie" views): mirroring swaps the driver's ear
 ## Live test on a laptop webcam
 
 ```bash
-python scripts/live.py --profile laptop_webcam            # keys: q r g m [ ] d
+python scripts/live.py --profile laptop_webcam            # keys: q r g m [ ] d p c
 python scripts/live.py --profile laptop_webcam --guided   # scored prompt sequence -> reports/
 ```
 
-How to sit, what the keys do, and what webcam results can and cannot tell us:
+Hand at ear = MediaPipe hand box in the ear zone or a YOLO26n-pose wrist at the ear; the guided
+report compares hands / hands+pose / hands+pose+classifier on the same frames. How to sit, the
+keys, the ear-crop classifier, and what webcam results can and cannot tell us:
 [docs/LAPTOP_TESTING.md](docs/LAPTOP_TESTING.md).
 
 ## Training data and evaluation

@@ -1,19 +1,25 @@
 # Live testing on a laptop webcam
 
-Until the Pi camera arrives, `scripts/live.py` runs the full pipeline (detector, face mesh,
-rules, smoothing) on a Windows laptop webcam, with an overlay and live controls.
+> **Current target (2026-10-11): laptop webcam, colour, daylight / indoor lighting only.**
+> The IR Pi camera is parked. Fisheye rectification is off, inference and training are in
+> colour, and the IR look / fisheye augmentations are off (`configs/data.yaml: look: color`).
+> Grayscale and the IR settings remain config switches (`capture.grayscale`, `look: ir`) to go
+> back later without code changes.
+
+`scripts/live.py` runs the full pipeline (detector, face mesh, MediaPipe hands, YOLO26n-pose,
+ear-crop classifier when trained, rules, smoothing) on the webcam with an overlay and live
+controls.
 
 ## Run
 
 ```bash
 cd models/distraction
 python scripts/live.py --profile laptop_webcam              # free play
-python scripts/live.py --profile laptop_webcam --guided     # ~2 min scored prompt sequence
-python scripts/live.py --profile laptop_webcam --fps-cap 10 # behave like the Pi's frame rate
+python scripts/live.py --profile laptop_webcam --guided     # ~2.5 min scored prompt sequence
+python scripts/live.py --profile laptop_webcam --fps-cap 10 # Pi-like frame rate for smoothing
 ```
 
-Open the webcam's privacy shutter first. A covered lens gives a near-black image and simply no
-face (seen on 2026-10-11: mean brightness 14/255).
+Open the webcam's privacy shutter first (a covered lens gives a near-black image and no face).
 
 **Startup side check (5 s):** touch your RIGHT ear with your RIGHT hand. If your hand lands on
 the mesh's left-ear point (454) the image is mirrored and the flip is turned on automatically;
@@ -25,65 +31,99 @@ the console says which. Skip it with `--no-side-check`.
 |---|---|
 | q / Esc | quit |
 | r | restart the head-pose baseline (sit normally ~10 s) |
-| g | grayscale on/off (on = what the IR camera will give) |
-| m | next detector: stock yolo26n → v1_416 → v1_512 → any other `models/*_ncnn_model` |
+| g | grayscale on/off (default off: colour is the target) |
+| m | next detector: stock yolo26n → v1_416 → v1_512 → any other detector in `models/` |
 | [ / ] | detector confidence −/+ 0.05 (all classes) |
-| d | debug overlay on/off (mesh, zones, reasons, per-stage ms) |
+| d | debug overlay on/off (mesh, zones, pose wrists, reasons, per-stage ms) |
+| p | pose wrist evidence on/off |
+| c | ear-crop classifier on/off (once trained) |
 
-Every change is printed as one line, e.g.
-`[live] model switched: model=v1_416 (..., imgsz 416, hands detector) conf=0.10 gray=True flip=False fps_cap=None`
-— copy those lines when reporting what worked.
+Every change prints one line with model, threshold, grayscale, flip, FPS cap and the active
+**ear setup** (`hands`, `hands+pose`, `hands+pose+clf`) — copy those lines when reporting.
 
-**Guided mode** prompts, in order: normal (baseline) · phone right ear · phone left ear · phone
-held low · drinking · eating · talking · hand on face · elbow on the desk with the hand on your
-head, with short normal gaps between them. Have a phone, a cup or bottle and a snack ready. At
-the end it writes `reports/live_<utc>.md` and `.json`:
+## Phone at the ear
+
+The detector rarely sees a phone held at an ear (hand and head hide it), so a call is also
+recognised from the hand:
+
+- **WARNING:** a hand held at either ear for ≥ 3 s (`rules.yaml: hand_at_ear.dwell_s`).
+  Short detection misses (< 0.7 s) don't end the episode; scratching (< 3 s) should not fire.
+- **ALERT:** during that episode a phone box appears in the ear zone, or the ear-crop
+  classifier's smoothed P(phone) ≥ 0.6. A phone box at the ear on its own is also an ALERT.
+- **Ear zone** = beside the ear, from the eye line to the jaw line. A hand above the eye line
+  (temple, top of the head — the elbow-on-door posture) does not count.
+- **Hand at ear** = a MediaPipe hand box centred in the zone, **or** a pose wrist within 0.5
+  face widths of the ear landmark, not above the eye line, elbow raised (or out of frame).
+  MediaPipe often misses a flat hand pressed to the head seen from the side; the pose wrist
+  comes from the arm, not the hand's appearance.
+
+In the debug overlay each ear shows `box± pose± clf <p> hand <s>` (box / pose / classifier
+evidence and the hand dwell), and pose wrists are drawn as orange circles.
+
+**Ear-crop classifier** (phone / hand_no_phone / none, 128 px colour crops beside the ears):
+
+```bash
+python scripts/build_ear_crops.py --statefarm data/public/statefarm   # State Farm + Open Images
+python scripts/train_ear_classifier.py                                # -> models/ear_cls_128_ncnn_model
+```
+
+State Farm is split by driver (`driver_imgs_list.csv`); the script prints per-class precision /
+recall on the held-out drivers. `live.py` loads the model automatically once it exists.
+
+## Guided mode
+
+Prompts, in order: normal (baseline) · phone RIGHT ear · phone LEFT ear · phone held low ·
+drinking · eating · talking · **scratching** near the ears (short, a few times) · **hand on
+chin** · **elbow on the desk, hand on head**, with short normal gaps. Have a phone, a cup or
+bottle and a snack ready. At the end it writes `reports/live_<utc>.md` and `.json`:
 
 | column | meaning |
 |---|---|
 | hit rate | share of the segment's frames with the expected behaviour active (after smoothing) |
-| raw rate | share of frames where the rules' per-frame evidence fired (before smoothing): did the detector + geometry see it at all |
+| raw rate | share of frames where the per-frame evidence fired (before smoothing) |
 | alerts | behaviour onsets in the segment |
-| false alarms | onsets of anything that was not the prompted behaviour (in negative and normal segments every onset is one) |
+| false alarms | onsets of anything that was not the prompted behaviour |
 | time-to-alert | seconds from the prompt to the expected behaviour becoming active |
 
-Model / threshold changes during a guided run are recorded per segment (`models` column in the
-JSON), so you can compare settings in one sitting.
+plus a **setup comparison** for phone at the ear, scored on the same frames for
+`hands` / `hands+pose` / `hands+pose+clf`: right- and left-ear hit rate and time-to-alert, and
+phone-at-ear false alarms during scratching, hand on chin, elbow-on-head, talking and the
+normal gaps.
 
 **Privacy:** by default only the event log (`logs/live_*.jsonl`, behaviour start/end lines) and
 the guided summary are written. `--save` additionally writes the raw video and a sidecar to
-`data/recordings/` so the run can be replayed (`eval_events.py ours --src data/recordings`).
-All of these are gitignored.
+`data/recordings/` for replay (`eval_events.py ours --src data/recordings`). All gitignored.
 
-## Position the laptop like the mirror camera
+## Position the laptop
 
-The real camera sits at the centre rear-view mirror: above eye level, in front, and to the
-driver's right (left-hand-drive car), looking down and across at the driver.
+Laptop at your **front-right**, so your right ear is the near ear (`driver_side: right`):
 
-- Raise the laptop so the webcam is ~10–20 cm above your eyes (books under it), tilted down.
-- Sit off-centre: the webcam should be ahead and to your **right**, ~30–40° off your straight
-  ahead, so your right cheek faces it more than your left. That makes your left ear the
-  "far", partly hidden ear, as in the car.
-- Distance ~60–80 cm. Keep your hands, a "steering wheel" height and your lap in frame.
-- Optionally narrow the ROI to you: `python scripts/select_roi.py --profile laptop_webcam`
-  (saves `roi.rect` into the profile).
+- Webcam slightly above eye level if you can (books under the laptop), tilted down a little.
+- Sit so the webcam is ahead and to your right, ~30–40° off your straight-ahead; your left ear
+  is then the "far", partly hidden ear.
+- Distance ~60–80 cm; keep both ears, your hands and shoulders in frame (elbows help the pose
+  rule but are optional).
+- Even, indoor or daylight lighting; avoid a bright window behind you.
+- Optionally narrow the ROI: `python scripts/select_roi.py --profile laptop_webcam`.
+
+## Moving to a Pi later
+
+The same profile runs on a Raspberry Pi with a **USB webcam**: capture is plain OpenCV (on
+Linux the backend is OpenCV's default, V4L2), detector / pose / classifier are NCNN, face mesh
+and hands are MediaPipe (aarch64 wheels). No retraining is needed for the camera change as long
+as it is a colour webcam in similar lighting. `--fps-cap` reproduces the Pi's frame rate for
+smoothing tests on the laptop. Pi benchmarks and thermal logging are parked.
 
 ## What webcam results can and cannot tell us
 
-**Can:** whether the rules and smoothing behave sensibly end to end; whether a given detector
-sees a phone / cup / food in a real hand at all; how the left/right ear logic, the far-ear
-hand-only rule, chewing vs talking and the head-down escalation feel live; rough relative
-comparisons between models and thresholds on the same person and setup.
+**Can:** whether rules and smoothing behave sensibly end to end; whether a detector sees a
+phone / cup / food in a real hand; how the ear rule, the 3 s dwell, chewing vs talking and the
+head-down escalation behave live; comparisons between models, thresholds and ear setups on the
+same person and setup.
 
 **Cannot:**
 
-- *Accuracy for the car.* One person, one room, colour optics (even in grayscale mode), no IR
-  illumination, no fisheye: the camera domain is different, exactly the gap that made the Open
-  Images fine-tune look good offline and poor on S01.
-- *Speed on the Pi.* The laptop CPU is several times faster; `--fps-cap` only reproduces the
-  Pi's frame RATE for the smoothing, not its per-stage cost. Pi numbers come from
-  `scripts/bench.py` on the Pi.
-- *False-alarm rates.* A few minutes at a desk is not driving. Use YawDD and the in-car session.
-- *Fisheye / ROI behaviour.* Rectification is off here.
-
-Treat a webcam result as "works / doesn't work and why", not as a number for the report.
+- *General accuracy.* One person, one room, one lighting condition. Treat results as
+  "works / doesn't work and why", not as numbers for the report.
+- *Night / IR behaviour* (out of scope for the current target).
+- *False-alarm rates over hours of real driving.*

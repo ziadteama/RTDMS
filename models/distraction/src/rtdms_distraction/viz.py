@@ -44,6 +44,8 @@ def render(res: FrameResult, fps: float | None = None, holder_zones=None, *, deb
             _rect(view, z, ZONE_COLOUR.get(name, (200, 200, 200)))
         for x, y, zw, zh in holder_zones or []:
             _rect(view, Box(x * w, y * h, (x + zw) * w, (y + zh) * h), (90, 90, 90))
+        for x, y in res.evidence.wrists:  # pose wrists (hand-at-ear evidence)
+            cv2.circle(view, (int(x), int(y)), 7, (0, 140, 255), 2, cv2.LINE_AA)
     for d in res.detections:
         c = CLS_COLOUR.get(d.cls, (255, 255, 255))
         _rect(view, d.box, c, 2)
@@ -78,7 +80,9 @@ def render(res: FrameResult, fps: float | None = None, holder_zones=None, *, deb
     y += 20
     f = res.face
     if f is None:
-        _text(panel, "face: none (holding state)", 12, y, (40, 40, 240))
+        stale = res.evidence.stale_face
+        msg = "face: none (zones from last face)" if stale else "face: none (holding state)"
+        _text(panel, msg, 12, y, (40, 40, 240))
         y += 20
     elif debug:
         dp = (f.pitch_deg - bl["pitch"]) if bl["ready"] and f.pitch_deg is not None else None

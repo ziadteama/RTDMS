@@ -19,7 +19,7 @@ def test_profile_merges_over_base():
     prof = load_pipeline_config(profile="laptop_webcam")
     assert (prof.capture.width, prof.capture.height) == (1280, 720)
     assert prof.rectify.enabled is False and prof.roi.rect is None
-    assert prof.capture.grayscale is True and prof.live.side_check is True
+    assert prof.capture.grayscale is False and prof.live.side_check is True  # colour target
     assert [m.hands for m in prof.live.models][:3] == ["mediapipe", "detector", "detector"]
     # untouched keys come from pipeline.yaml
     assert prof.facemesh.crop_size == base.facemesh.crop_size
@@ -102,3 +102,22 @@ def test_reports_written_as_json_and_markdown(tmp_path, monkeypatch):
     assert "| drinking | 50% | 80% | 1 | 0 | 1.2 |" in md
     assert "False alarms during the 'normal' gaps: 1" in md
     assert stem.with_suffix(".json").is_file()
+
+
+def test_scorer_compares_setups_and_scratching_stays_below_dwell():
+    script = [(0, 2, "normal", "n"), (2, 8, "phone_right_ear", "r"), (8, 13, "neg_scratch", "s")]
+    sc = live.GuidedScorer(script)
+    hand = [det("hand", 215, 270, 50, 50)]  # centred in the right ear zone
+    with_hand = build(hand)
+    t = 0.0
+    while t < 13.0:
+        at_ear = 2.0 <= t < 8.0 or 8.5 <= t < 9.5 or 10.5 <= t < 11.5  # 1 s scratches
+        # one pipeline throughout (the rule engine keeps the episode); swap its detections
+        with_hand.detector.dets = hand if at_ear else []
+        res = with_hand.process(np.zeros((640, 640), np.uint8), t)
+        sc.update(t, res, "m")
+        t += 1 / 30
+    rows = {r["segment"]: r for r in sc.summary()}
+    r = rows["phone_right_ear"]["setups"]["hands"]
+    assert r["ear_hit_rate"] > 0.4 and 2.9 < r["ear_time_to_alert_s"] < 3.2
+    assert rows["neg_scratch"]["setups"]["hands"]["ear_false_alarms"] == 0

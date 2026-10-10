@@ -7,6 +7,7 @@
 
 Keys:  q quit   r redo head-pose baseline   g grayscale on/off   m next detector model
        [ / ] lower / raise detector confidence   d debug overlay on/off
+       p pose wrist evidence on/off   c ear-crop classifier on/off
 
 Startup side check (profile live.side_check): touch your RIGHT ear with your RIGHT hand for a
 few seconds; if the hand lands on landmark 454 instead of 234 the webcam image is mirrored and
@@ -45,27 +46,31 @@ from rtdms_distraction.config import (  # noqa: E402
 from rtdms_distraction.detector import make_detector  # noqa: E402
 from rtdms_distraction.eventlog import EventLog  # noqa: E402
 from rtdms_distraction.pipeline import DistractionPipeline  # noqa: E402
+from rtdms_distraction.rules import EAR_VARIANTS  # noqa: E402
 from rtdms_distraction.viz import render  # noqa: E402
 
-# Same order as record.py --guided, plus the hand-on-face / elbow-on-door negatives.
-# (start_s, end_s, label, prompt). 'neg_*' and 'normal' segments expect NO alert.
+# Same order as record.py --guided, with the hand-at-ear negatives split out. Ear segments are
+# 12 s so the 3 s hand dwell has room. (start_s, end_s, label, prompt). 'neg_*' and 'normal'
+# segments expect NO alert.
 GUIDED_LIVE = [
     (0, 12, "normal", "Look at the screen normally (baseline)"),
-    (12, 22, "phone_right_ear", "Phone call at your RIGHT ear"),
-    (22, 27, "normal", "Phone down, look normally"),
-    (27, 37, "phone_left_ear", "Phone call at your LEFT ear"),
-    (37, 42, "normal", "Phone down"),
-    (42, 52, "phone_in_hand", "Hold the phone LOW and text / look at it"),
-    (52, 57, "normal", "Phone down, pick up a cup or bottle"),
-    (57, 67, "drinking", "DRINK from the cup / bottle (2-3 sips)"),
-    (67, 72, "normal", "Cup down, pick up some food"),
-    (72, 84, "eating", "EAT and chew (lips closed)"),
-    (84, 89, "normal", "Food down"),
-    (89, 99, "neg_talking", "TALK out loud (no food)"),
-    (99, 106, "neg_hand_on_face", "Touch / scratch your face, hand on your chin"),
-    (106, 116, "neg_hand_on_head", "LEFT elbow on the desk, hand resting on your head / temple"),
-    (116, 121, "normal", "Normal, eyes on the screen"),
+    (12, 24, "phone_right_ear", "Phone call at your RIGHT ear (keep it there)"),
+    (24, 29, "normal", "Phone down, look normally"),
+    (29, 41, "phone_left_ear", "Phone call at your LEFT ear (keep it there)"),
+    (41, 46, "normal", "Phone down"),
+    (46, 56, "phone_in_hand", "Hold the phone LOW and text / look at it"),
+    (56, 61, "normal", "Phone down, pick up a cup or bottle"),
+    (61, 71, "drinking", "DRINK from the cup / bottle (2-3 sips)"),
+    (71, 76, "normal", "Cup down, pick up some food"),
+    (76, 88, "eating", "EAT and chew (lips closed)"),
+    (88, 93, "normal", "Food down"),
+    (93, 103, "neg_talking", "TALK out loud (no food)"),
+    (103, 113, "neg_scratch", "SCRATCH near your ears / cheek, short (1-2 s), a few times"),
+    (113, 121, "neg_hand_on_chin", "Rest your hand on your CHIN"),
+    (121, 133, "neg_hand_on_head", "LEFT elbow on the desk, hand resting on your head / temple"),
+    (133, 138, "normal", "Normal, eyes on the screen"),
 ]
+EAR_BEHAVIOURS = ("phone_right_ear", "phone_left_ear")
 
 
 def parse_args():
@@ -96,12 +101,28 @@ def discover_models(listed: list[LiveModel]) -> list[LiveModel]:
         if d.resolve() in known or not (d / "metadata.yaml").is_file():
             continue
         meta = yaml.safe_load((d / "metadata.yaml").read_text(encoding="utf8"))
+        if meta.get("task", "detect") != "detect":
+            continue  # pose / classifier exports are not detectors
         names = meta.get("names", {})
         names = list(names.values()) if isinstance(names, dict) else list(names)
         imgsz = meta.get("imgsz", [416])
         out.append(LiveModel(name=d.name.removesuffix("_ncnn_model"), weights=str(d),
                              imgsz=int(imgsz[0] if isinstance(imgsz, list) else imgsz),
                              hands="detector" if "hand" in names else "mediapipe"))
+    return out
+
+
+def ear_lines(res) -> list[str]:
+    """One overlay line per ear: hand-box hit, pose wrist hit, classifier P(phone), dwell."""
+    out = []
+    for b, tag in (("phone_right_ear", "R ear"), ("phone_left_ear", "L ear")):
+        st = res.behaviours.get(b, {})
+        if "hand_s" not in st:
+            continue
+        mark = {True: "+", False: "-", None: "."}
+        clf = "-" if st.get("clf_p") is None else f"{st['clf_p']:.2f}"
+        out.append(f"{tag}: box{mark[st.get('hand_box')]} pose{mark[st.get('pose')]} "
+                   f"clf {clf}  hand {st['hand_s']:.1f}s")
     return out
 
 
@@ -147,7 +168,7 @@ def side_check(src: WebcamSource, pipe: DistractionPipeline, seconds: float) -> 
     total = votes[234] + votes[454]
     if total < 5:
         print(f"[live] side check inconclusive ({total} hand-at-ear frames); flip stays "
-              f"{src.flip}. Press nothing, or restart and keep the hand at the ear.")
+              f"{src.flip}. Restart and keep the hand at the ear if the sides look swapped.")
     elif votes[454] > 0.7 * total:
         src.flip = not src.flip
         print(f"[live] side check: hand landed on landmark 454 in {votes[454]}/{total} frames "
@@ -165,17 +186,24 @@ def side_check(src: WebcamSource, pipe: DistractionPipeline, seconds: float) -> 
 
 
 class GuidedScorer:
-    """Per-segment: hit rate (share of frames with the expected behaviour active), raw rate
-    (share with this frame's evidence true, i.e. did the detector + rules see it at all),
-    alerts raised (behaviour onsets), false alarms (onsets of anything not expected),
-    time-to-alert (expected behaviour's first active frame minus segment start)."""
+    """Per segment, for the reported setup: hit rate (share of frames with the expected
+    behaviour active), raw rate (share with this frame's evidence true), alerts raised
+    (behaviour onsets), false alarms (onsets of anything not expected), time-to-alert.
+
+    Per hand-at-ear setup (hands / hands+pose / hands+pose+clf), all scored on the same frames:
+    phone-at-ear hit rate and time-to-alert in the ear segments, and phone-at-ear onsets (false
+    alarms) in every other segment."""
 
     def __init__(self, script):
         self.script = script
         self.segs = [{"start": a, "end": b, "label": lab, "prompt": pr, "frames": 0, "hit": 0,
-                      "raw": 0, "onsets": [], "tta_s": None, "models": set()}
+                      "raw": 0, "onsets": [], "tta_s": None, "models": set(),
+                      "v_hit": dict.fromkeys(EAR_VARIANTS, 0),
+                      "v_tta": dict.fromkeys(EAR_VARIANTS),
+                      "v_fa": {v: [] for v in EAR_VARIANTS}}
                      for a, b, lab, pr in script]
         self._prev = dict.fromkeys(BEHAVIOURS, "none")
+        self._vprev = {v: dict.fromkeys(EAR_BEHAVIOURS, "none") for v in EAR_VARIANTS}
 
     def seg_at(self, t):
         return next((s for s in self.segs if s["start"] <= t < s["end"]), None)
@@ -185,6 +213,12 @@ class GuidedScorer:
         onsets = [b for b, st in res.behaviours.items()
                   if st["level"] != "none" and self._prev[b] == "none"]
         self._prev = {b: st["level"] for b, st in res.behaviours.items()}
+        v_onsets = {}
+        for v in EAR_VARIANTS:
+            lv = res.ear_levels.get(v, {})
+            v_onsets[v] = [b for b in EAR_BEHAVIOURS
+                           if lv.get(b, "none") != "none" and self._vprev[v][b] == "none"]
+            self._vprev[v] = {b: lv.get(b, "none") for b in EAR_BEHAVIOURS}
         if seg is None:
             return
         seg["frames"] += 1
@@ -200,6 +234,12 @@ class GuidedScorer:
         for b in onsets:
             seg["onsets"].append({"t": round(t - seg["start"], 2), "behaviour": b,
                                   "level": res.behaviours[b]["level"], "expected": b == exp})
+        for v in EAR_VARIANTS:
+            if exp in EAR_BEHAVIOURS and res.ear_levels.get(v, {}).get(exp, "none") != "none":
+                seg["v_hit"][v] += 1
+                if seg["v_tta"][v] is None:
+                    seg["v_tta"][v] = round(t - seg["start"], 2)
+            seg["v_fa"][v] += [b for b in v_onsets[v] if b != exp]
 
     def summary(self):
         rows = []
@@ -207,7 +247,7 @@ class GuidedScorer:
             exp = s["label"] in BEHAVIOURS
             n = max(1, s["frames"])
             fa = [o for o in s["onsets"] if not o["expected"]]
-            rows.append({
+            row = {
                 "segment": s["label"], "start_s": s["start"], "end_s": s["end"],
                 "frames": s["frames"],
                 "hit_rate": round(s["hit"] / n, 3) if exp else None,
@@ -216,7 +256,13 @@ class GuidedScorer:
                 "false_alarms": len(fa), "false_alarm_behaviours": sorted({o["behaviour"]
                                                                            for o in fa}),
                 "time_to_alert_s": s["tta_s"], "models": sorted(s["models"]),
-            })
+                "setups": {v: {
+                    "ear_hit_rate": round(s["v_hit"][v] / n, 3)
+                    if s["label"] in EAR_BEHAVIOURS else None,
+                    "ear_time_to_alert_s": s["v_tta"][v],
+                    "ear_false_alarms": len(s["v_fa"][v])} for v in EAR_VARIANTS},
+            }
+            rows.append(row)
         return rows
 
 
@@ -229,7 +275,8 @@ def write_reports(rows, meta) -> Path:
     lines = [f"# Live webcam test {meta['utc']}", "",
              f"model(s): {', '.join(meta['models_used'])} | conf {meta['conf_final']} | "
              f"gray {meta['grayscale_final']} | flip {meta['flip']} | "
-             f"fps cap {meta['fps_cap']} | measured {meta['measured_fps']} fps", "",
+             f"fps cap {meta['fps_cap']} | measured {meta['measured_fps']} fps | "
+             f"reported setup {meta.get('setup', '-')}", "",
              "| segment | hit rate | raw rate | alerts | false alarms | time-to-alert s |",
              "|---|---|---|---|---|---|"]
     for r in rows:
@@ -239,9 +286,34 @@ def write_reports(rows, meta) -> Path:
         lines.append(f"| {r['segment']} | {_p(r['hit_rate'])} | {_p(r['raw_rate'])} | "
                      f"{r['alerts_raised']} | {fa} | {r['time_to_alert_s'] or '-'} |")
     normal_fa = sum(r["false_alarms"] for r in rows if r["segment"] == "normal")
-    lines += ["", f"False alarms during the 'normal' gaps: {normal_fa}", "",
-              "hit rate = share of frames with the expected behaviour active (after smoothing);",
-              "raw rate = share of frames whose evidence fired before smoothing."]
+    lines += ["", f"False alarms during the 'normal' gaps: {normal_fa}", ""]
+    if rows and "setups" in rows[0]:
+        by = {r["segment"]: r for r in rows}
+
+        def fa(seg, v):
+            return str(by[seg]["setups"][v]["ear_false_alarms"]) if seg in by else "-"
+
+        lines += ["## Phone at ear: hand-at-ear setups (same frames)", "",
+                  "| setup | R-ear hit | R-ear TTA s | L-ear hit | L-ear TTA s | "
+                  "FA scratch | FA hand on chin | FA elbow-on-head | FA talking | FA normal |",
+                  "|---|---|---|---|---|---|---|---|---|---|"]
+        for v in EAR_VARIANTS:
+            r_ = by.get("phone_right_ear", {}).get("setups", {}).get(v, {})
+            l_ = by.get("phone_left_ear", {}).get("setups", {}).get(v, {})
+            fa_norm = sum(r["setups"][v]["ear_false_alarms"] for r in rows
+                          if r["segment"] == "normal")
+            lines.append(
+                f"| {v} | {_p(r_.get('ear_hit_rate'))} | {r_.get('ear_time_to_alert_s') or '-'} "
+                f"| {_p(l_.get('ear_hit_rate'))} | {l_.get('ear_time_to_alert_s') or '-'} | "
+                f"{fa('neg_scratch', v)} | {fa('neg_hand_on_chin', v)} | "
+                f"{fa('neg_hand_on_head', v)} | {fa('neg_talking', v)} | {fa_norm} |")
+        if not meta.get("classifier_loaded"):
+            lines += ["", "hands+pose+clf = hands+pose here: no ear-crop classifier was loaded."]
+        lines.append("")
+    lines += ["hit rate = share of frames with the expected behaviour active (after smoothing);",
+              "raw rate = share of frames whose evidence fired before smoothing;",
+              "FA = phone-at-ear onsets in that segment (scratching must stay under the 3 s "
+              "dwell)."]
     stem.with_suffix(".md").write_text("\n".join(lines) + "\n", encoding="utf8", newline="\n")
     return stem
 
@@ -279,7 +351,11 @@ def main() -> int:
     def announce(why):
         m = models[mi]
         print(f"[live] {why}: model={m.name} ({m.weights}, imgsz {m.imgsz}, hands {m.hands}) "
-              f"conf={conf:.2f} gray={gray} flip={src.flip} fps_cap={fps_cap}", flush=True)
+              f"conf={conf:.2f} gray={gray} flip={src.flip} fps_cap={fps_cap} "
+              f"ear_setup={pipe.variant} (pose {'on' if pipe.pose_on else 'off'}"
+              f"{'' if pipe.pose else ' [not loaded]'}, classifier "
+              f"{'on' if pipe.clf_on else 'off'}{'' if pipe.ear_clf else ' [not loaded]'})",
+              flush=True)
 
     print(f"[live] {src.describe()} -> view {pipe.roi.out_w}x{pipe.roi.out_h}; "
           f"{len(models)} model(s): {', '.join(m.name for m in models)}")
@@ -338,7 +414,9 @@ def main() -> int:
             info = [f"model {m.name} @{m.imgsz}  hands {m.hands}",
                     f"conf {conf:.2f}  gray {'on' if gray else 'off'}  flip "
                     f"{'on' if src.flip else 'off'}  cap {fps_cap or '-'}",
-                    "q r g m [ ] d"]
+                    f"ear setup {pipe.variant}",
+                    *ear_lines(res),
+                    "q r g m [ ] d p c"]
             cv2.imshow("rtdms live", render(res, fps, rcfg.phone_in_hand.holder_zones,
                                             debug=debug, info=info, banner=banner))
             k = cv2.waitKey(1) & 0xFF
@@ -352,6 +430,12 @@ def main() -> int:
                 announce("grayscale toggled")
             elif k == ord("d"):
                 debug = not debug
+            elif k == ord("p") and pipe.pose is not None:
+                pipe.pose_on = not pipe.pose_on
+                announce("pose toggled")
+            elif k == ord("c") and pipe.ear_clf is not None:
+                pipe.clf_on = not pipe.clf_on
+                announce("ear classifier toggled")
             elif k == ord("m") and len(models) > 1:
                 mi = (mi + 1) % len(models)
                 pipe.set_detector(build_detector(pcfg.detector, models[mi], conf), models[mi].hands)
@@ -386,7 +470,9 @@ def main() -> int:
         meta = {"utc": utc, "profile": args.profile, "models_used": sorted(models_used),
                 "conf_final": round(conf, 2), "grayscale_final": gray, "flip": src.flip,
                 "fps_cap": fps_cap, "measured_fps": round(n / max(1e-6, elapsed), 1),
-                "frames": n, "source": src.describe()}
+                "frames": n, "source": src.describe(), "setup": pipe.variant,
+                "pose_loaded": pipe.pose is not None,
+                "classifier_loaded": pipe.ear_clf is not None}
         stem = write_reports(scorer.summary(), meta)
         print(f"[live] summary: {stem.with_suffix('.md')}")
         print(stem.with_suffix(".md").read_text(encoding="utf8"))

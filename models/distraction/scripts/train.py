@@ -4,7 +4,8 @@
     python scripts/train.py --data D:/rtdms-data/datasets/v1/data.yaml --imgsz 416 --name v1_416
     python scripts/train.py --data ... --imgsz 512 --name v1_512
 
-Images are already grayscale x3 (offline conversion); colour jitter is off so they stay gray.
+Target look from configs/data.yaml (look: color = laptop webcam, current; ir = IR camera):
+colour keeps hue / saturation jitter; ir trains on grayscale x3 with that jitter off.
 Horizontal flip stays ON: the classes are side-neutral, left/right is decided by the rules.
 IRTrainer adds the IR photometric augmentation on top of Ultralytics' geometric ones.
 Runs land in <root>/runs/<name>; best.pt is then exported with scripts/export_ncnn.py.
@@ -32,20 +33,26 @@ def main() -> int:
     p.add_argument("--weights", default=str(ROOT / "models" / "yolo26n.pt"))
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--patience", type=int, default=15)
+    p.add_argument("--look", choices=["color", "ir"], default=None,
+                   help="photometric augmentation target (default: configs/data.yaml look)")
     args = p.parse_args()
 
     from ultralytics import YOLO
 
     from rtdms_distraction.training import IRTrainer
 
-    root = Path(yaml.safe_load((ROOT / "configs" / "data.yaml").read_text(encoding="utf8"))["root"])
+    dcfg = yaml.safe_load((ROOT / "configs" / "data.yaml").read_text(encoding="utf8"))
+    root = Path(dcfg["root"])
+    look = args.look or dcfg.get("look", "color")
+    IRTrainer.look = look
+    colour = look == "color"
     model = YOLO(args.weights)
     model.train(
         trainer=IRTrainer, data=args.data, imgsz=args.imgsz, epochs=args.epochs,
         batch=args.batch, workers=args.workers, patience=args.patience,
         project=str(root / "runs"), name=args.name, exist_ok=True, seed=0, deterministic=False,
-        # grayscale: no hue / saturation jitter; brightness jitter is fine
-        hsv_h=0.0, hsv_s=0.0, hsv_v=0.3,
+        # colour target: normal hue / saturation jitter; IR (grayscale) target: none
+        hsv_h=0.015 if colour else 0.0, hsv_s=0.6 if colour else 0.0, hsv_v=0.4,
         fliplr=0.5, flipud=0.0, degrees=5.0, translate=0.1, scale=0.5,
         mosaic=1.0, close_mosaic=10, mixup=0.0,
         plots=True, val=True,
