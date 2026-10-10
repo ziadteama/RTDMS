@@ -35,7 +35,8 @@ hand first, then any person in the image, then the rest.
 ```
 build_openimages.py      stream + filter the official CSVs, select, download (max side 1024)
 teacher_label.py         fill missing boxes: yolo26m @1280 + TTA (phone, drink, COCO foods),
-                         YOLOE-26l text prompts (food, hand); provenance in labels_meta/
+                         YOLO-World v2-L text prompts (food), MediaPipe Hands (hand);
+                         provenance of every box in labels_meta/
 review_sample.py make    ~120 stratified images -> review_sample.html (local) -> you mark boxes
 review_sample.py score   precision per source x class, missed objects per image
 domain_convert.py        head-and-shoulders crop, fisheye geometry, hand occlusion, IR look
@@ -49,6 +50,30 @@ purge_recordings.py      delete raw recordings whose frames were extracted (conf
 ```
 
 `run_oiv_pipeline.sh` runs teacher -> convert -> dataset -> train (416, 512) -> export -> evals.
+
+## Teacher choice (measured, 2026-10-10)
+
+The spec named yolo26m + YOLOE / YOLO-World. Each open-vocabulary candidate was scored against
+Open Images ground truth on a 40-image train sample (IoU 0.5), as a sanity check before
+spending ~1 GPU-hour on the full set:
+
+| Teacher | Class | Setting | Recall vs GT | Unmatched boxes |
+|---|---|---|---|---|
+| YOLOE-26l-seg | hand | 640, conf 0.30 / 0.10 / 0.05 | 0.04 / 0.11 / 0.25 | 1 / 5 / 13 |
+| YOLOE-26l-seg | hand | prompt "hand" only, 1024, conf 0.10 | 0.19 | 12 |
+| YOLOE-26l-seg | food | 640, conf 0.10 / 0.05 | 0.20 / 0.40 | 4 / 7 |
+| YOLO-World v2-L | food | 640, conf 0.10 / 0.05 | 0.24 / 0.44 | 1 / 8 |
+| MediaPipe Hands | hand | min conf 0.3, pad 0.10 | 0.24 | 5 |
+
+Kept: YOLO-World at conf 0.10 for food and MediaPipe Hands for hands (similar recall, fewest
+boxes that match nothing; precision matters most for a gap-filler). "Unmatched" is not the
+same as wrong: Open Images is not exhaustive, so some are real unlabelled objects. 40 images is
+a sanity check, not a measurement; the review sample is the measurement.
+
+Two practical findings: YOLOE is a segmentation model and at 1280 px its per-box masks overflow
+an 8 GB GPU; and passing Ultralytics a list of mixed-size photos with TTA at 1280 peaked at
+13.5 GB (Windows then spills to system RAM, ~4 s/image). Per-image calls stay under 6.5 GB at
+~0.13 s/image, so teacher_label.py predicts one image per call.
 
 ## Caveats that affect the numbers
 

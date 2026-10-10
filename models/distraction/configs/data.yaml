@@ -42,11 +42,16 @@ teacher:
   coco_model: yolo26m.pt
   coco_imgsz: 1280
   coco_conf: 0.35
-  # Open-vocabulary teacher for food and hands (COCO has no hand class; its foods are narrow).
-  open_vocab_model: yoloe-26l-seg.pt
+  # Open-vocabulary teacher for food (COCO's foods are narrow). YOLO-World v2 beat YOLOE-26l on
+  # a 40-image check against Open Images GT (fewer unmatched boxes); YOLOE also overflowed 8 GB.
+  open_vocab_model: yolov8l-worldv2.pt
   open_vocab_prompts:
     food: [food, snack, sandwich, burger, chips bag, fruit, cookie, chocolate bar]
-    hand: [hand]
-  open_vocab_conf: 0.30
+  open_vocab_conf: 0.10
+  open_vocab_imgsz: 640
+  max_det: 100
+  # Hands: MediaPipe Hand Landmarker (COCO has no hand class; YOLOE found few hands).
+  hand_min_conf: 0.3
+  hand_pad: 0.1
   # A teacher box is added only if no existing box of the same class overlaps it this much.
   dedup_iou: 0.4

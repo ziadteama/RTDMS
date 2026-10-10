@@ -20,3 +20,6 @@ bench_*.json
 
 # Per-camera calibration is produced on the rig, not shipped.
 configs/camera_fisheye.yaml
+
+# Text encoder Ultralytics downloads into the working dir for YOLOE prompts.
+/mobileclip*.ts
