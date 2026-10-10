@@ -109,3 +109,48 @@ is the first lever if the Pi misses 10 FPS.
 - MediaPipe hands on small IR hands at this mount (the palm detector may miss hands < ~30 px).
 - The `dms_face` LiteRT backend path through this package (adapter written, not executed: the
   LiteRT backend lives on the unmerged `face/pi-litert-stream` branch).
+
+## Public-data fine-tune v1 (2026-10-10, laptop RTX 4060)
+
+Training data: Open Images only (no own recordings; decision 2026-10-10), converted to our camera
+(grayscale, head-and-shoulders crop, fisheye geometry, real-hand occluders, IR look), teacher-filled
+labels (yolo26m @1280+TTA, YOLO-World v2 food, MediaPipe hands). Product shots removed.
+yolo26n from COCO weights, 60 epochs, IRTrainer. See docs/DATA.md.
+
+| split | images | phone | drink | food | hand (boxes) |
+|---|---|---|---|---|---|
+| train | 13,623 | 5,762 | 27,406 | 14,449 | 17,946 |
+| val | 815 | 135 | 969 | 669 | 897 |
+| test | 937 | 343 | 1,596 | 1,243 | 880 |
+
+**Open Images test (converted), P / R / AP50, conf 0.25, IoU 0.5** (test boxes are partly
+teacher-made, which flatters every model):
+
+| class | stock yolo26n @416 | v1_416 | v1_512 @512 |
+|---|---|---|---|
+| phone | 0.88 / 0.48 / 0.65 | 0.81 / 0.82 / 0.86 | 0.82 / 0.83 / 0.87 |
+| drink | 0.75 / 0.16 / 0.28 | 0.64 / 0.35 / 0.42 | 0.66 / 0.36 / 0.45 |
+| food | 0.73 / 0.06 / 0.21 | 0.59 / 0.30 / 0.36 | 0.57 / 0.29 / 0.36 |
+| hand | — | 0.74 / 0.37 / 0.50 | 0.75 / 0.38 / 0.52 |
+
+**S01 (developer webcam clip, never trained on) — share of frames with the object detected, gray, conf 0.25:**
+
+| model @ imgsz | phone in hand | phone R ear | phone L ear | drinking | eating | phone boxes in normal/talking |
+|---|---|---|---|---|---|---|
+| stock yolo26n @416 | 0.70 | 0.00 | 0.00 | 0.06 | 0.00 | 0.10 |
+| v1_416 @416 | 0.24 | 0.00 | 0.00 | 0.09 | 0.12 | 0.09 |
+| v1_416 @416, conf 0.10 | 0.55 | 0.00 | 0.00 | 0.27 | 0.42 | 0.16 |
+| v1_512 @512 | 0.07 | 0.00 | 0.00 | 0.33 | 0.04 | 0.08 |
+| v1_512 @416 | 0.47 | 0.00 | 0.00 | 0.33 | 0.05 | 0.16 |
+
+**S01 event level (full pipeline):** stock+MediaPipe hands: phone in hand ✓, left ear ✓ (hand-only),
+others ✗. v1_416 conf 0.25: left ear ✓ only. v1_416 conf 0.10: in hand ✓ (+1 false alarm),
+left ear ✓, eating ✓ (first ever). v1_512: left ear ✓, drinking ✓ (alert starts at the prompt
+boundary, likely while lifting the cup), phone in hand ✗.
+
+> [!warning] Conclusion
+> Large gains on converted Open Images do not transfer to a real camera clip; S01 results are
+> unstable across input size and threshold, and phone-at-ear is ~0 for every model (Open Images
+> has few phone-at-ear photos). One 92 s clip is a weak test, but the direction is clear: in-cabin
+> video data (SynDD rear view, DMD, 100-Driver) is the critical path, and YawDD is needed to
+> measure false alarms before lowering thresholds.
