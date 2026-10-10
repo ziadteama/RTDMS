@@ -55,8 +55,9 @@ def main() -> int:
     total_ref = matched = 0
     for path in args.images:
         bgr = cv2.imread(path)
-        img = cv2.cvtColor(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2RGB) \
-            if args.gray else cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        # Every backend takes OpenCV BGR (Ultralytics' numpy convention).
+        img = cv2.cvtColor(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR) \
+            if args.gray else bgr
         r = ref.detect(img)
         print(f"\n{Path(path).name}: ultralytics {len(r)} boxes")
         for name, det in others.items():

@@ -41,9 +41,15 @@ def letterbox(img: np.ndarray, size: int) -> tuple[np.ndarray, float, float, flo
 
 
 def decode_output(
-    out: np.ndarray, num_classes: int, conf_min: float, iou: float
+    out: np.ndarray, num_classes: int, conf_min: float, iou: float, nms: bool = True,
+    max_det: int = 300,
 ) -> list[tuple[float, float, float, float, float, int]]:
-    """Network output -> [(x1, y1, x2, y2, score, class_id)] in letterboxed-input pixels."""
+    """Network output -> [(x1, y1, x2, y2, score, class_id)] in letterboxed-input pixels.
+
+    nms=False is for a raw export of YOLO26's ONE-TO-ONE head (scripts/export_ncnn.py
+    --head one2one): it was trained to emit one box per object, so threshold + top-k replaces
+    NMS, exactly as Ultralytics' end-to-end post-processing does (per-anchor best class here).
+    """
     a = np.asarray(out, dtype=np.float32)
     a = a.reshape(a.shape[-2], a.shape[-1]) if a.ndim == 3 else a
     if a.ndim != 2:
@@ -68,11 +74,21 @@ def decode_output(
         return []
     cx, cy, w, h = a[0, keep], a[1, keep], a[2, keep], a[3, keep]
     conf, cls = conf[keep], cls[keep]
-    boxes_xywh = np.stack([cx - w / 2, cy - h / 2, w, h], 1)
-    idx = cv2.dnn.NMSBoxesBatched(boxes_xywh.tolist(), conf.tolist(), cls.tolist(), conf_min, iou)
-    idx = np.array(idx).reshape(-1)
+    if nms:
+        boxes_xywh = np.stack([cx - w / 2, cy - h / 2, w, h], 1)
+        idx = cv2.dnn.NMSBoxesBatched(boxes_xywh.tolist(), conf.tolist(), cls.tolist(), conf_min,
+                                      iou)
+        idx = np.array(idx).reshape(-1)
+    else:
+        idx = np.argsort(-conf)[:max_det]
     return [(float(cx[i] - w[i] / 2), float(cy[i] - h[i] / 2), float(cx[i] + w[i] / 2),
              float(cy[i] + h[i] / 2), float(conf[i]), int(cls[i])) for i in idx]
+
+
+def load_metadata(weights: Path) -> dict:
+    """Ultralytics export metadata.yaml (NCNN folder, or next to an ONNX file), else {}."""
+    m = weights / "metadata.yaml" if weights.is_dir() else weights.with_suffix(".metadata.yaml")
+    return yaml.safe_load(m.read_text(encoding="utf8")) if m.is_file() else {}
 
 
 def load_class_names(weights: Path) -> list[str]:
@@ -98,6 +114,9 @@ class Detector:
         # model class id -> our class; built once the backend knows the model's names
         self._map: dict[int, str] = {}
         self._min_conf = min(cfg.conf.values()) if cfg.conf else 0.25
+        # export_ncnn.py --head one2one tags the export; such a model must NOT get NMS.
+        meta = load_metadata(self.weights) if self.weights.exists() else {}
+        self.head = meta.get("rtdms_head", "one2many")
 
     def _set_names(self, names: list[str]) -> None:
         self.names = names
@@ -110,9 +129,11 @@ class Detector:
         raise NotImplementedError
 
     def detect(self, view: np.ndarray) -> list[Detection]:
-        """view: (H, W, 3) uint8 driver view."""
+        """view: (H, W, 3) uint8 in OpenCV BGR order, as Ultralytics expects for numpy input.
+        The pipeline feeds grayscale x3, where channel order does not matter."""
         lb, r, px, py = letterbox(view, self.cfg.imgsz)
-        raw = decode_output(self._infer(lb), len(self.names), self._min_conf, self.cfg.nms_iou)
+        raw = decode_output(self._infer(lb), len(self.names), self._min_conf, self.cfg.nms_iou,
+                            nms=self.head != "one2one")
         return self._finish(raw, r, px, py, view.shape[1], view.shape[0])
 
     def _finish(self, raw, r, px, py, w, h) -> list[Detection]:
@@ -181,7 +202,11 @@ class OnnxDetector(Detector):
 
 
 class UltralyticsDetector(Detector):
-    """PC-only convenience; uses Ultralytics' own pre/post-processing."""
+    """PC-only convenience; uses Ultralytics' own pre/post-processing.
+
+    rect=False forces the fixed square letterbox the NCNN/ONNX exports see; Ultralytics' default
+    for .pt is a minimal rectangle, which changes confidences by up to ~0.14 (EVIDENCE.md).
+    """
 
     def __init__(self, cfg: DetectorConfig):
         super().__init__(cfg)
@@ -193,7 +218,7 @@ class UltralyticsDetector(Detector):
 
     def detect(self, view: np.ndarray) -> list[Detection]:
         res = self._model.predict(view, imgsz=self.cfg.imgsz, conf=self._min_conf,
-                                  iou=self.cfg.nms_iou, verbose=False)[0]
+                                  iou=self.cfg.nms_iou, rect=False, verbose=False)[0]
         b = res.boxes
         raw = [(*xyxy, float(c), int(k)) for xyxy, c, k in
                zip(b.xyxy.cpu().numpy().tolist(), b.conf.cpu().numpy(), b.cls.cpu().numpy(),
