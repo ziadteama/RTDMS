@@ -46,6 +46,7 @@ class FrameResult:
     variant: str = "hands"
     person: Any = None  # driver's pose (pose.Person) or None
     clf: dict[str, float] | None = None  # ear-crop classifier, smoothed P(phone) per ear
+    mouth: dict[str, float] | None = None  # mouth-crop classifier, smoothed class probabilities
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-safe per-frame output (no image, no landmarks)."""
@@ -122,10 +123,17 @@ class DistractionPipeline:
                 ear_clf = EarClassifier(pcfg.ear_classifier)
             except (FileNotFoundError, ImportError) as e:
                 print(f"[pipeline] ear classifier disabled: {e}")
-        self.pose, self.ear_clf = pose, ear_clf
+        mouth_clf = None
+        if pcfg.mouth_classifier.enabled:
+            try:
+                from .ear_clf import MouthClassifier
+                mouth_clf = MouthClassifier(pcfg.mouth_classifier)
+            except (FileNotFoundError, ImportError) as e:
+                print(f"[pipeline] mouth classifier disabled: {e}")
+        self.pose, self.ear_clf, self.mouth_clf = pose, ear_clf, mouth_clf
         # Run-time switches (live.py keys p / c). A stage that is not loaded stays off.
         self.pose_on = pose is not None
-        self.clf_on = ear_clf is not None
+        self.clf_on = ear_clf is not None  # ear AND mouth classifiers (key c)
         self._person = None
 
         hands_available = pcfg.hands.source != "off"
@@ -189,16 +197,21 @@ class DistractionPipeline:
                                          face.center if face is not None else None)
         tm["pose"] = (time.perf_counter() - t0) * 1000
         t0 = time.perf_counter()
-        clf = None
-        if self.ear_clf is not None and face is not None:
-            clf = self.ear_clf.update(det_in, face, face_scale(face))
-        tm["ear_clf"] = (time.perf_counter() - t0) * 1000
+        clf = mouth = None
+        if face is not None:
+            fw = face_scale(face)
+            if self.ear_clf is not None:
+                clf = self.ear_clf.update(det_in, face, fw)
+            if self.mouth_clf is not None:
+                mouth = self.mouth_clf.update(det_in, face, fw)
+        tm["crop_clf"] = (time.perf_counter() - t0) * 1000
 
         t0 = time.perf_counter()
         dets = [d for d in self._dets if d.cls != "hand" or p.hands.source == "detector"]
         dets += self._hands if p.hands.source == "mediapipe" else []
         ev = self.rules.evaluate(t, face, dets, person=self._person if self.pose else None,
-                                 clf=clf)
+                                 clf=clf, mouth_p=mouth if self.clf_on or self.ear_clf is None
+                                 else None)
         variant = self.variant
         dwell = self.rcfg.hand_at_ear.dwell_s
         behaviours = {}
@@ -237,7 +250,8 @@ class DistractionPipeline:
                     "pitch": _r(bl.pitch, 2), "yaw": _r(bl.yaw, 2), "gaze": _r(bl.gaze)}
         self._i += 1
         return FrameResult(t, view, face, dets, ev, behaviours, level, baseline, tm, ran,
-                           ear_levels, variant, self._person if self.pose_on else None, clf)
+                           ear_levels, variant, self._person if self.pose_on else None, clf,
+                           mouth)
 
     @property
     def variant(self) -> str:

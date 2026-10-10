@@ -308,9 +308,11 @@ class RuleEngine:
     # -- per frame ------------------------------------------------------------
 
     def evaluate(self, t: float, face: FaceObservation | None, dets: list[Detection],
-                 person=None, clf: dict[str, float] | None = None) -> FrameEvidence:
+                 person=None, clf: dict[str, float] | None = None,
+                 mouth_p: dict[str, float] | None = None) -> FrameEvidence:
         """person: the driver's pose (pose.Person) or None; clf: per ear behaviour, the ear-crop
-        classifier's smoothed P(phone), or None when the classifier is off."""
+        classifier's smoothed P(phone); mouth_p: the mouth-crop classifier's smoothed
+        {drink, food, none} probabilities. Both None when the classifier is off."""
         stale = False
         if face is None:
             # Item 4: within face_geometry_hold_s, keep the last face's zones so a phone or cup
@@ -424,6 +426,10 @@ class RuleEngine:
                 if conf > out["drinking"].confidence:
                     why = f"drink at mouth, overlap {ov:.2f}" + (" (last face)" if stale else "")
                     out["drinking"] = Evidence(True, conf, why)
+        p_drink = (mouth_p or {}).get("drink")
+        if not stale and p_drink is not None and p_drink >= dk.classifier_drink and \
+                p_drink > out["drinking"].confidence:
+            out["drinking"] = Evidence(True, p_drink, f"mouth classifier drink {p_drink:.2f}")
 
         # Eating: food near the mouth recently AND chewing now (chewing needs a live face).
         ea = self.cfg.eating
@@ -431,6 +437,9 @@ class RuleEngine:
         for d in dets:
             if d.cls == "food" and point_box_dist(mx, my, d.box) <= ea.food_mouth_max_dist * s:
                 self._last_food_t, self._last_food_conf = t, d.conf
+        p_food = (mouth_p or {}).get("food")
+        if not stale and p_food is not None and p_food >= ea.classifier_food:
+            self._last_food_t, self._last_food_conf = t, p_food
         chew = None if stale else self.chewing.analyze()
         recent = self._last_food_t is not None and t - self._last_food_t <= ea.food_memory_s
         if stale:

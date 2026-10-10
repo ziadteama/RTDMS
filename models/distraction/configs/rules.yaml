@@ -73,12 +73,18 @@ drinking:
   # Head tilted back (pitch above baseline) multiplies confidence by this.
   pitch_up_deg: 8.0
   pitch_up_bonus: 1.25
+  # Mouth-crop classifier (when loaded): smoothed P(drink) at or above this is drinking
+  # evidence on its own (the detector rarely sees a cup at the mouth).
+  classifier_drink: 0.6
 
 eating:
   # Food box within this distance of the mouth centre (fw) counts as a bite ...
   food_mouth_max_dist: 0.80
   # ... and stays relevant for this long.
   food_memory_s: 5.0
+  # Mouth-crop classifier (when loaded): smoothed P(food) at or above this counts as food at
+  # the mouth (still needs chewing to be eating).
+  classifier_food: 0.6
   chewing:
     window_s: 3.0
     min_span_s: 2.0

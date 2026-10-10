@@ -7,7 +7,7 @@
 
 Keys:  q quit   r redo head-pose baseline   g grayscale on/off   m next detector model
        [ / ] lower / raise detector confidence   d debug overlay on/off
-       p pose wrist evidence on/off   c ear-crop classifier on/off
+       p pose wrist evidence on/off   c ear + mouth crop classifiers on/off
 
 Startup side check (profile live.side_check): touch your RIGHT ear with your RIGHT hand for a
 few seconds; if the hand lands on landmark 454 instead of 234 the webcam image is mirrored and
@@ -123,6 +123,8 @@ def ear_lines(res) -> list[str]:
         clf = "-" if st.get("clf_p") is None else f"{st['clf_p']:.2f}"
         out.append(f"{tag}: box{mark[st.get('hand_box')]} pose{mark[st.get('pose')]} "
                    f"clf {clf}  hand {st['hand_s']:.1f}s")
+    if res.mouth:
+        out.append("mouth: " + "  ".join(f"{k} {v:.2f}" for k, v in res.mouth.items()))
     return out
 
 
@@ -433,7 +435,7 @@ def main() -> int:
             elif k == ord("p") and pipe.pose is not None:
                 pipe.pose_on = not pipe.pose_on
                 announce("pose toggled")
-            elif k == ord("c") and pipe.ear_clf is not None:
+            elif k == ord("c") and (pipe.ear_clf is not None or pipe.mouth_clf is not None):
                 pipe.clf_on = not pipe.clf_on
                 announce("ear classifier toggled")
             elif k == ord("m") and len(models) > 1:
@@ -472,7 +474,8 @@ def main() -> int:
                 "fps_cap": fps_cap, "measured_fps": round(n / max(1e-6, elapsed), 1),
                 "frames": n, "source": src.describe(), "setup": pipe.variant,
                 "pose_loaded": pipe.pose is not None,
-                "classifier_loaded": pipe.ear_clf is not None}
+                "classifier_loaded": pipe.ear_clf is not None,
+                "mouth_classifier_loaded": pipe.mouth_clf is not None}
         stem = write_reports(scorer.summary(), meta)
         print(f"[live] summary: {stem.with_suffix('.md')}")
         print(stem.with_suffix(".md").read_text(encoding="utf8"))

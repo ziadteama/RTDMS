@@ -97,3 +97,31 @@ def test_missing_layout_fails_loudly(tmp_path):
     for fn in (D.syndd, D.dmd, D.yawdd):
         with pytest.raises(FileNotFoundError):
             fn(tmp_path)
+
+
+def test_ebdd_names_and_clip_frames(tmp_path):
+    for n in ("AKKAS_CELL_PHONE", "AKKAS_EATING", "TASHRIF_ATTENTIVE", "ZAKARIA_UNATTENTIVE",
+              "SOHEL_TEXT"):
+        tiny_video(tmp_path / "EBDD_Video_Database" / f"{n}.mp4", seconds=3, fps=10)
+    clips = D.ebdd(tmp_path)
+    got = {(c.driver, c.label) for c in clips}
+    assert got == {("ebdd_akkas", "phone_unknown_ear"), ("ebdd_akkas", "eating"),
+                   ("ebdd_tashrif", "normal"), ("ebdd_zakaria", "other_none"),
+                   ("ebdd_sohel", "phone_in_hand")}
+    ts = [t for t, _ in clips[0].frames(0.5)]
+    assert ts[:3] == pytest.approx([0.0, 0.5, 1.0]) and len(ts) == 6
+
+
+def test_3mdad_front_frame_folders(tmp_path):
+    for view in ("RGB1", "RGB2"):
+        for s, a in ((6, 7), (6, 13), (31, 8), (31, 9)):
+            d = tmp_path / "Day" / view / f"S{s}" / f"AC{a}"
+            d.mkdir(parents=True)
+            for i in range(12):
+                cv2.imwrite(str(d / f"img_{i}.jpg"), np.zeros((8, 8, 3), np.uint8))
+    clips = D.mdad3_front(tmp_path)  # RGB2 = front view only; A9 (picture) skipped
+    assert sorted((c.driver, c.label) for c in clips) == [
+        ("3mdad_s31", "phone_left_ear"), ("3mdad_s6", "drinking"), ("3mdad_s6",
+                                                                     "phone_right_ear")]
+    assert all("RGB2" in str(c.path) for c in clips)
+    assert len(list(clips[0].frames(0.1))) == 4  # every 3rd of 12 frames at 30 fps

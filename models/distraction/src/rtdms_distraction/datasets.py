@@ -284,4 +284,99 @@ def ours(root: str | Path) -> list[Segment]:
     return out
 
 
+# --------------------------------------------------------------------------- clips (crop builder)
+
+
+@dataclass(frozen=True)
+class Clip:
+    """One labelled action clip: a video file, or a folder of frame images (3MDAD)."""
+
+    source: str
+    driver: str
+    label: str
+    path: Path  # video file or frame folder
+    fps: float = 30.0
+
+    @property
+    def name(self) -> str:
+        return self.path.name
+
+    def frames(self, every_s: float):
+        """Yield (t_seconds, BGR frame) every `every_s` seconds."""
+        import cv2
+
+        if self.path.is_dir():
+            imgs = sorted((p for p in self.path.iterdir()
+                           if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".bmp")),
+                          key=lambda p: [int(x) for x in re.findall(r"\d+", p.stem)] or [0])
+            step = max(1, round(every_s * self.fps))
+            for i in range(0, len(imgs), step):
+                img = cv2.imread(str(imgs[i]))
+                if img is not None:
+                    yield i / self.fps, img
+            return
+        cap = cv2.VideoCapture(str(self.path))
+        fps = cap.get(cv2.CAP_PROP_FPS) or self.fps
+        n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        step = max(1, round(every_s * fps))
+        for i in range(0, n, step):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+            ok, img = cap.read()
+            if not ok:
+                break
+            yield i / fps, img
+        cap.release()
+
+
+EBDD_LABELS = {"ATTENTIVE": "normal", "CELL_PHONE": "phone_unknown_ear", "EATING": "eating",
+               "TEXT": "phone_in_hand", "UNATTENTIVE": "other_none"}
+
+
+def ebdd(root: str | Path) -> list[Clip]:
+    """EBDD (windshield camera facing the driver): <DRIVER>_<ACTIVITY>.mp4, e.g.
+    AKKAS_CELL_PHONE.mp4. Which ear the phone is at is not labelled (resolved by the pose
+    wrist in the crop builder)."""
+    out = []
+    for v in sorted(Path(root).rglob("*")):
+        if v.suffix.lower() not in VIDEO_EXT:
+            continue
+        stem = re.sub(r"\s+", "", v.stem).upper()
+        for key, label in EBDD_LABELS.items():
+            if stem.endswith("_" + key):
+                out.append(Clip("ebdd", f"ebdd_{stem[: -len(key) - 1].lower()}", label, v))
+                break
+    if not out:
+        raise FileNotFoundError(f"EBDD: no <DRIVER>_<ACTIVITY>.mp4 clips under {root}")
+    return out
+
+
+MDAD3_LABELS = {1: "normal", 2: "hair_makeup", 3: "other_none", 4: "other_none",
+                5: "phone_in_hand", 6: "phone_in_hand", 7: "phone_right_ear",
+                8: "phone_left_ear", 10: "neg_talking", 11: "neg_singing", 13: "drinking",
+                14: "drinking", 16: "smoking"}  # A9 picture, A12 fatigue, A15 reach: skipped
+
+
+def mdad3_front(root: str | Path, view_token: str = "RGB2", fps: float = 30.0) -> list[Clip]:
+    """3MDAD, front view (Kinect 2 = 'RGB2'), day RGB: frame-image folders per subject and
+    action, identified by S<n> and A<n> / AC<n> tokens in the path (e.g. .../RGB2/S6/AC7/).
+    A7 / A8 = talking on the phone with the right / left hand."""
+    root = Path(root)
+    groups: dict[Path, tuple[str, int]] = {}
+    for img in root.rglob("*"):
+        if img.suffix.lower() not in (".jpg", ".jpeg", ".png", ".bmp"):
+            continue
+        rel = str(img.relative_to(root)).replace("\\", "/")
+        if view_token and view_token.lower() not in rel.lower():
+            continue
+        s = re.search(r"(?:^|[/_])S(?:UB)?(\d+)", rel, re.I)
+        a = re.search(r"(?:^|[/_])AC?T?(\d+)(?:[/_.]|$)", rel, re.I)
+        if s and a and img.parent not in groups:
+            groups[img.parent] = (s.group(1), int(a.group(1)))
+    out = [Clip("3mdad", f"3mdad_s{s}", MDAD3_LABELS[a], d, fps)
+           for d, (s, a) in sorted(groups.items()) if a in MDAD3_LABELS]
+    if not out:
+        raise FileNotFoundError(f"3MDAD: no {view_token} frame folders with S<n>/A<n> under {root}")
+    return out
+
+
 ADAPTERS = {"syndd": syndd, "dmd": dmd, "driver100": driver100, "yawdd": yawdd, "ours": ours}

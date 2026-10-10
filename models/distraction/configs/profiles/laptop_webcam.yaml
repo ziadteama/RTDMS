@@ -43,3 +43,7 @@ pose:
 ear_classifier:
   enabled: true          # loads models/ear_cls_128_ncnn_model once trained; 'c' toggles
   grayscale: false       # colour crops (current target); must match training
+
+mouth_classifier:
+  enabled: true          # loads models/mouth_cls_128_ncnn_model once trained (drink / food)
+  grayscale: false

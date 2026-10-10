@@ -325,3 +325,17 @@ def test_geometric_jaw_source_uses_its_own_amplitude_threshold():
 def test_no_face_gives_unknown_not_negative():
     ev = engine().evaluate(0.0, None, [det("phone", 215, 265, 35, 70)])
     assert all(v.active is None for v in ev.behaviours.values())
+
+
+def test_mouth_classifier_drink_and_food_evidence():
+    e = engine()
+    ev = e.evaluate(0.0, make_face(), [], mouth_p={"drink": 0.8, "food": 0.1, "none": 0.1})
+    assert active(ev, "drinking") is True and "mouth classifier" in ev.behaviours["drinking"].why
+    ev = e.evaluate(0.1, make_face(), [], mouth_p={"drink": 0.4, "food": 0.1, "none": 0.5})
+    assert active(ev, "drinking") is False
+    # P(food) marks food at the mouth; chewing still decides eating
+    e2 = engine()
+    ev = run_mouth(e2, 0.1, chew, lambda t: 0.03)
+    e2.evaluate(0.2, make_face(), [], mouth_p={"drink": 0.0, "food": 0.9, "none": 0.1})
+    ev = run_mouth(e2, 4.0, chew, lambda t: 0.03)
+    assert e2._last_food_t == 0.2

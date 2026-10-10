@@ -111,6 +111,20 @@ class EarClassifierConfig:
 
 
 @dataclass
+class MouthClassifierConfig:
+    """Crop centred on the lips -> drink / food / none."""
+
+    enabled: bool = False
+    weights: str = "models/mouth_cls_128_ncnn_model"
+    imgsz: int = 128
+    scale: float = 1.0  # crop side in face widths
+    down: float = 0.1  # centre shifted this many fw below the lips (cups / food sit low)
+    grayscale: bool = False
+    ema: float = 0.4
+    num_threads: int = 1
+
+
+@dataclass
 class HandsConfig:
     source: str = "mediapipe"
     model_path: str = "models/hand_landmarker.task"
@@ -166,6 +180,7 @@ class PipelineConfig:
     hands: HandsConfig = field(default_factory=HandsConfig)
     pose: PoseConfig = field(default_factory=PoseConfig)
     ear_classifier: EarClassifierConfig = field(default_factory=EarClassifierConfig)
+    mouth_classifier: MouthClassifierConfig = field(default_factory=MouthClassifierConfig)
     eventlog: EventLogConfig = field(default_factory=EventLogConfig)
     threads: ThreadsConfig = field(default_factory=ThreadsConfig)
     live: LiveConfig = field(default_factory=LiveConfig)
@@ -249,6 +264,7 @@ class DrinkingConfig:
     min_overlap: float = 0.15
     pitch_up_deg: float = 8.0
     pitch_up_bonus: float = 1.25
+    classifier_drink: float = 0.6  # mouth classifier P(drink) at or above -> drinking evidence
 
 
 @dataclass
@@ -268,6 +284,7 @@ class ChewingConfig:
 class EatingConfig:
     food_mouth_max_dist: float = 0.80
     food_memory_s: float = 5.0
+    classifier_food: float = 0.6  # mouth classifier P(food) at or above = food at the mouth
     chewing: ChewingConfig = field(default_factory=ChewingConfig)
 
 

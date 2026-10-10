@@ -1,0 +1,277 @@
+#!/usr/bin/env python3
+"""Build ear-crop (phone / hand_no_phone / none) and mouth-crop (drink / food / none) datasets
+from front-facing driver videos, cropped exactly like live.py (same face mesh + crop functions).
+
+    python scripts/build_crops.py --3mdad D:/rtdms-data/raw/3mdad/x --ebdd D:/rtdms-data/raw/ebdd/x
+
+Sources (adapters in rtdms_distraction.datasets; front / windshield views only):
+  3MDAD front view, day RGB. A7 phone right hand -> right ear phone, left ear none; A8 the
+    mirror; A2 hair/makeup -> hand_no_phone at an ear where the pose wrist is; A13/A14
+    drinking -> mouth drink while the wrist is at the mouth; A16 smoking -> mouth none (hard
+    negative: hand at the mouth, no drink / food); A1, A3-A6, A10, A11 -> none.
+  EBDD (windshield camera): talking on the phone -> phone at the ear where the pose wrist is;
+    eating -> mouth food while the wrist is at the mouth; cautious / texting / cabin
+    equipment -> none.
+  Open Images (optional): hand-at-face crops -> ear hand_no_phone.
+Crops whose label depends on the wrist are skipped when the wrist is not where it should be
+(the clip label covers the whole action, including reaching for the cup).
+Split BY DRIVER within each dataset (70/15/15), so every split has drivers of both.
+Output: <root>/crops/{ear,mouth}/{train,val,test}/<class>/*.jpg + manifest.csv
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import random
+import sys
+from collections import Counter
+from pathlib import Path
+
+import cv2
+import numpy as np
+import yaml
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from rtdms_distraction import datasets as D  # noqa: E402
+from rtdms_distraction.config import load_pipeline_config  # noqa: E402
+from rtdms_distraction.ear_clf import crop_ear, crop_mouth, ear_center, mouth_center  # noqa: E402
+from rtdms_distraction.facemesh import FaceMesh  # noqa: E402
+from rtdms_distraction.pose import PoseEstimator, driver_person  # noqa: E402
+from rtdms_distraction.rules import face_scale  # noqa: E402
+
+R_EAR, L_EAR = 234, 454
+WRISTS = (9, 10)
+
+# action -> (ear rule, mouth rule). Ear rules: "none", "phone_R", "phone_L", "phone_wrist",
+# "hand_wrist" (label at the ear the wrist is at; skip otherwise), None = skip ears.
+# Mouth rules: "none", "drink_wrist", "food_wrist" (only while the wrist is at the mouth),
+# None = skip mouth.
+RULES = {
+    "normal": ("none", "none"),
+    "phone_right_ear": ("phone_R", "none"),
+    "phone_left_ear": ("phone_L", "none"),
+    "phone_unknown_ear": ("phone_wrist", "none"),
+    "phone_in_hand": ("none", "none"),
+    "hair_makeup": ("hand_wrist", None),
+    "drinking": ("none", "drink_wrist"),
+    "eating": ("none", "food_wrist"),
+    "smoking": ("none", "none"),
+    "neg_talking": ("none", "none"),
+    "neg_singing": ("none", "none"),
+    "other_none": ("none", "none"),
+}
+
+
+def split_drivers(drivers, seed=1337):
+    d = sorted(drivers)
+    random.Random(seed).shuffle(d)
+    n = len(d)
+    n_test = max(1, round(0.15 * n))
+    n_val = max(1, round(0.15 * n))
+    out = dict.fromkeys(d[:n_test], "test")
+    out.update(dict.fromkeys(d[n_test:n_test + n_val], "val"))
+    out.update(dict.fromkeys(d[n_test + n_val:], "train"))
+    return out
+
+
+def wrist_near(person, point, fw, max_fw=0.6) -> bool:
+    if person is None:
+        return False
+    return any(person.kpts[w, 2] >= 0.3 and np.linalg.norm(person.kpts[w, :2] - point) <=
+               max_fw * fw for w in WRISTS)
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    p.add_argument("--3mdad", dest="mdad", help="3MDAD front-view (day RGB) folder")
+    p.add_argument("--ebdd", help="extracted EBDD folder")
+    p.add_argument("--no-openimages", action="store_true")
+    p.add_argument("--every", type=float, default=0.33, help="seconds between sampled frames")
+    p.add_argument("--max-none-ratio", type=float, default=2.0)
+    p.add_argument("--limit-clips", type=int, help="clips per dataset (smoke test)")
+    args = p.parse_args()
+
+    pcfg = load_pipeline_config(profile="laptop_webcam")
+    ec, mc = pcfg.ear_classifier, pcfg.mouth_classifier
+    dcfg = yaml.safe_load((ROOT / "configs" / "data.yaml").read_text(encoding="utf8"))
+    out = Path(dcfg["root"]) / "crops"
+    pose = PoseEstimator(pcfg.pose)
+    rows: list[dict] = []
+
+    clips: list[D.Clip] = []
+    if args.mdad:
+        clips += D.mdad3_front(args.mdad)[: args.limit_clips]
+    if args.ebdd:
+        clips += D.ebdd(args.ebdd)[: args.limit_clips]
+    if not clips and args.no_openimages:
+        raise SystemExit("nothing to do: pass --3mdad and/or --ebdd")
+    splits = {}
+    for src in {c.source for c in clips}:
+        splits.update(split_drivers({c.driver for c in clips if c.source == src}))
+
+    def save(kind, crop, label, split, clip, name):
+        d = out / kind / split / label
+        d.mkdir(parents=True, exist_ok=True)
+        fn = f"{clip.source}__{clip.driver}__{name}.jpg"
+        cv2.imwrite(str(d / fn), crop, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        rows.append({"kind": kind, "file": f"{split}/{label}/{fn}", "split": split,
+                     "label": label, "source": clip.source, "driver": clip.driver,
+                     "action": clip.label})
+
+    for ci, clip in enumerate(clips, 1):
+        ear_rule, mouth_rule = RULES.get(clip.label, (None, None))
+        if ear_rule is None and mouth_rule is None:
+            continue
+        split = splits[clip.driver]
+        mesh = None
+        for k, (t, frame) in enumerate(clip.frames(args.every)):
+            if mesh is None:  # one tracker per clip, sized to the clip, like live.py
+                h, w = frame.shape[:2]
+                mesh = FaceMesh(pcfg.facemesh, w, h, np.array([[w, 0, w / 2], [0, w, h / 2],
+                                                              [0, 0, 1.0]]))
+            face = mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), t)
+            if face is None:
+                continue
+            lm, fw = face.landmarks, face_scale(face)
+            needs_pose = (ear_rule in ("phone_wrist", "hand_wrist") or
+                          (mouth_rule or "").endswith("_wrist"))
+            person = driver_person(pose.detect(frame), face.center) if needs_pose else None
+            name = f"{Path(clip.name).stem}_{k:05d}"
+            # ---- ears
+            ear_labels = {}
+            if ear_rule == "none":
+                ear_labels = {R_EAR: "none", L_EAR: "none"}
+            elif ear_rule == "phone_R":
+                ear_labels = {R_EAR: "phone", L_EAR: "none"}
+            elif ear_rule == "phone_L":
+                ear_labels = {L_EAR: "phone", R_EAR: "none"}
+            elif ear_rule in ("phone_wrist", "hand_wrist"):
+                lab = "phone" if ear_rule == "phone_wrist" else "hand_no_phone"
+                at = [e for e in (R_EAR, L_EAR)
+                      if wrist_near(person, ear_center(lm, e, ec.outward, fw), fw)]
+                if len(at) == 1:
+                    ear_labels = {at[0]: lab}
+                    if lab == "phone":
+                        ear_labels[L_EAR if at[0] == R_EAR else R_EAR] = "none"
+            for e, lab in ear_labels.items():
+                crop = crop_ear(frame, lm, e, ec.imgsz, ec.scale, ec.outward, fw, ec.grayscale)
+                save("ear", crop, lab, split, clip, f"{name}_{'R' if e == R_EAR else 'L'}")
+            # ---- mouth
+            mlab = None
+            if mouth_rule == "none":
+                mlab = "none"
+            elif mouth_rule in ("drink_wrist", "food_wrist") and \
+                    wrist_near(person, mouth_center(lm, mc.down, fw), fw):
+                mlab = mouth_rule.split("_")[0]
+            if mlab:
+                crop = crop_mouth(frame, lm, mc.imgsz, mc.scale, mc.down, fw, mc.grayscale)
+                save("mouth", crop, mlab, split, clip, name)
+        if mesh is not None:
+            mesh.close()
+        if ci % 20 == 0:
+            print(f"[crops] {ci}/{len(clips)} clips, {len(rows)} crops", flush=True)
+
+    if not args.no_openimages:
+        rows += openimages_hand_crops(dcfg, ec, out)
+
+    # balance 'none' per kind and split, then write manifests
+    rng = random.Random(7)
+    for kind in ("ear", "mouth"):
+        for split in ("train", "val", "test"):
+            sel = [r for r in rows if r["kind"] == kind and r["split"] == split]
+            others = Counter(r["label"] for r in sel if r["label"] != "none")
+            cap = int(args.max_none_ratio * max(others.values(), default=1))
+            nones = [r for r in sel if r["label"] == "none"]
+            rng.shuffle(nones)
+            for r in nones[cap:]:
+                (out / kind / r["file"]).unlink(missing_ok=True)
+                r["dropped"] = True
+    rows = [r for r in rows if not r.get("dropped")]
+    for kind in ("ear", "mouth"):
+        kr = [r for r in rows if r["kind"] == kind]
+        if not kr:
+            continue
+        with open(out / kind / "manifest.csv", "w", newline="", encoding="utf8") as f:
+            w = csv.DictWriter(f, fieldnames=list(kr[0].keys()))
+            w.writeheader()
+            w.writerows(kr)
+        c = Counter((r["split"], r["label"]) for r in kr)
+        labels = sorted({r["label"] for r in kr})
+        print(f"\n{kind} crops")
+        for split in ("train", "val", "test"):
+            drivers = len({r["driver"] for r in kr if r["split"] == split})
+            print(f"  {split:5s} ({drivers:3d} drivers) " +
+                  "  ".join(f"{lab} {c[(split, lab)]}" for lab in labels))
+        print("  by source:", dict(Counter((r["source"], r["label"]) for r in kr)))
+    print(f"-> {out}")
+    return 0
+
+
+def openimages_hand_crops(dcfg, ec, out) -> list[dict]:
+    """Open Images: an ear whose crop window holds >= 40 % of a GT hand box, in an image with
+    no phone -> ear hand_no_phone (IMAGE-mode face mesh: the photos are unrelated)."""
+    import mediapipe as mp
+    from mediapipe.tasks import python as mpp
+    from mediapipe.tasks.python import vision
+
+    pcfg = load_pipeline_config(profile="laptop_webcam")
+    lmk = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
+        base_options=mpp.BaseOptions(model_asset_path=str((ROOT / pcfg.facemesh.model_path)
+                                                          .resolve())),
+        running_mode=vision.RunningMode.IMAGE, num_faces=1))
+    oi = Path(dcfg["root"]) / "openimages"
+    rows = []
+    for split in ("train", "val", "test"):
+        faces = json.loads((oi / "meta" / f"{split}_faces.json").read_text(encoding="utf8"))
+        for lab_p in sorted((oi / "labels" / split).glob("*.txt")):
+            if not faces.get(lab_p.stem):
+                continue
+            boxes = [(int(r[0]), *map(float, r[1:])) for r in
+                     (ln.split() for ln in lab_p.read_text(encoding="utf8").split("\n")
+                      if ln.strip())]
+            if any(b[0] == 0 for b in boxes) or not any(b[0] == 3 for b in boxes):
+                continue
+            img = cv2.imread(str(oi / "images" / split / f"{lab_p.stem}.jpg"))
+            if img is None:
+                continue
+            res = lmk.detect(mp.Image(image_format=mp.ImageFormat.SRGB,
+                                      data=cv2.cvtColor(img, cv2.COLOR_BGR2RGB)))
+            if not res.face_landmarks:
+                continue
+            h, w = img.shape[:2]
+            lm = np.array([(q.x * w, q.y * h) for q in res.face_landmarks[0]])
+            from rtdms_distraction.types import FaceObservation
+            fw = face_scale(FaceObservation(lm, None, None, None, "none", None, "geometric", 0))
+            for e in (R_EAR, L_EAR):
+                cx, cy = ear_center(lm, e, ec.outward, fw)
+                half = ec.scale * fw / 2
+                win = (cx - half, cy - half, cx + half, cy + half)
+                best = 0.0
+                for _, bx, by, bw, bh in (b for b in boxes if b[0] == 3):
+                    x1, y1, x2, y2 = (bx - bw / 2) * w, (by - bh / 2) * h, \
+                        (bx + bw / 2) * w, (by + bh / 2) * h
+                    iw = min(x2, win[2]) - max(x1, win[0])
+                    ih = min(y2, win[3]) - max(y1, win[1])
+                    if iw > 0 and ih > 0:
+                        best = max(best, iw * ih / ((x2 - x1) * (y2 - y1)))
+                if best >= 0.4:
+                    crop = crop_ear(img, lm, e, ec.imgsz, ec.scale, ec.outward, fw, ec.grayscale)
+                    d = out / "ear" / split / "hand_no_phone"
+                    d.mkdir(parents=True, exist_ok=True)
+                    fn = f"openimages__{lab_p.stem}__{'R' if e == R_EAR else 'L'}.jpg"
+                    cv2.imwrite(str(d / fn), crop, [cv2.IMWRITE_JPEG_QUALITY, 92])
+                    rows.append({"kind": "ear", "file": f"{split}/hand_no_phone/{fn}",
+                                 "split": split, "label": "hand_no_phone",
+                                 "source": "openimages", "driver": lab_p.stem,
+                                 "action": "hand_at_face"})
+    lmk.close()
+    print(f"[openimages] {len(rows)} hand_no_phone ear crops")
+    return rows
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
