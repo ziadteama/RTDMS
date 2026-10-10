@@ -11,6 +11,7 @@ small driver view, because MediaPipe and YOLO both want 3-channel input.
 
 from __future__ import annotations
 
+import json
 import platform
 import threading
 import time
@@ -190,6 +191,13 @@ class VideoFileSource(FrameSource):
         if not self._cap.isOpened():
             raise RuntimeError(f"could not open video: {path}")
         self.fps = self._cap.get(cv2.CAP_PROP_FPS) or 30.0
+        # record.py writes the REAL capture rate to a sidecar .json: webcams often deliver less
+        # than the container header claims, and every time-based rule needs the true clock.
+        meta = Path(path).with_suffix(".json")
+        if meta.is_file():
+            measured = json.loads(meta.read_text(encoding="utf8")).get("measured_fps")
+            if measured:
+                self.fps = float(measured)
         self.frame_count = int(self._cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.size = (int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
                      int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
