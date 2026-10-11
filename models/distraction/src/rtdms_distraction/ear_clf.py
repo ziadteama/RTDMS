@@ -82,6 +82,8 @@ class _CropClassifier:
     def probs(self, crop_bgr: np.ndarray) -> np.ndarray:
         nc = self._ncnn
         s = self.imgsz
+        if crop_bgr.shape[:2] != (s, s):  # e.g. crops stored larger for a crop-size study
+            crop_bgr = cv2.resize(crop_bgr, (s, s), interpolation=cv2.INTER_AREA)
         mat = nc.Mat.from_pixels(np.ascontiguousarray(crop_bgr), nc.Mat.PixelType.PIXEL_BGR2RGB,
                                  s, s)
         mat.substract_mean_normalize([], [1 / 255.0] * 3)

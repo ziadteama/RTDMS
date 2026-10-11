@@ -42,8 +42,10 @@ def classifier(kind: str, weights: Path):
     return MouthClassifier(MouthClassifierConfig(enabled=True, weights=str(weights)))
 
 
-def evaluate(kind: str, weights: Path, test_dir: Path, sheet: Path, per_class: int = 30):
+def evaluate(kind: str, weights: Path, test_dir: Path, sheet: Path | None, imgsz: int,
+             per_class: int = 30):
     clf = classifier(kind, weights)
+    clf.imgsz = imgsz
     conf = Counter()
     tiles = {c: [] for c in CLASSES[kind]}
     rng = random.Random(0)
@@ -55,22 +57,23 @@ def evaluate(kind: str, weights: Path, test_dir: Path, sheet: Path, per_class: i
             p = clf.probs(img)
             pred = clf.names[int(np.argmax(p))]
             conf[(true, pred)] += 1
-            if i in show:
+            if sheet is not None and i in show:
                 t = cv2.resize(img, (96, 96))
                 col = (60, 200, 60) if pred == true else (40, 40, 230)
                 cv2.rectangle(t, (0, 0), (95, 95), col, 3)
                 cv2.putText(t, f"{pred[:6]} {p.max():.2f}", (3, 92), cv2.FONT_HERSHEY_SIMPLEX,
                             0.33, (255, 255, 255), 1, cv2.LINE_AA)
                 tiles[true].append(t)
-    cols = (per_class + 1) // 2  # each class: 2 rows of `cols` tiles
-    blocks = []
-    for c in CLASSES[kind]:
-        t = tiles[c] + [np.zeros((96, 96, 3), np.uint8)] * (2 * cols - len(tiles[c]))
-        grid = np.vstack([np.hstack(t[:cols]), np.hstack(t[cols:2 * cols])])
-        head = np.zeros((192, 120, 3), np.uint8)
-        cv2.putText(head, c, (4, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
-        blocks.append(np.hstack([head, grid]))
-    cv2.imwrite(str(sheet), np.vstack(blocks))
+    if sheet is not None:
+        cols = (per_class + 1) // 2  # each class: 2 rows of `cols` tiles
+        blocks = []
+        for c in CLASSES[kind]:
+            t = tiles[c] + [np.zeros((96, 96, 3), np.uint8)] * (2 * cols - len(tiles[c]))
+            grid = np.vstack([np.hstack(t[:cols]), np.hstack(t[cols:2 * cols])])
+            head = np.zeros((192, 120, 3), np.uint8)
+            cv2.putText(head, c, (4, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
+            blocks.append(np.hstack([head, grid]))
+        cv2.imwrite(str(sheet), np.vstack(blocks))
     out = {}
     for c in CLASSES[kind]:
         tp = conf[(c, c)]
@@ -78,6 +81,9 @@ def evaluate(kind: str, weights: Path, test_dir: Path, sheet: Path, per_class: i
         n_pred = sum(v for (_, pr), v in conf.items() if pr == c)
         out[c] = {"n": n_true, "precision": round(tp / n_pred, 3) if n_pred else None,
                   "recall": round(tp / n_true, 3) if n_true else None}
+    f1 = [2 * v["precision"] * v["recall"] / (v["precision"] + v["recall"])
+          if v["precision"] and v["recall"] else 0.0 for v in out.values()]
+    out["macro_f1"] = round(float(np.mean(f1)), 3)
     out["confusion"] = {f"{t}->{pr}": v for (t, pr), v in sorted(conf.items())}
     return out
 
@@ -118,9 +124,16 @@ def main() -> int:
         shutil.move(str(out), dest)
         print(f"NCNN -> {dest}")
     run.mkdir(parents=True, exist_ok=True)
-    res = evaluate(args.kind, dest, data / "test", run / "test_contact_sheet.jpg")
+    # val (held-out drivers) chooses between runs (e.g. crop size); test is only reported.
+    val = evaluate(args.kind, dest, data / "val", None, args.imgsz)
+    (run / "val_eval.json").write_text(json.dumps(val, indent=2), encoding="utf8", newline="\n")
+    print("val", json.dumps(val, indent=2))
+    res = evaluate(args.kind, dest, data / "test", run / "test_contact_sheet.jpg", args.imgsz)
+    if args.kind == "mouth" and not (data / "HAND_CHECKED").exists():
+        # 3MDAD drink labels (test drivers too) come from CLIP zero-shot (build_crops.py).
+        res["test_labels"] = "CLIP-labelled test set (drink not hand-checked yet)"
     (run / "test_eval.json").write_text(json.dumps(res, indent=2), encoding="utf8", newline="\n")
-    print(json.dumps(res, indent=2))
+    print("test", json.dumps(res, indent=2))
     print(f"contact sheet: {run / 'test_contact_sheet.jpg'}")
     return 0
 

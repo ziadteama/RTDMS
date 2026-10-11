@@ -60,15 +60,19 @@ recognised from the hand:
 In the debug overlay each ear shows `box± pose± clf <p> hand <s>` (box / pose / classifier
 evidence and the hand dwell), and pose wrists are drawn as orange circles.
 
-**Ear-crop classifier** (phone / hand_no_phone / none, 128 px colour crops beside the ears):
+**Crop classifiers** (128 px colour crops): ear = phone / hand_no_phone / none beside each
+ear, mouth = drink / food / none on the lips. When a cup or phone hides the face, both keep
+cropping from the last face for 1 s.
 
 ```bash
-python scripts/build_ear_crops.py --statefarm data/public/statefarm   # State Farm + Open Images
-python scripts/train_ear_classifier.py                                # -> models/ear_cls_128_ncnn_model
+python scripts/build_crops.py --3mdad D:/rtdms-data/raw/3mdad/front --every 0.15   # + --ebdd
+python scripts/train_crop_classifier.py --kind ear     # -> models/ear_cls_128_ncnn_model
+python scripts/train_crop_classifier.py --kind mouth   # -> models/mouth_cls_128_ncnn_model
 ```
 
-State Farm is split by driver (`driver_imgs_list.csv`); the script prints per-class precision /
-recall on the held-out drivers. `live.py` loads the model automatically once it exists.
+Data and labelling: `DATA.md` (crop classifiers). The training script prints per-class
+precision / recall on held-out drivers and writes a contact sheet. `live.py` loads both models
+automatically once they exist; key `c` toggles them.
 
 ## Guided mode
 

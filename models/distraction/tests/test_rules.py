@@ -339,3 +339,11 @@ def test_mouth_classifier_drink_and_food_evidence():
     e2.evaluate(0.2, make_face(), [], mouth_p={"drink": 0.0, "food": 0.9, "none": 0.1})
     ev = run_mouth(e2, 4.0, chew, lambda t: 0.03)
     assert e2._last_food_t == 0.2
+
+
+def test_mouth_classifier_drink_counts_while_the_cup_hides_the_face():
+    e = engine()
+    e.evaluate(0.0, make_face(), [])
+    ev = e.evaluate(0.5, None, [], mouth_p={"drink": 0.9, "food": 0.0, "none": 0.1})
+    assert ev.stale_face and active(ev, "drinking") is True
+    assert "(last face)" in ev.behaviours["drinking"].why

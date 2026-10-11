@@ -99,7 +99,7 @@ class PoseConfig:
 class EarClassifierConfig:
     """Crops beside landmarks 234 / 454 -> phone / hand_no_phone / none."""
 
-    enabled: bool = False  # on once a model is trained (scripts/train_ear_classifier.py)
+    enabled: bool = False  # on once a model is trained (scripts/train_crop_classifier.py)
     weights: str = "models/ear_cls_128_ncnn_model"
     imgsz: int = 128
     # Crop: square of side `scale` face widths, centred `outward` fw beyond the ear landmark.
@@ -108,6 +108,9 @@ class EarClassifierConfig:
     grayscale: bool = False  # must match how the model was trained
     ema: float = 0.4  # smoothing of P(phone) per ear (weight of the newest frame)
     num_threads: int = 1
+    # A phone or cup can hide the face; crops then come from the last face for this long
+    # (build_crops.py does the same, so training crops match).
+    face_hold_s: float = 1.0
 
 
 @dataclass
@@ -122,6 +125,9 @@ class MouthClassifierConfig:
     grayscale: bool = False
     ema: float = 0.4
     num_threads: int = 1
+    # A phone or cup can hide the face; crops then come from the last face for this long
+    # (build_crops.py does the same, so training crops match).
+    face_hold_s: float = 1.0
 
 
 @dataclass

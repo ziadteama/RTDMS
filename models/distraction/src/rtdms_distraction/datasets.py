@@ -319,8 +319,11 @@ class Clip:
         fps = cap.get(cv2.CAP_PROP_FPS) or self.fps
         n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         step = max(1, round(every_s * fps))
-        for i in range(0, n, step):
-            cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+        for i in range(n):  # sequential grab is faster and more reliable than seeking
+            if i % step:
+                if not cap.grab():
+                    break
+                continue
             ok, img = cap.read()
             if not ok:
                 break

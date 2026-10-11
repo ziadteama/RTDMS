@@ -427,9 +427,11 @@ class RuleEngine:
                     why = f"drink at mouth, overlap {ov:.2f}" + (" (last face)" if stale else "")
                     out["drinking"] = Evidence(True, conf, why)
         p_drink = (mouth_p or {}).get("drink")
-        if not stale and p_drink is not None and p_drink >= dk.classifier_drink and \
+        # The pipeline crops from the last face for a moment when the cup hides the face.
+        if p_drink is not None and p_drink >= dk.classifier_drink and \
                 p_drink > out["drinking"].confidence:
-            out["drinking"] = Evidence(True, p_drink, f"mouth classifier drink {p_drink:.2f}")
+            why = f"mouth classifier drink {p_drink:.2f}" + (" (last face)" if stale else "")
+            out["drinking"] = Evidence(True, p_drink, why)
 
         # Eating: food near the mouth recently AND chewing now (chewing needs a live face).
         ea = self.cfg.eating

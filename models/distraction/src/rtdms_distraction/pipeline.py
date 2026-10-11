@@ -135,6 +135,7 @@ class DistractionPipeline:
         self.pose_on = pose is not None
         self.clf_on = ear_clf is not None  # ear AND mouth classifiers (key c)
         self._person = None
+        self._clf_face, self._clf_face_t = None, 0.0  # last face, for crops while it is hidden
 
         hands_available = pcfg.hands.source != "off"
         self.rules = RuleEngine(rcfg, pcfg.driver_side, hands_available, (vw, vh))
@@ -199,11 +200,14 @@ class DistractionPipeline:
         t0 = time.perf_counter()
         clf = mouth = None
         if face is not None:
-            fw = face_scale(face)
-            if self.ear_clf is not None:
-                clf = self.ear_clf.update(det_in, face, fw)
-            if self.mouth_clf is not None:
-                mouth = self.mouth_clf.update(det_in, face, fw)
+            self._clf_face, self._clf_face_t = face, t
+        held, age = self._clf_face, t - self._clf_face_t
+        if held is not None:
+            fw = face_scale(held)
+            if self.ear_clf is not None and age <= p.ear_classifier.face_hold_s:
+                clf = self.ear_clf.update(det_in, held, fw)
+            if self.mouth_clf is not None and age <= p.mouth_classifier.face_hold_s:
+                mouth = self.mouth_clf.update(det_in, held, fw)
         tm["crop_clf"] = (time.perf_counter() - t0) * 1000
 
         t0 = time.perf_counter()

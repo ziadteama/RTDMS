@@ -10,9 +10,35 @@ nearly full), never in git.
 > **2026-10-11: current target is the laptop webcam in colour** (`configs/data.yaml: look:
 > color`). New conversions and fine-tunes use colour; fisheye geometry and the IR look are off
 > (blur, brightness / contrast, noise, JPEG and occlusion stay). The v1 models below were
-> trained before this change, on the grayscale IR look. The ear-crop classifier
-> (`build_ear_crops.py` / `train_ear_classifier.py`) uses State Farm (phone / none, split by
-> driver) plus Open Images hand-at-face crops (hand_no_phone), in colour.
+> trained before this change, on the grayscale IR look.
+
+### Crop classifiers (ear: phone / hand_no_phone / none; mouth: drink / food / none)
+
+`scripts/build_crops.py` crops front-view driver video with the same face mesh and crop
+functions as `live.py`, split by driver within each dataset (70 / 15 / 15), then
+`scripts/train_crop_classifier.py --kind ear|mouth` trains YOLO26n-cls at 128 px in colour.
+
+- **3MDAD front view** (Kinect 2 = `Day-RGB2`, 50 drivers, day RGB only; the depth, IR and side
+  view were deleted). The frames are **mirrored**: on contact sheets A7 (phone, right hand)
+  always has the phone at image right, i.e. landmark 454, and A8 at 234. The pose wrist could
+  not pick the ear (phone ear 0.6–1.5 fw, other ear 1.1–1.7 fw from a wrist), so the ear comes
+  from the label plus the mirroring. A2 hair / makeup -> hand_no_phone where a wrist is within
+  0.9 fw of an ear. A13 / A14 drinking -> drink only while **CLIP ViT-L/14 zero-shot** scores
+  the mouth region >= 0.97 drinking: yolo26m (COCO), YOLO-World and MediaPipe hands missed most
+  cups at the lips, CLIP caught nearly all and scored smoking crops mostly < 0.6. A16 smoking
+  is a mouth "none" hard negative.
+- The mesh runs on every frame (its face search assumes live frame rate); crops are saved
+  every 0.15 s. A face hidden by a cup or phone is held for 1 s, as in `live.py`.
+- Per-driver check sheet (`scripts/crop_sheets.py ear-phone`): the mirror mapping held for
+  every driver whose face was tracked, but for some clips (s6, s29) the tracker had locked onto
+  the **rear passenger** at the right image edge. Faces centred right of 0.85 w or narrower
+  than 0.1 w are now rejected (the cropper searches again), and crops less than 75 % inside
+  the frame are dropped (`--min-in`).
+- **EBDD**: downloaded, encrypted; waiting for the password from the author. Then phone ear =
+  where the wrist is, eating -> food while the wrist is at the mouth (check sheets first).
+- **Open Images**: hand-at-face -> ear hand_no_phone; food within 0.15 fw of the lips -> mouth
+  food (contact sheet ~30/36 eating), plus as many no-food faces -> mouth none.
+- **State Farm and AUC: not used** (passenger-side view).
 
 ## Sources
 
