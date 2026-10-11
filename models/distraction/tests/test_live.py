@@ -121,3 +121,41 @@ def test_scorer_compares_setups_and_scratching_stays_below_dwell():
     r = rows["phone_right_ear"]["setups"]["hands"]
     assert r["ear_hit_rate"] > 0.4 and 2.9 < r["ear_time_to_alert_s"] < 3.2
     assert rows["neg_scratch"]["setups"]["hands"]["ear_false_alarms"] == 0
+
+
+class FakeEarClf:
+    def __init__(self, p):
+        self.p = p
+
+    def update(self, view, face, fw):
+        return {"phone_right_ear": self.p, "phone_left_ear": 0.0}
+
+
+def test_guided_compares_two_ear_models_on_the_same_frames(tmp_path, monkeypatch):
+    script = [(0, 2, "normal", "n"), (2, 8, "phone_right_ear", "r"), (8, 13, "neg_scratch", "s")]
+    hand = [det("hand", 215, 270, 50, 50)]  # centred in the right ear zone
+    pipe = build(hand)
+    pipe.ear_clf, pipe.pose_on, pipe.clf_on = FakeEarClf(0.9), True, True  # sees the phone
+    pipe.ear_alts["m128"] = FakeEarClf(0.1)  # misses it
+    alt = pipe.rules.add_clf_variant("m128")
+    sc = live.GuidedScorer(script, pipe.rules.variants, [("m160", None), ("m128", "m128")])
+    t = 0.0
+    while t < 13.0:
+        pipe.detector.dets = hand if 2.0 <= t < 8.0 else []
+        sc.update(t, pipe.process(np.zeros((640, 640), np.uint8), t), "m")
+        t += 1 / 30
+    rows = sc.summary()
+    by = {r["segment"]: r for r in rows}
+    ear = by["phone_right_ear"]
+    a, b = ear["setups"]["hands+pose+clf"], ear["setups"][alt]
+    assert a["ear_hit_rate"] == b["ear_hit_rate"] > 0.4  # same hand dwell -> same WARNINGs
+    assert a["ear_alert_rate"] > 0.4 and b["ear_alert_rate"] == 0.0
+    assert ear["ear_models"]["m160"]["phone_rate"] == 1.0
+    assert ear["ear_models"]["m128"]["phone_rate"] == 0.0
+    monkeypatch.setattr(live, "ROOT", tmp_path)
+    meta = {"utc": "X", "models_used": ["m"], "conf_final": 0.25, "grayscale_final": False,
+            "flip": False, "fps_cap": None, "measured_fps": 20.0, "classifier_loaded": True,
+            "ear_model": "m160"}
+    md = live.write_reports(rows, meta).with_suffix(".md").read_text()
+    assert "hands+pose+clf [m160]" in md and "hands+pose+clf [m128]" in md
+    assert "| m160 | 100% |" in md and "Suggested ear model: m160" in md

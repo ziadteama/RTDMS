@@ -83,6 +83,12 @@ class FaceMeshConfig:
     search_region: list[float] = field(default_factory=lambda: [0.0, 0.0, 1.0, 0.7])
     search_tile: float = 0.45
     lost_reset_frames: int = 5
+    # Driver lock (facemesh.DriverLock): track only the largest face in the search region,
+    # ignore other faces, re-acquire after the driver is lost this long.
+    driver_lock: bool = True
+    relock_after_s: float = 1.0
+    lock_max_jump: float = 1.0  # x face size, from the last accepted face
+    lock_max_scale: float = 1.6
 
 
 @dataclass
@@ -244,9 +250,17 @@ class HandAtEarConfig:
 
     dwell_s: float = 3.0  # hand at the ear this long -> WARNING (scratching is shorter)
     gap_s: float = 0.7  # misses shorter than this do not end the episode
+    # Hand box at the ear (frontal camera: the box runs down over palm and wrist): it covers
+    # >= this share of the ear zone, or its top edge is between the eye and jaw lines and it
+    # overlaps the zone horizontally. Boxes centred above the eye line never count.
+    hand_zone_cover: float = 0.30
     # Pose wrist rule: wrist within this many face widths of the ear landmark, not above the
-    # eye line, elbow raised (not hanging by the body).
-    wrist_ear_max: float = 0.5
+    # eye line, elbow raised (not hanging by the body). Frontal view: the wrist of a hand
+    # holding a phone at the ear sits ~1 fw below the ear.
+    wrist_ear_max: float = 1.3
+    # ... and out at the ear's side: at least this share of the way from the face centre to
+    # that ear (horizontally along the ear axis), so a hand on the chin does not count. 0 = off.
+    wrist_min_side: float = 0.6
     elbow_max_below_shoulder: float = 1.0  # elbow y <= shoulder y + this * fw
     elbow_unseen_ok: bool = True  # webcam framing often cuts the elbows off
     kpt_conf: float = 0.3

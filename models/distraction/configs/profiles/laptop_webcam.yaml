@@ -41,9 +41,12 @@ pose:
   enabled: true          # wrist-at-ear evidence (yolo26n-pose @320, every 3rd frame); 'p' toggles
 
 ear_classifier:
-  enabled: true          # 'c' toggles (with the mouth classifier)
-  # Crop size chosen on val drivers (96 / 128 / 160 study, 2026-10-11): 160 had the best
-  # val macro-F1 (0.910 vs 0.899 at 128). models/ear_cls_128_ncnn_model is kept as fallback.
+  # OFF (2026-10-11 live test): the only phone-at-ear training data was 3MDAD, a low dashboard
+  # camera at 30-45 deg that sees the phone from the side; from the front (mirror mount) the
+  # phone is hidden behind the hand and the model gave P(phone) 0.00. Hand-at-ear (hands +
+  # pose) carries the phone call until a frontal source (EBDD) exists.
+  enabled: false
+  # Last trained (3MDAD): crop size 160 chosen on val drivers (0.910 vs 0.899 at 128).
   weights: models/ear_cls_160_ncnn_model
   imgsz: 160
   grayscale: false       # colour crops (current target); must match training

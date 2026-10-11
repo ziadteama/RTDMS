@@ -52,17 +52,30 @@ recognised from the hand:
   classifier's smoothed P(phone) ≥ 0.6. A phone box at the ear on its own is also an ALERT.
 - **Ear zone** = beside the ear, from the eye line to the jaw line. A hand above the eye line
   (temple, top of the head — the elbow-on-door posture) does not count.
-- **Hand at ear** = a MediaPipe hand box centred in the zone, **or** a pose wrist within 0.5
-  face widths of the ear landmark, not above the eye line, elbow raised (or out of frame).
-  MediaPipe often misses a flat hand pressed to the head seen from the side; the pose wrist
-  comes from the arm, not the hand's appearance.
+- **Hand at ear** (built for a frontal camera, where the phone hides behind the hand):
+  - a hand box that covers >= 30 % of the ear zone, **or** whose top edge is between the eye
+    line and the jaw line with its centre inside the zone's x range (from the front the box
+    runs down over palm and wrist, so its centre is often below the jaw line);
+  - **or** a pose wrist within 1.3 face widths of the ear landmark (from the front it sits
+    ~1 fw below the ear), below the eye line, out at that ear's side (not under the chin),
+    elbow raised or out of frame.
+  - A hand box centred above the eye line never counts (hand on the head).
+- **Driver lock**: the face mesh locks onto the largest face in the driver ROI (during the
+  side check) and ignores every other face, e.g. someone behind you. If your face is lost for
+  more than 1 s it searches again. The overlay shows `driver locked` / `searching`.
 
 In the debug overlay each ear shows `box± pose± clf <p> hand <s>` (box / pose / classifier
 evidence and the hand dwell), and pose wrists are drawn as orange circles.
 
-**Crop classifiers** (128 px colour crops): ear = phone / hand_no_phone / none beside each
-ear, mouth = drink / food / none on the lips. When a cup or phone hides the face, both keep
+**Crop classifiers** (colour crops): ear = phone / hand_no_phone / none beside each ear,
+mouth = drink / food / none on the lips. When a cup or phone hides the face, both keep
 cropping from the last face for 1 s.
+
+> **Ear classifier OFF (2026-10-11).** Its only phone-at-ear data was 3MDAD, whose "front"
+> camera is low on the dashboard at 30-45 deg and sees the phone from the side. From a
+> mirror-mounted camera the phone hides behind the hand: P(phone) was 0.00 live. Hand-at-ear
+> (hands + pose) carries phone calls until frontal phone data (EBDD) exists. In `--guided`,
+> `--compare-ear <model dirs>` scores extra ear classifiers side by side once one is on.
 
 ```bash
 python scripts/build_crops.py --3mdad D:/rtdms-data/raw/3mdad/front --every 0.15   # + --ebdd

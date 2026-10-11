@@ -116,7 +116,7 @@ def test_pose_wrist_rule():
         "elbow hanging by the body": (person((ear[0] - 10, ear[1] + 30), elbow=(230, 600)),
                                       False),
         "wrist above the eye line": (person((ear[0], ear[1] - 60), elbow=(200, 380)), False),
-        "wrist far from the ear": (person((ear[0] - 120, ear[1] + 30), elbow=(200, 380)), False),
+        "wrist far from the ear": (person((ear[0] - 180, ear[1] + 30), elbow=(200, 380)), False),
         "elbow out of frame": (person((ear[0] - 10, ear[1] + 30)), True),
     }
     for name, (p, want) in cases.items():
@@ -347,3 +347,68 @@ def test_mouth_classifier_drink_counts_while_the_cup_hides_the_face():
     ev = e.evaluate(0.5, None, [], mouth_p={"drink": 0.9, "food": 0.0, "none": 0.1})
     assert ev.stale_face and active(ev, "drinking") is True
     assert "(last face)" in ev.behaviours["drinking"].why
+
+
+# --------------------------------------------------------------------------- frontal camera
+# Face fw 120 centred (320, 260): driver's right ear 234 at (260, 260), eye line y 242, jaw
+# line y 302 (+ 0.10 fw margin = 314).
+
+FRONTAL_EAR_HAND = (240, 315, 70, 140)  # x 205..275, y 245..385: top at the eye line, the box
+# runs down over palm and wrist, so its CENTRE (y 315) is below the jaw line
+
+
+def test_frontal_tall_hand_box_at_the_ear_counts():
+    e = engine()
+    old_centre_rule = 242 <= FRONTAL_EAR_HAND[1] <= 314
+    assert not old_centre_rule  # the case that never triggered live
+    ev = run_hand(e, 3.5, lambda t: FRONTAL_EAR_HAND)
+    d, _ = dwell(ev)
+    assert d >= 3.0 and ev.ears["phone_right_ear"].hand_box is True
+
+
+def test_frontal_hand_box_covering_the_ear_zone_counts():
+    # a big hand right over the ear zone, top above the eye line but centred below it
+    ev = run_hand(engine(), 3.5, lambda t: (235, 280, 90, 130))  # y 215..345
+    assert dwell(ev)[0] >= 3.0
+
+
+def test_frontal_hand_on_head_above_eye_line_does_not_count():
+    # elbow-on-desk posture: hand on the temple / top of the head, centred above the eye line
+    ev = run_hand(engine(), 4.0, lambda t: (240, 190, 80, 110))  # y 135..245, centre 190
+    assert dwell(ev)[0] == 0.0 and ev.ears["phone_right_ear"].hand_box is False
+
+
+def test_frontal_tall_hand_box_on_the_chin_does_not_count():
+    # hand under the chin, fingers up the cheek: centred on the face, not at either ear
+    ev = run_hand(engine(), 4.0, lambda t: (320, 340, 80, 90))  # y 295..385
+    assert dwell(ev, "phone_right_ear")[0] == 0.0 and dwell(ev, "phone_left_ear")[0] == 0.0
+
+
+def test_frontal_wrist_one_face_width_below_the_ear_counts():
+    e = engine()
+    wrist = (255, 375)  # ~0.96 fw below landmark 234, elbow out of frame
+    ev = run_hand(e, 3.5, lambda t: None, person_fn=lambda t: person(wrist))
+    assert ev.ears["phone_right_ear"].pose is True
+    assert dwell(ev, variant="hands+pose")[0] >= 3.0 and dwell(ev, variant="hands")[0] == 0.0
+
+
+def test_frontal_wrist_rule_limits():
+    e = engine()
+    cases = {
+        "1.25 fw below the ear": ((260, 410), True),
+        "1.5 fw below the ear": ((260, 440), False),
+        "under the chin (hand on chin)": ((320, 360), False),
+        "above the eye line (hand on head)": ((250, 230), False),
+    }
+    for name, (wrist, want) in cases.items():
+        ev = e.evaluate(0.0, make_face(), [], person=person(wrist))
+        assert ev.ears["phone_right_ear"].pose is want, name
+
+
+def test_frontal_scratch_with_tall_box_stays_under_dwell():
+    e = engine()
+    ev = None
+    for k in range(4):  # 1 s at the ear, 1 s away, x4
+        ev = run_hand(e, 1.0, lambda t: FRONTAL_EAR_HAND, t0=2.0 * k)
+        ev = run_hand(e, 1.0, lambda t: None, t0=2.0 * k + 1.0)
+    assert dwell(ev)[0] < 3.0

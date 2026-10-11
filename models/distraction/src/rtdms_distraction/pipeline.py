@@ -21,7 +21,7 @@ import numpy as np
 from .calibration import FisheyeCalibration
 from .config import BEHAVIOURS, PipelineConfig, RulesConfig, resolve_path
 from .roi import DriverROI
-from .rules import EAR_VARIANTS, Baseline, FrameEvidence, RuleEngine, face_scale
+from .rules import Baseline, FrameEvidence, RuleEngine, face_scale
 from .smoothing import BehaviourSmoother
 from .types import Detection, FaceObservation
 
@@ -47,6 +47,7 @@ class FrameResult:
     person: Any = None  # driver's pose (pose.Person) or None
     clf: dict[str, float] | None = None  # ear-crop classifier, smoothed P(phone) per ear
     mouth: dict[str, float] | None = None  # mouth-crop classifier, smoothed class probabilities
+    clf_alt: dict[str, dict[str, float]] = field(default_factory=dict)  # extra ear classifiers
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-safe per-frame output (no image, no landmarks)."""
@@ -136,6 +137,7 @@ class DistractionPipeline:
         self.clf_on = ear_clf is not None  # ear AND mouth classifiers (key c)
         self._person = None
         self._clf_face, self._clf_face_t = None, 0.0  # last face, for crops while it is hidden
+        self.ear_alts: dict = {}  # extra ear classifiers scored side by side (add_ear_model)
 
         hands_available = pcfg.hands.source != "off"
         self.rules = RuleEngine(rcfg, pcfg.driver_side, hands_available, (vw, vh))
@@ -155,6 +157,14 @@ class DistractionPipeline:
             from .hands import MediaPipeHands
             self.hands = MediaPipeHands(self.pcfg.hands)
         self._dets, self._hands = [], []
+
+    def add_ear_model(self, name: str, cfg) -> str:
+        """Score one more ear-crop classifier on the same crops (guided comparison). Its setup
+        is hands+pose+<this classifier>; returns the setup name."""
+        from .ear_clf import EarClassifier
+
+        self.ear_alts[name] = EarClassifier(cfg)
+        return self.rules.add_clf_variant(name)
 
     def reset_baseline(self) -> None:
         b = self.rcfg.baseline
@@ -199,6 +209,7 @@ class DistractionPipeline:
         tm["pose"] = (time.perf_counter() - t0) * 1000
         t0 = time.perf_counter()
         clf = mouth = None
+        clf_alt: dict[str, dict[str, float]] = {}
         if face is not None:
             self._clf_face, self._clf_face_t = face, t
         held, age = self._clf_face, t - self._clf_face_t
@@ -206,6 +217,8 @@ class DistractionPipeline:
             fw = face_scale(held)
             if self.ear_clf is not None and age <= p.ear_classifier.face_hold_s:
                 clf = self.ear_clf.update(det_in, held, fw)
+            if age <= p.ear_classifier.face_hold_s:
+                clf_alt = {n: m.update(det_in, held, fw) for n, m in self.ear_alts.items()}
             if self.mouth_clf is not None and age <= p.mouth_classifier.face_hold_s:
                 mouth = self.mouth_clf.update(det_in, held, fw)
         tm["crop_clf"] = (time.perf_counter() - t0) * 1000
@@ -215,11 +228,11 @@ class DistractionPipeline:
         dets += self._hands if p.hands.source == "mediapipe" else []
         ev = self.rules.evaluate(t, face, dets, person=self._person if self.pose else None,
                                  clf=clf, mouth_p=mouth if self.clf_on or self.ear_clf is None
-                                 else None)
+                                 else None, clf_alt=clf_alt)
         variant = self.variant
         dwell = self.rcfg.hand_at_ear.dwell_s
         behaviours = {}
-        ear_levels: dict[str, dict[str, str]] = {v: {} for v in EAR_VARIANTS}
+        ear_levels: dict[str, dict[str, str]] = {v: {} for v in self.rules.variants}
         for b in BEHAVIOURS:
             e = ev.behaviours[b]
             s = self.smoothers[b].update(t, e.active, e.confidence)
@@ -231,7 +244,7 @@ class DistractionPipeline:
             if b in ev.ears:
                 # Phone at an ear: a smoothed phone box -> ALERT; else a hand held at the ear
                 # >= dwell -> WARNING, ALERT if a phone (box or classifier) was seen meanwhile.
-                for v in EAR_VARIANTS:
+                for v in self.rules.variants:
                     d_s, seen = ev.ears[b].variants.get(v, (0.0, False))
                     lv = "alert" if s.active else (("alert" if seen else "warning")
                                                    if d_s >= dwell else "none")
@@ -255,7 +268,7 @@ class DistractionPipeline:
         self._i += 1
         return FrameResult(t, view, face, dets, ev, behaviours, level, baseline, tm, ran,
                            ear_levels, variant, self._person if self.pose_on else None, clf,
-                           mouth)
+                           mouth, clf_alt)
 
     @property
     def variant(self) -> str:

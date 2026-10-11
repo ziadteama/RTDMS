@@ -39,6 +39,15 @@ functions as `live.py`, split by driver within each dataset (70 / 15 / 15), then
 - **Open Images**: hand-at-face -> ear hand_no_phone; food within 0.15 fw of the lips -> mouth
   food (contact sheet ~30/36 eating), plus as many no-food faces -> mouth none.
 - **State Farm and AUC: not used** (passenger-side view).
+- **3MDAD is not used for the ear classifier** (2026-10-11, `NO_EAR` in `build_crops.py`):
+  its RGB2 camera sits low on the dashboard below the mirror and sees the face at
+  30-45 deg, so the phone is visible from the side. From a mirror-mounted camera the
+  phone hides behind the hand (live: P(phone) 0.00). The ear classifier is off until a
+  frontal phone source exists (EBDD). 3MDAD stays in the mouth classifier.
+- **Mouth hard negatives**: Open Images hand over the mouth / cheek / chin (GT hand box
+  >= 15 % of the mouth window, no phone / drink / food in the image) and 3MDAD A2 hair /
+  makeup -> mouth none, kept first when none is capped (live: hand on the cheek gave
+  P(food) 0.99).
 
 ## Sources
 

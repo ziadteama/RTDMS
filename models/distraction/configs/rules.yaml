@@ -48,7 +48,13 @@ ears:
 hand_at_ear:
   dwell_s: 3.0           # scratching / adjusting glasses is usually shorter
   gap_s: 0.7             # brief detection misses do not end the episode
-  wrist_ear_max: 0.5     # pose wrist within this many fw of the ear landmark ...
+  # Hand box at the ear, frontal camera (the box runs down over palm and wrist, so its centre
+  # is often below the jaw line): it covers >= hand_zone_cover of the ear zone, OR its top
+  # edge is between the eye line and the jaw line and it overlaps the zone horizontally. A box
+  # centred above the eye line (hand on the head) never counts.
+  hand_zone_cover: 0.30
+  wrist_ear_max: 1.3     # pose wrist within this many fw of the ear landmark (frontal: ~1 fw below) ...
+  wrist_min_side: 0.6    # ... out at that ear's side (>= 0.6 of face centre -> ear), not under the chin ...
   elbow_max_below_shoulder: 1.0   # ... with the elbow raised (elbow y <= shoulder y + 1.0 fw)
   elbow_unseen_ok: true  # elbows are often out of a webcam's frame
   kpt_conf: 0.3

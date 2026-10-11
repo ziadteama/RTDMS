@@ -17,7 +17,10 @@ Sources (adapters in rtdms_distraction.datasets; front / windshield views only):
     equipment -> none.
   Open Images (optional): hand-at-face crops -> ear hand_no_phone; food touching the lips ->
     mouth food (contact-sheet check: ~30/36 someone eating), with as many no-food faces ->
-    mouth none so "photo" does not become a shortcut for "food".
+    mouth none so "photo" does not become a shortcut for "food"; a hand over the mouth /
+    cheek / chin with no food, drink or phone in the image -> mouth none (live test: hand
+    on the cheek gave P(food) 0.99). 3MDAD A2 hair / makeup -> mouth none as well.
+  3MDAD gives NO ear crops (NO_EAR: low dashboard angle, phone seen from the side).
 Crops whose label depends on the wrist are skipped when the wrist is not where it should be
 (the clip label covers the whole action, including reaching for the cup).
 Split BY DRIVER within each dataset (70/15/15), so every split has drivers of both.
@@ -50,6 +53,13 @@ from rtdms_distraction.rules import face_scale  # noqa: E402
 
 R_EAR, L_EAR = 234, 454  # driver's right / left ear in a non-mirrored image
 MIRRORED = {"3mdad"}  # sources whose frames are mirrored (driver's right ear at image right)
+# No ear crops from these: the 3MDAD front view is a low dashboard camera seeing the face at
+# 30-45 deg, so the phone is seen from the side; at a mirror-mounted camera it is hidden
+# behind the hand (live test 2026-10-11: the 3MDAD-trained ear classifier gave P(phone) 0.00
+# from the front).
+NO_EAR = {"3mdad"}
+# Mouth "none" crops kept first when "none" is capped: a hand at the face with no food.
+HARD_NONE = {"hand_at_face", "hair_makeup", "smoking"}
 WRISTS = (9, 10)
 
 # action -> (ear rule, mouth rule). Ear rules: "none", "phone_R", "phone_L", "phone_wrist",
@@ -63,7 +73,7 @@ RULES = {
     "phone_left_ear": ("phone_L", "none"),
     "phone_unknown_ear": ("phone_wrist", "none"),
     "phone_in_hand": ("none", "none"),
-    "hair_makeup": ("hand_wrist", None),
+    "hair_makeup": ("hand_wrist", "none"),
     "drinking": ("none", "drink_clip"),
     "eating": ("none", "food_wrist"),
     "smoking": ("none", "none"),
@@ -194,6 +204,8 @@ def main() -> int:
 
     for ci, clip in enumerate(clips, 1):
         ear_rule, mouth_rule = RULES.get(clip.label, (None, None))
+        if clip.source in NO_EAR:
+            ear_rule = None
         if ear_rule is None and mouth_rule is None:
             continue
         split = splits[clip.driver]
@@ -270,6 +282,7 @@ def main() -> int:
     if not args.no_openimages:
         rows += openimages_hand_crops(dcfg, ec, out)
         rows += openimages_mouth_crops(dcfg, mc, out)
+        rows += openimages_hand_face_crops(dcfg, mc, out)
 
     # balance 'none' per kind and split, then write manifests
     rng = random.Random(7)
@@ -280,6 +293,7 @@ def main() -> int:
             cap = int(args.max_none_ratio * max(others.values(), default=1))
             nones = [r for r in sel if r["label"] == "none"]
             rng.shuffle(nones)
+            nones.sort(key=lambda r: r["action"] not in HARD_NONE)  # hard negatives first
             for r in nones[cap:]:
                 (out / kind / r["file"]).unlink(missing_ok=True)
                 r["dropped"] = True
@@ -374,6 +388,69 @@ def openimages_mouth_crops(dcfg, mc, out) -> list[dict]:
                 n_none += 1
     lmk.close()
     print(f"[openimages] mouth food {dict(n_food)}, plus as many 'none' faces")
+    return rows
+
+
+def openimages_hand_face_crops(dcfg, mc, out) -> list[dict]:
+    """Open Images: a GT hand box over the mouth crop window (>= 15 % of it: hand on the
+    mouth, cheek or chin) in an image with no phone, drink or food box -> mouth none
+    (action hand_at_face, kept first when 'none' is capped)."""
+    import mediapipe as mp
+    from mediapipe.tasks import python as mpp
+    from mediapipe.tasks.python import vision
+
+    from rtdms_distraction.types import FaceObservation
+
+    pcfg = load_pipeline_config(profile="laptop_webcam")
+    lmk = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
+        base_options=mpp.BaseOptions(model_asset_path=str((ROOT / pcfg.facemesh.model_path)
+                                                          .resolve())),
+        running_mode=vision.RunningMode.IMAGE, num_faces=1))
+    oi = Path(dcfg["root"]) / "openimages"
+    rows, n = [], Counter()
+    for split in ("train", "val", "test"):
+        faces = json.loads((oi / "meta" / f"{split}_faces.json").read_text(encoding="utf8"))
+        for lab_p in sorted((oi / "labels_gt" / split).glob("*.txt")):
+            if not faces.get(lab_p.stem):
+                continue
+            boxes = [(int(r[0]), *map(float, r[1:])) for r in
+                     (ln.split() for ln in lab_p.read_text(encoding="utf8").split("\n")
+                      if ln.strip())]
+            if any(b[0] in (0, 1, 2) for b in boxes) or not any(b[0] == 3 for b in boxes):
+                continue
+            img = cv2.imread(str(oi / "images" / split / f"{lab_p.stem}.jpg"))
+            if img is None:
+                continue
+            res = lmk.detect(mp.Image(image_format=mp.ImageFormat.SRGB,
+                                      data=cv2.cvtColor(img, cv2.COLOR_BGR2RGB)))
+            if not res.face_landmarks:
+                continue
+            h, w = img.shape[:2]
+            lm = np.array([(q.x * w, q.y * h) for q in res.face_landmarks[0]])
+            fw = face_scale(FaceObservation(lm, None, None, None, "none", None, "geometric", 0))
+            cx, cy = mouth_center(lm, mc.down, fw)
+            half = mc.scale * fw / 2
+            best = 0.0
+            for _, bx, by, bw, bh in (b for b in boxes if b[0] == 3):
+                x1, y1, x2, y2 = (bx - bw / 2) * w, (by - bh / 2) * h, \
+                    (bx + bw / 2) * w, (by + bh / 2) * h
+                iw = min(x2, cx + half) - max(x1, cx - half)
+                ih = min(y2, cy + half) - max(y1, cy - half)
+                if iw > 0 and ih > 0:
+                    best = max(best, iw * ih / (4 * half * half))
+            if best < 0.15:
+                continue
+            crop = crop_mouth(img, lm, mc.imgsz, mc.scale, mc.down, fw, mc.grayscale)
+            d = out / "mouth" / split / "none"
+            d.mkdir(parents=True, exist_ok=True)
+            fn = f"openimages__{lab_p.stem}__handface.jpg"
+            cv2.imwrite(str(d / fn), crop, [cv2.IMWRITE_JPEG_QUALITY, 92])
+            rows.append({"kind": "mouth", "file": f"{split}/none/{fn}", "split": split,
+                         "label": "none", "source": "openimages", "driver": lab_p.stem,
+                         "action": "hand_at_face"})
+            n[split] += 1
+    lmk.close()
+    print(f"[openimages] mouth none, hand at the face: {dict(n)}")
     return rows
 
 

@@ -46,7 +46,7 @@ from rtdms_distraction.config import (  # noqa: E402
 from rtdms_distraction.detector import make_detector  # noqa: E402
 from rtdms_distraction.eventlog import EventLog  # noqa: E402
 from rtdms_distraction.pipeline import DistractionPipeline  # noqa: E402
-from rtdms_distraction.rules import EAR_VARIANTS  # noqa: E402
+from rtdms_distraction.rules import CLF_VARIANT, EAR_VARIANTS  # noqa: E402
 from rtdms_distraction.viz import render  # noqa: E402
 
 # Same order as record.py --guided, with the hand-at-ear negatives split out. Ear segments are
@@ -82,6 +82,8 @@ def parse_args():
     p.add_argument("--guided", action="store_true", help="prompt sequence + scored summary")
     p.add_argument("--save", action="store_true", help="also write the raw video (privacy: off)")
     p.add_argument("--duration", type=float, help="stop after N seconds (free mode)")
+    p.add_argument("--compare-ear", nargs="*", default=["models/ear_cls_128_ncnn_model"],
+                   help="--guided: extra ear classifiers scored side by side on the same frames")
     return p.parse_args()
 
 
@@ -110,6 +112,25 @@ def discover_models(listed: list[LiveModel]) -> list[LiveModel]:
                              imgsz=int(imgsz[0] if isinstance(imgsz, list) else imgsz),
                              hands="detector" if "hand" in names else "mediapipe"))
     return out
+
+
+def model_name(weights: str) -> str:
+    return Path(weights).name.removesuffix("_ncnn_model")
+
+
+def model_imgsz(d: Path, default: int) -> int:
+    meta = d / "metadata.yaml"
+    if not meta.is_file():
+        return default
+    v = yaml.safe_load(meta.read_text(encoding="utf8")).get("imgsz", default)
+    return int(v[0] if isinstance(v, list) else v)
+
+
+def lock_text(pipe) -> str:
+    lock = getattr(pipe.facemesh, "lock", None)
+    if lock is None:
+        return "driver lock off"
+    return f"driver locked ({lock.size:.0f} px face)" if lock.locked else "driver lock: searching"
 
 
 def ear_lines(res) -> list[str]:
@@ -192,20 +213,30 @@ class GuidedScorer:
     behaviour active), raw rate (share with this frame's evidence true), alerts raised
     (behaviour onsets), false alarms (onsets of anything not expected), time-to-alert.
 
-    Per hand-at-ear setup (hands / hands+pose / hands+pose+clf), all scored on the same frames:
-    phone-at-ear hit rate and time-to-alert in the ear segments, and phone-at-ear onsets (false
-    alarms) in every other segment."""
+    Per hand-at-ear setup (hands / hands+pose / hands+pose+clf, plus one per extra ear
+    classifier), all scored on the same frames: phone-at-ear hit rate, ALERT rate and
+    time-to-alert in the ear segments; phone-at-ear onsets (false alarms) and ALERT onsets
+    (false alerts) in every other segment. The classifier setups share the hand evidence, so
+    their WARNINGs are identical; they differ only in ALERT (phone seen during the episode).
 
-    def __init__(self, script):
-        self.script = script
+    Per ear classifier (ear_models: [(label, None = res.clf | name in res.clf_alt)]): share of
+    frames with P(phone) >= thr at the expected ear (ear segments) or at either ear."""
+
+    def __init__(self, script, variants=EAR_VARIANTS, ear_models=(), thr=0.6):
+        self.script, self.variants, self.ear_models, self.thr = script, list(variants), \
+            list(ear_models), thr
         self.segs = [{"start": a, "end": b, "label": lab, "prompt": pr, "frames": 0, "hit": 0,
                       "raw": 0, "onsets": [], "tta_s": None, "models": set(),
-                      "v_hit": dict.fromkeys(EAR_VARIANTS, 0),
-                      "v_tta": dict.fromkeys(EAR_VARIANTS),
-                      "v_fa": {v: [] for v in EAR_VARIANTS}}
+                      "v_hit": dict.fromkeys(self.variants, 0),
+                      "v_alert": dict.fromkeys(self.variants, 0),
+                      "v_tta": dict.fromkeys(self.variants),
+                      "v_fa": {v: [] for v in self.variants},
+                      "v_fa_alert": {v: [] for v in self.variants},
+                      "m_n": {m: 0 for m, _ in self.ear_models},
+                      "m_phone": {m: 0 for m, _ in self.ear_models}}
                      for a, b, lab, pr in script]
         self._prev = dict.fromkeys(BEHAVIOURS, "none")
-        self._vprev = {v: dict.fromkeys(EAR_BEHAVIOURS, "none") for v in EAR_VARIANTS}
+        self._vprev = {v: dict.fromkeys(EAR_BEHAVIOURS, "none") for v in self.variants}
 
     def seg_at(self, t):
         return next((s for s in self.segs if s["start"] <= t < s["end"]), None)
@@ -215,11 +246,13 @@ class GuidedScorer:
         onsets = [b for b, st in res.behaviours.items()
                   if st["level"] != "none" and self._prev[b] == "none"]
         self._prev = {b: st["level"] for b, st in res.behaviours.items()}
-        v_onsets = {}
-        for v in EAR_VARIANTS:
-            lv = res.ear_levels.get(v, {})
+        v_onsets, v_alerts = {}, {}
+        for v in self.variants:
+            lv, pv = res.ear_levels.get(v, {}), self._vprev[v]
             v_onsets[v] = [b for b in EAR_BEHAVIOURS
-                           if lv.get(b, "none") != "none" and self._vprev[v][b] == "none"]
+                           if lv.get(b, "none") != "none" and pv[b] == "none"]
+            v_alerts[v] = [b for b in EAR_BEHAVIOURS
+                           if lv.get(b, "none") == "alert" and pv[b] != "alert"]
             self._vprev[v] = {b: lv.get(b, "none") for b in EAR_BEHAVIOURS}
         if seg is None:
             return
@@ -236,20 +269,31 @@ class GuidedScorer:
         for b in onsets:
             seg["onsets"].append({"t": round(t - seg["start"], 2), "behaviour": b,
                                   "level": res.behaviours[b]["level"], "expected": b == exp})
-        for v in EAR_VARIANTS:
-            if exp in EAR_BEHAVIOURS and res.ear_levels.get(v, {}).get(exp, "none") != "none":
+        for v in self.variants:
+            lv = res.ear_levels.get(v, {}).get(exp, "none") if exp in EAR_BEHAVIOURS else "none"
+            if lv != "none":
                 seg["v_hit"][v] += 1
                 if seg["v_tta"][v] is None:
                     seg["v_tta"][v] = round(t - seg["start"], 2)
+            seg["v_alert"][v] += lv == "alert"
             seg["v_fa"][v] += [b for b in v_onsets[v] if b != exp]
+            seg["v_fa_alert"][v] += [b for b in v_alerts[v] if b != exp]
+        for m, key in self.ear_models:
+            p = res.clf if key is None else res.clf_alt.get(key)
+            if not p:
+                continue
+            seg["m_n"][m] += 1
+            ears = [exp] if exp in EAR_BEHAVIOURS else list(EAR_BEHAVIOURS)
+            seg["m_phone"][m] += any(p.get(b, 0.0) >= self.thr for b in ears)
 
     def summary(self):
         rows = []
         for s in self.segs:
             exp = s["label"] in BEHAVIOURS
+            ear = s["label"] in EAR_BEHAVIOURS
             n = max(1, s["frames"])
             fa = [o for o in s["onsets"] if not o["expected"]]
-            row = {
+            rows.append({
                 "segment": s["label"], "start_s": s["start"], "end_s": s["end"],
                 "frames": s["frames"],
                 "hit_rate": round(s["hit"] / n, 3) if exp else None,
@@ -259,13 +303,28 @@ class GuidedScorer:
                                                                            for o in fa}),
                 "time_to_alert_s": s["tta_s"], "models": sorted(s["models"]),
                 "setups": {v: {
-                    "ear_hit_rate": round(s["v_hit"][v] / n, 3)
-                    if s["label"] in EAR_BEHAVIOURS else None,
+                    "ear_hit_rate": round(s["v_hit"][v] / n, 3) if ear else None,
+                    "ear_alert_rate": round(s["v_alert"][v] / n, 3) if ear else None,
                     "ear_time_to_alert_s": s["v_tta"][v],
-                    "ear_false_alarms": len(s["v_fa"][v])} for v in EAR_VARIANTS},
-            }
-            rows.append(row)
+                    "ear_false_alarms": len(s["v_fa"][v]),
+                    "ear_false_alerts": len(s["v_fa_alert"][v])} for v in self.variants},
+                "ear_models": {m: {"frames": s["m_n"][m], "phone_frames": s["m_phone"][m],
+                                   "phone_rate": round(s["m_phone"][m] / s["m_n"][m], 3)
+                                   if s["m_n"][m] else None} for m, _ in self.ear_models},
+            })
         return rows
+
+
+NEG_EAR = (("neg_scratch", "scratch"), ("neg_hand_on_chin", "hand on chin"),
+           ("neg_hand_on_head", "elbow-on-head"), ("neg_talking", "talking"))
+
+
+def setup_label(v, meta):
+    if v == CLF_VARIANT:
+        return f"hands+pose+clf [{meta.get('ear_model', 'configured')}]"
+    if v.startswith(CLF_VARIANT + ":"):
+        return f"hands+pose+clf [{v.split(':', 1)[1]}]"
+    return v
 
 
 def write_reports(rows, meta) -> Path:
@@ -290,34 +349,87 @@ def write_reports(rows, meta) -> Path:
     normal_fa = sum(r["false_alarms"] for r in rows if r["segment"] == "normal")
     lines += ["", f"False alarms during the 'normal' gaps: {normal_fa}", ""]
     if rows and "setups" in rows[0]:
-        by = {r["segment"]: r for r in rows}
-
-        def fa(seg, v):
-            return str(by[seg]["setups"][v]["ear_false_alarms"]) if seg in by else "-"
-
-        lines += ["## Phone at ear: hand-at-ear setups (same frames)", "",
-                  "| setup | R-ear hit | R-ear TTA s | L-ear hit | L-ear TTA s | "
-                  "FA scratch | FA hand on chin | FA elbow-on-head | FA talking | FA normal |",
-                  "|---|---|---|---|---|---|---|---|---|---|"]
-        for v in EAR_VARIANTS:
-            r_ = by.get("phone_right_ear", {}).get("setups", {}).get(v, {})
-            l_ = by.get("phone_left_ear", {}).get("setups", {}).get(v, {})
-            fa_norm = sum(r["setups"][v]["ear_false_alarms"] for r in rows
-                          if r["segment"] == "normal")
-            lines.append(
-                f"| {v} | {_p(r_.get('ear_hit_rate'))} | {r_.get('ear_time_to_alert_s') or '-'} "
-                f"| {_p(l_.get('ear_hit_rate'))} | {l_.get('ear_time_to_alert_s') or '-'} | "
-                f"{fa('neg_scratch', v)} | {fa('neg_hand_on_chin', v)} | "
-                f"{fa('neg_hand_on_head', v)} | {fa('neg_talking', v)} | {fa_norm} |")
-        if not meta.get("classifier_loaded"):
-            lines += ["", "hands+pose+clf = hands+pose here: no ear-crop classifier was loaded."]
-        lines.append("")
+        lines += ear_tables(rows, meta)
     lines += ["hit rate = share of frames with the expected behaviour active (after smoothing);",
-              "raw rate = share of frames whose evidence fired before smoothing;",
-              "FA = phone-at-ear onsets in that segment (scratching must stay under the 3 s "
-              "dwell)."]
+              "raw rate = share of frames whose evidence fired before smoothing."]
     stem.with_suffix(".md").write_text("\n".join(lines) + "\n", encoding="utf8", newline="\n")
     return stem
+
+
+def ear_tables(rows, meta) -> list[str]:
+    by = {r["segment"]: r for r in rows}
+    variants = list(rows[0]["setups"])
+    normal = [r for r in rows if r["segment"] == "normal"]
+
+    def fa(seg, v):
+        if seg not in by:
+            return "-"
+        s = by[seg]["setups"][v]
+        return f"{s['ear_false_alarms']} ({s['ear_false_alerts']})"
+
+    lines = ["## Phone at ear: setups and ear models (same frames)", "",
+             "hit = hand-at-ear WARNING or ALERT; ALERT = phone seen during the episode (box or "
+             "ear classifier). FA = phone-at-ear onsets (ALERT onsets in brackets).", "",
+             "| setup | R-ear hit | R-ear ALERT | R TTA s | L-ear hit | L-ear ALERT | L TTA s | "
+             + " | ".join(f"FA {n}" for _, n in NEG_EAR) + " | FA normal |",
+             "|---|---|---|---|---|---|---|" + "---|" * (len(NEG_EAR) + 1)]
+    for v in variants:
+        r_ = by.get("phone_right_ear", {}).get("setups", {}).get(v, {})
+        l_ = by.get("phone_left_ear", {}).get("setups", {}).get(v, {})
+        fa_n = sum(r["setups"][v]["ear_false_alarms"] for r in normal)
+        fa_na = sum(r["setups"][v]["ear_false_alerts"] for r in normal)
+        lines.append(
+            f"| {setup_label(v, meta)} | {_p(r_.get('ear_hit_rate'))} | "
+            f"{_p(r_.get('ear_alert_rate'))} | {r_.get('ear_time_to_alert_s') or '-'} | "
+            f"{_p(l_.get('ear_hit_rate'))} | {_p(l_.get('ear_alert_rate'))} | "
+            f"{l_.get('ear_time_to_alert_s') or '-'} | "
+            + " | ".join(fa(s, v) for s, _ in NEG_EAR) + f" | {fa_n} ({fa_na}) |")
+    if not meta.get("classifier_loaded"):
+        lines += ["", "hands+pose+clf = hands+pose here: no ear-crop classifier was loaded."]
+    models = list(rows[0].get("ear_models", {}))
+    if models:
+        def rate(seg, m):
+            e = by.get(seg, {}).get("ear_models", {}).get(m, {})
+            return _p(e.get("phone_rate"))
+
+        def normal_rate(m):
+            n = sum(r["ear_models"][m]["frames"] for r in normal)
+            return _p(sum(r["ear_models"][m]["phone_frames"] for r in normal) / n if n else None)
+
+        lines += ["", "### Ear-crop classifiers: frames with P(phone) >= "
+                  f"{meta.get('clf_threshold', 0.6)}",
+                  "", "ear segments: at the expected ear; others: at either ear.", "",
+                  "| ear model | R-ear seg | L-ear seg | " +
+                  " | ".join(n for _, n in NEG_EAR) + " | normal |",
+                  "|---|---|---|" + "---|" * (len(NEG_EAR) + 1)]
+        for m in models:
+            lines.append(f"| {m} | {rate('phone_right_ear', m)} | {rate('phone_left_ear', m)} | "
+                         + " | ".join(rate(s, m) for s, _ in NEG_EAR) + f" | {normal_rate(m)} |")
+        verdict = ear_verdict(rows, meta)
+        if verdict:
+            lines += ["", f"**Suggested ear model: {verdict}** (fewest false ALERTs over the "
+                      "negative and normal segments; tie -> higher mean ALERT rate at the ears)."]
+    return lines + [""]
+
+
+def ear_verdict(rows, meta) -> str | None:
+    """Among the classifier setups: fewest false ALERTs, then the highest ear ALERT rate."""
+    variants = [v for v in rows[0]["setups"] if v.startswith(CLF_VARIANT)]
+    if len(variants) < 2:
+        return None
+    by = {r["segment"]: r for r in rows}
+
+    def key(v):
+        fal = sum(r["setups"][v]["ear_false_alerts"] for r in rows
+                  if r["segment"] not in EAR_BEHAVIOURS)
+        alert = [by[s]["setups"][v]["ear_alert_rate"] or 0.0 for s in EAR_BEHAVIOURS if s in by]
+        return (fal, -(sum(alert) / max(1, len(alert))))
+
+    keys = {v: key(v) for v in variants}
+    best = min(variants, key=keys.get)
+    if sum(k == keys[best] for k in keys.values()) > 1:
+        return "no difference in this run"
+    return setup_label(best, meta).split("[", 1)[-1].rstrip("]")
 
 
 def _p(v):
@@ -356,8 +468,8 @@ def main() -> int:
               f"conf={conf:.2f} gray={gray} flip={src.flip} fps_cap={fps_cap} "
               f"ear_setup={pipe.variant} (pose {'on' if pipe.pose_on else 'off'}"
               f"{'' if pipe.pose else ' [not loaded]'}, classifier "
-              f"{'on' if pipe.clf_on else 'off'}{'' if pipe.ear_clf else ' [not loaded]'})",
-              flush=True)
+              f"{'on' if pipe.clf_on else 'off'}{'' if pipe.ear_clf else ' [not loaded]'}) "
+              f"{lock_text(pipe)}", flush=True)
 
     print(f"[live] {src.describe()} -> view {pipe.roi.out_w}x{pipe.roi.out_h}; "
           f"{len(models)} model(s): {', '.join(m.name for m in models)}")
@@ -368,8 +480,29 @@ def main() -> int:
     if live.side_check and not args.no_side_check:
         side_check(src, pipe, live.side_check_s)
         announce("after side check")
+    if getattr(pipe.facemesh, "locked", None) is False:
+        print("[live] driver lock: no face locked yet; it locks onto the largest face in the "
+              "driver ROI as soon as one is seen", flush=True)
 
-    scorer = GuidedScorer(GUIDED_LIVE) if args.guided else None
+    scorer, ear_models = None, []
+    if args.guided:
+        if pipe.ear_clf is not None:
+            ear_models.append((model_name(pcfg.ear_classifier.weights), None))
+        for w in args.compare_ear:
+            d = resolve_path(w)
+            same = d.resolve() == resolve_path(pcfg.ear_classifier.weights).resolve()
+            if pipe.ear_clf is None or not (d / "model.ncnn.param").is_file() or same:
+                print(f"[live] --compare-ear {w}: skipped (missing, same as the configured "
+                      f"model, or no configured ear classifier)")
+                continue
+            cfg = copy.deepcopy(pcfg.ear_classifier)
+            cfg.weights, cfg.imgsz = str(d), model_imgsz(d, cfg.imgsz)
+            name = model_name(w)
+            pipe.add_ear_model(name, cfg)
+            ear_models.append((name, name))
+            print(f"[live] comparing ear models: {[m for m, _ in ear_models]}", flush=True)
+        scorer = GuidedScorer(GUIDED_LIVE, pipe.rules.variants, ear_models,
+                              rcfg.hand_at_ear.classifier_phone)
     utc = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     writer = None
     raw_path = ROOT / "data" / "recordings" / f"live_{utc}.mp4"
@@ -416,7 +549,7 @@ def main() -> int:
             info = [f"model {m.name} @{m.imgsz}  hands {m.hands}",
                     f"conf {conf:.2f}  gray {'on' if gray else 'off'}  flip "
                     f"{'on' if src.flip else 'off'}  cap {fps_cap or '-'}",
-                    f"ear setup {pipe.variant}",
+                    f"ear setup {pipe.variant}  {lock_text(pipe)}",
                     *ear_lines(res),
                     "q r g m [ ] d p c"]
             cv2.imshow("rtdms live", render(res, fps, rcfg.phone_in_hand.holder_zones,
@@ -475,6 +608,10 @@ def main() -> int:
                 "frames": n, "source": src.describe(), "setup": pipe.variant,
                 "pose_loaded": pipe.pose is not None,
                 "classifier_loaded": pipe.ear_clf is not None,
+                "ear_model": model_name(pcfg.ear_classifier.weights),
+                "ear_models_compared": [m for m, _ in ear_models],
+                "clf_threshold": rcfg.hand_at_ear.classifier_phone,
+                "driver_lock": pcfg.facemesh.driver_lock,
                 "mouth_classifier_loaded": pipe.mouth_clf is not None}
         stem = write_reports(scorer.summary(), meta)
         print(f"[live] summary: {stem.with_suffix('.md')}")

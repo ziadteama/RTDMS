@@ -154,8 +154,10 @@ class ChewingDetector:
 
 
 # Hand-at-ear evidence sets compared in guided mode. Every variant sees the same frames; the
-# pipeline reports the one matching what is enabled.
+# pipeline reports the one matching what is enabled. RuleEngine.add_clf_variant adds one more
+# per extra ear-crop classifier ("hands+pose+clf:<name>"), e.g. to compare crop sizes.
 EAR_VARIANTS = ("hands", "hands+pose", "hands+pose+clf")
+CLF_VARIANT = "hands+pose+clf"
 # Eye line / jaw line landmarks per face side: outer eye corner, jaw angle.
 EYE_OF = {DRIVER_RIGHT_EAR: 33, DRIVER_LEFT_EAR: 263}
 JAW_OF = {DRIVER_RIGHT_EAR: 172, DRIVER_LEFT_EAR: 397}
@@ -196,6 +198,7 @@ class EarEvidence:
     pose: bool | None = None  # pose wrist rule
     phone_box: bool = False  # a phone box overlapping the ear zone
     clf_p: float | None = None  # ear-crop classifier, smoothed P(phone)
+    clf_alt: dict[str, float] = field(default_factory=dict)  # extra classifiers, P(phone)
     variants: dict[str, tuple[float, bool]] = field(default_factory=dict)  # dwell_s, phone_seen
 
 
@@ -235,7 +238,17 @@ class RuleEngine:
         self._last_face: FaceObservation | None = None
         self._last_face_t = -1e9
         gap = cfg.hand_at_ear.gap_s
-        self.episodes = {v: {b: HandEpisode(gap) for b in self.ears} for v in EAR_VARIANTS}
+        self.variants = list(EAR_VARIANTS)
+        self.episodes = {v: {b: HandEpisode(gap) for b in self.ears} for v in self.variants}
+
+    def add_clf_variant(self, name: str) -> str:
+        """An extra ear-crop classifier: same hand evidence as hands+pose, phone evidence from
+        that classifier. Returns the variant name."""
+        v = f"{CLF_VARIANT}:{name}"
+        if v not in self.variants:
+            self.variants.append(v)
+            self.episodes[v] = {b: HandEpisode(self.cfg.hand_at_ear.gap_s) for b in self.ears}
+        return v
 
     # -- geometry -------------------------------------------------------------
 
@@ -276,6 +289,29 @@ class RuleEngine:
                 return True
         return False
 
+    def _hand_at_ear(self, b: Box, z: Box, face: FaceObservation, ear: int, s: float) -> bool:
+        """A hand box at the side of the head. Seen from the front, the hand holding a phone
+        hides it and its box runs down over the palm and wrist, so the box CENTRE is often
+        below the jaw line: count it if the box covers >= hand_zone_cover of the ear zone, or
+        its top edge lies between the eye line and the jaw line and it overlaps the zone
+        horizontally (box centre within the zone's x range: a hand on the chin, centred on the
+        face, only grazes the far zone's inward reach). A box centred above the eye line is a
+        hand on the head, not a call."""
+        h = self.cfg.hand_at_ear
+        lm = face.landmarks
+        eye_y = lm[EYE_OF[ear]][1] - self.cfg.ears.eye_margin * s
+        jaw_y = lm[JAW_OF[ear]][1] + self.cfg.ears.jaw_margin * s
+        if b.cy < eye_y:
+            return False
+        iw = min(b.x2, z.x2) - max(b.x1, z.x1)
+        ih = min(b.y2, z.y2) - max(b.y1, z.y1)
+        if iw <= 0:
+            return False
+        z_area = max(1e-6, (z.x2 - z.x1) * (z.y2 - z.y1))
+        if ih > 0 and iw * ih / z_area >= h.hand_zone_cover:
+            return True
+        return eye_y <= b.y1 <= jaw_y and z.x1 <= b.cx <= z.x2
+
     def _pose_wrist_ears(self, face: FaceObservation, s: float, person) -> tuple[set, list]:
         """Ears (landmark ids) a raised wrist is at, per the pose wrist rule; wrist points."""
         if person is None:
@@ -295,6 +331,10 @@ class RuleEngine:
                       key=lambda e, w=w: float(np.linalg.norm(w - lm[e])))
             if np.linalg.norm(w - lm[ear]) > h.wrist_ear_max * s:
                 continue
+            c = 0.5 * (lm[DRIVER_RIGHT_EAR] + lm[DRIVER_LEFT_EAR])
+            u = lm[ear] - c
+            if float(np.dot(w - c, u)) < h.wrist_min_side * float(np.dot(u, u)):
+                continue  # under the chin / mouth, not out at the side of the head
             if w[1] < lm[EYE_OF[ear]][1] - self.cfg.ears.eye_margin * s:
                 continue  # above the eye line: hand on the head, not a call
             if k[el, 2] >= h.kpt_conf and k[sh, 2] >= h.kpt_conf:
@@ -309,10 +349,12 @@ class RuleEngine:
 
     def evaluate(self, t: float, face: FaceObservation | None, dets: list[Detection],
                  person=None, clf: dict[str, float] | None = None,
-                 mouth_p: dict[str, float] | None = None) -> FrameEvidence:
+                 mouth_p: dict[str, float] | None = None,
+                 clf_alt: dict[str, dict[str, float]] | None = None) -> FrameEvidence:
         """person: the driver's pose (pose.Person) or None; clf: per ear behaviour, the ear-crop
         classifier's smoothed P(phone); mouth_p: the mouth-crop classifier's smoothed
-        {drink, food, none} probabilities. Both None when the classifier is off."""
+        {drink, food, none} probabilities. Both None when the classifier is off. clf_alt:
+        extra ear classifiers by name (add_clf_variant), same shape as clf."""
         stale = False
         if face is None:
             # Item 4: within face_geometry_hold_s, keep the last face's zones so a phone or cup
@@ -325,7 +367,7 @@ class RuleEngine:
                 unknown = {b: Evidence(None, why="no face") for b in BEHAVIOURS}
                 down_s = t - self._down_since if self._down_since is not None else 0.0
                 ears = {b: EarEvidence() for b in self.ears}
-                for v in EAR_VARIANTS:
+                for v in self.variants:
                     for b, ep in self.episodes[v].items():
                         ep.update(t, None, False)
                         ears[b].variants[v] = (ep.dwell(t), ep.phone_seen)
@@ -363,19 +405,22 @@ class RuleEngine:
         ears: dict[str, EarEvidence] = {}
         for b, (idx, _) in self.ears.items():
             z = ear_zones[b]
-            box_hit = any(z.x1 <= h.box.cx <= z.x2 and z.y1 <= h.box.cy <= z.y2 and
+            box_hit = any(self._hand_at_ear(h.box, z, face, idx, s) and
                           not any(overlap_min(h.box, o) > 0.3 for o in held) for h in hands)
             p_clf = clf.get(b) if clf else None
             ev = EarEvidence(hand_box=box_hit if self.hands_available else None,
                              pose=(idx in pose_ears) if person is not None else None,
-                             phone_box=bool(at_ear[b].active), clf_p=p_clf)
-            clf_phone = p_clf is not None and p_clf >= self.cfg.hand_at_ear.classifier_phone
-            hand = {"hands": ev.hand_box,
-                    "hands+pose": bool(ev.hand_box) or bool(ev.pose),
-                    "hands+pose+clf": bool(ev.hand_box) or bool(ev.pose)}
+                             phone_box=bool(at_ear[b].active), clf_p=p_clf,
+                             clf_alt={n: p[b] for n, p in (clf_alt or {}).items() if b in p})
+            thr = self.cfg.hand_at_ear.classifier_phone
+            hand_pose = bool(ev.hand_box) or bool(ev.pose)
+            hand = {"hands": ev.hand_box, "hands+pose": hand_pose, CLF_VARIANT: hand_pose}
             phone = {"hands": ev.phone_box, "hands+pose": ev.phone_box,
-                     "hands+pose+clf": ev.phone_box or clf_phone}
-            for v in EAR_VARIANTS:
+                     CLF_VARIANT: ev.phone_box or (p_clf is not None and p_clf >= thr)}
+            for v in self.variants[len(EAR_VARIANTS):]:
+                pa = ev.clf_alt.get(v.split(":", 1)[1])
+                hand[v], phone[v] = hand_pose, ev.phone_box or (pa is not None and pa >= thr)
+            for v in self.variants:
                 ep = self.episodes[v][b]
                 ep.update(t, hand[v], phone[v])
                 ev.variants[v] = (ep.dwell(t), ep.phone_seen)

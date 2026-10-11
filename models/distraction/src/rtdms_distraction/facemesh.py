@@ -284,8 +284,72 @@ class FaceCropper:
         self.tracking = True
 
 
+def face_size(px: np.ndarray) -> float:
+    """Larger side of the landmark box: stable when the head turns (ear-to-ear width is not)."""
+    lo, hi = px.min(0), px.max(0)
+    return float(max(hi - lo))
+
+
+class DriverLock:
+    """Track only the driver's face; ignore anyone else in view (e.g. someone behind).
+
+    acquire  one full cycle of search tiles collects every face seen; lock onto the largest
+             whose centre is inside the search region (the driver ROI).
+    locked   accept only a face continuous with the locked one: centre within max_jump x its
+             size of the last accepted face, size within max_scale. Anything else is ignored.
+    release  after relock_after_s without an accepted face; then acquire again.
+    """
+
+    def __init__(self, region: tuple[float, float, float, float], relock_after_s: float,
+                 max_jump: float, max_scale: float):
+        self.region = region  # x0, y0, x1, y1 in view pixels
+        self.relock_after_s, self.max_jump, self.max_scale = relock_after_s, max_jump, max_scale
+        self.center: np.ndarray | None = None
+        self.size = 0.0
+        self.t = -math.inf
+        self._cands: list[np.ndarray] = []
+
+    @property
+    def locked(self) -> bool:
+        return self.center is not None
+
+    def expire(self, t: float) -> bool:
+        """Release a lock not refreshed for relock_after_s; True if it was released now."""
+        if self.locked and t - self.t > self.relock_after_s:
+            self.center, self._cands = None, []
+            return True
+        return False
+
+    def offer(self, px: np.ndarray) -> None:
+        """Acquisition: a face seen on this frame's search tile."""
+        c = 0.5 * (px.min(0) + px.max(0))
+        x0, y0, x1, y1 = self.region
+        if x0 <= c[0] <= x1 and y0 <= c[1] <= y1:
+            self._cands.append(px)
+
+    def end_cycle(self, t: float) -> np.ndarray | None:
+        """After a full tile cycle: lock onto the largest candidate (returns its landmarks)."""
+        best = max(self._cands, key=face_size) if self._cands else None
+        self._cands = []
+        if best is not None:
+            self._set(best, t)
+        return best
+
+    def accept(self, px: np.ndarray, t: float) -> bool:
+        c, s = 0.5 * (px.min(0) + px.max(0)), face_size(px)
+        ok = (np.linalg.norm(c - self.center) <= self.max_jump * self.size and
+              1 / self.max_scale <= s / max(self.size, 1e-6) <= self.max_scale)
+        if ok:
+            self._set(px, t)
+        return ok
+
+    def _set(self, px: np.ndarray, t: float) -> None:
+        self.center, self.size, self.t = 0.5 * (px.min(0) + px.max(0)), face_size(px), t
+
+
 class FaceMesh:
-    """Cropper + backend + analyzer behind one call. Landmarks come back in view pixels."""
+    """Cropper + backend + analyzer behind one call. Landmarks come back in view pixels.
+    With facemesh.driver_lock, only the locked driver's face is returned (DriverLock)."""
 
     def __init__(self, cfg: FaceMeshConfig, width: int, height: int, intrinsics: np.ndarray):
         backends = {"mediapipe": MediaPipeFaceMesh, "dms_face": DmsFaceMesh}
@@ -294,18 +358,44 @@ class FaceMesh:
         self.backend = backends[cfg.backend](cfg, cfg.crop_size, cfg.crop_size)
         self.cropper = FaceCropper(cfg, width, height)
         self.analyzer = FaceAnalyzer(intrinsics)
+        x, y, w, h = cfg.search_region
+        self.lock = DriverLock((x * width, y * height, (x + w) * width, (y + h) * height),
+                               cfg.relock_after_s, cfg.lock_max_jump, cfg.lock_max_scale) \
+            if cfg.driver_lock else None
+        self._tiles_seen = 0
 
     def process(self, view_rgb: np.ndarray, t: float) -> FaceObservation | None:
+        lock = self.lock
+        if lock is not None and lock.expire(t):  # driver lost > relock_after_s: search again
+            self.cropper.tracking, self._tiles_seen = False, 0
         crop, x0, y0, scale = self.cropper.crop(view_rgb)
         raw = self.backend.process(crop, t)
-        if raw is None:
-            self.cropper.update(None)
+        if raw is not None:
+            raw.pixels = raw.pixels / scale + (x0, y0)
+        if lock is None:
+            self.cropper.update(None if raw is None else raw.pixels)
+            return None if raw is None else self.analyzer.analyze(raw)
+        if not lock.locked:  # acquiring: one tile per frame, lock after a full cycle
+            if raw is not None:
+                lock.offer(raw.pixels)
+            self._tiles_seen += 1
+            if self._tiles_seen >= len(self.cropper.tiles):
+                self._tiles_seen = 0
+                best = lock.end_cycle(t)
+                if best is not None:
+                    self.cropper.update(best)  # crop box onto the driver, tracking on
             return None
-        raw.pixels = raw.pixels / scale + (x0, y0)
-        # The transformation matrix assumes MediaPipe's own camera on the crop; rotation is
-        # unaffected by the crop's translation/scale to first order, so it is kept for pose.
-        self.cropper.update(raw.pixels)
-        return self.analyzer.analyze(raw)
+        if raw is not None and lock.accept(raw.pixels, t):
+            # The transformation matrix assumes MediaPipe's own camera on the crop; rotation
+            # is unaffected by the crop's translation/scale to first order (kept for pose).
+            self.cropper.update(raw.pixels)
+            return self.analyzer.analyze(raw)
+        # No face, or someone else's: keep the crop on the driver's last place (no search).
+        return None
+
+    @property
+    def locked(self) -> bool | None:
+        return None if self.lock is None else self.lock.locked
 
     @property
     def crop_box(self) -> tuple[float, float, float]:

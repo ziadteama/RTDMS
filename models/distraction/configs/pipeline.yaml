@@ -90,8 +90,16 @@ facemesh:
   # size: ~3x the expected face width, so the face is large enough for the detector.
   search_region: [0.0, 0.0, 1.0, 0.7]
   search_tile: 0.45
-  # Frames without a face before falling back to the search region.
+  # Frames without a face before falling back to the search region (driver_lock off).
   lost_reset_frames: 5
+  # Driver lock: one search cycle picks the LARGEST face inside search_region (the driver ROI);
+  # after that only a face continuous with it is used (centre within lock_max_jump x its size,
+  # size within lock_max_scale), so someone behind the driver is ignored. The crop stays on
+  # the driver while the face is hidden; after relock_after_s without the driver, search again.
+  driver_lock: true
+  relock_after_s: 1.0
+  lock_max_jump: 1.0
+  lock_max_scale: 1.6
 
 hands:
   # COCO has no hand class. Baseline: MediaPipe hands. Once the fine-tuned detector has a

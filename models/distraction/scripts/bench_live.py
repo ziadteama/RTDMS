@@ -28,6 +28,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from live import build_detector, discover_models  # noqa: E402
+
 from rtdms_distraction.config import load_pipeline_config, load_rules_config  # noqa: E402
 from rtdms_distraction.pipeline import DistractionPipeline  # noqa: E402
 from rtdms_distraction.viz import render  # noqa: E402
