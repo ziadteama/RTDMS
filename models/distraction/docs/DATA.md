@@ -44,6 +44,22 @@ functions as `live.py`, split by driver within each dataset (70 / 15 / 15), then
   30-45 deg, so the phone is visible from the side. From a mirror-mounted camera the
   phone hides behind the hand (live: P(phone) 0.00). The ear classifier is off until a
   frontal phone source exists (EBDD). 3MDAD stays in the mouth classifier.
+- **Mouth classifier off as well (2026-10-11).** Per segment on the S01 webcam recording,
+  share of frames with P >= 0.6 (v1 = before, v2 = with the hand-at-face negatives below):
+
+  | segment | food v1 | food v2 | drink v1 | drink v2 |
+  |---|---|---|---|---|
+  | drinking | 48 % | 1 % | 0 % | 0 % |
+  | eating | 0 % | 37 % | 0 % | 0 % |
+  | phone in hand | 0 % | 26 % | 0 % | 0 % |
+  | nod / turn | 3 % | 32 % | 0 % | 0 % |
+  | talking | 0 % | 8 % | 0 % | 0 % |
+  | normal | 4 % | 6 % | 1 % | 0 % |
+
+  v1 calls the clear cup at the lips "food"; v2 calls a turned bare face "food". Held-out
+  3MDAD drivers looked fine (drink P/R 0.89/0.87 v1, 0.83/0.81 v2), so this is the camera
+  angle, not the split: 3MDAD's 3/4 dashboard view and Open Images photos do not transfer to a
+  frontal camera. Needs frontal driver video (EBDD eating, DMD drinking).
 - **Mouth hard negatives**: Open Images hand over the mouth / cheek / chin (GT hand box
   >= 15 % of the mouth window, no phone / drink / food in the image) and 3MDAD A2 hair /
   makeup -> mouth none, kept first when none is capped (live: hand on the cheek gave

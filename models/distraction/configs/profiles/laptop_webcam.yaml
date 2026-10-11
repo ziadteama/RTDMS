@@ -52,7 +52,13 @@ ear_classifier:
   grayscale: false       # colour crops (current target); must match training
 
 mouth_classifier:
-  enabled: true          # drink / food / none
+  # OFF (2026-10-11): neither mouth model transfers to the frontal webcam. On the S01 recording
+  # v1 (models/mouth_cls_96_v1_ncnn_model) called the cup at the lips "food" (48 % of the
+  # drinking segment) and never fired while eating; v2 (+ hand-at-face negatives) never
+  # fired on the cup and called a turned bare face "food" (26-32 % of phone-in-hand / nod).
+  # Training data is a 3/4 dashboard view (3MDAD) + Open Images photos; needs frontal driver
+  # video (EBDD, DMD). Drinking / eating fall back to detector boxes + chewing.
+  enabled: false
   # Crop size chosen on val drivers: 96 had the best val drink+none F1 (0.947 vs 0.939 at
   # 128 / 160; val has only 4 food crops, so food is not used to choose).
   weights: models/mouth_cls_96_ncnn_model

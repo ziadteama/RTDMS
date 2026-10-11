@@ -76,6 +76,12 @@ cropping from the last face for 1 s.
 > mirror-mounted camera the phone hides behind the hand: P(phone) was 0.00 live. Hand-at-ear
 > (hands + pose) carries phone calls until frontal phone data (EBDD) exists. In `--guided`,
 > `--compare-ear <model dirs>` scores extra ear classifiers side by side once one is on.
+>
+> **Mouth classifier OFF too (2026-10-11).** On the S01 webcam recording v1 called the cup at
+> the lips "food" and v2 (with hand-at-face negatives) called a turned bare face "food"
+> (`DATA.md`). Drinking / eating use detector boxes + chewing until frontal data exists. Set
+> `mouth_classifier.enabled: true` in the profile to try one (v1:
+> `models/mouth_cls_96_v1_ncnn_model`, v2: `models/mouth_cls_96_ncnn_model`).
 
 ```bash
 python scripts/build_crops.py --3mdad D:/rtdms-data/raw/3mdad/front --every 0.15   # + --ebdd
