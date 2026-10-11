@@ -119,6 +119,14 @@ YawDD as they arrive), converted to look like our camera. Our own clips are test
 sources, licences, teacher labelling and caveats: [docs/DATA.md](docs/DATA.md). One-time in-car
 test session: [docs/IN_CAR_TEST_PROTOCOL.md](docs/IN_CAR_TEST_PROTOCOL.md).
 
+Datasets used so far:
+
+- **Open Images V7** (boxes): detector fine-tune, Open Images crops for the crop classifiers.
+- **3MDAD** (front view, day RGB): ear / mouth crop classifiers. I. Jegham, A. Ben Khalifa,
+  I. Alouani, M. A. Mahjoub, "A novel public dataset for multimodal multiview and multispectral
+  driver distraction analysis: 3MDAD", *Signal Processing: Image Communication*, vol. 88,
+  art. 115960, 2020. doi:10.1016/j.image.2020.115960
+
 ```bash
 python scripts/build_openimages.py                     # download + balanced subset (D:/rtdms-data)
 PY=python bash scripts/run_oiv_pipeline.sh v1          # teacher -> convert -> train 416/512 -> eval

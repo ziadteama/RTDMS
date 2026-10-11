@@ -154,3 +154,11 @@ boundary, likely while lifting the cup), phone in hand ✗.
 > has few phone-at-ear photos). One 92 s clip is a weak test, but the direction is clear: in-cabin
 > video data (SynDD rear view, DMD, 100-Driver) is the critical path, and YawDD is needed to
 > measure false alarms before lowering thresholds.
+
+## Datasets cited
+
+- **3MDAD** (front view, day RGB; crop classifiers 2026-10-11, see `DATA.md` and
+  `MORNING_REPORT.md`): I. Jegham, A. Ben Khalifa, I. Alouani, M. A. Mahjoub, "A novel public
+  dataset for multimodal multiview and multispectral driver distraction analysis: 3MDAD",
+  *Signal Processing: Image Communication*, vol. 88, art. 115960, 2020.
+  doi:10.1016/j.image.2020.115960
