@@ -41,9 +41,17 @@ pose:
   enabled: true          # wrist-at-ear evidence (yolo26n-pose @320, every 3rd frame); 'p' toggles
 
 ear_classifier:
-  enabled: true          # loads models/ear_cls_128_ncnn_model once trained; 'c' toggles
+  enabled: true          # 'c' toggles (with the mouth classifier)
+  # Crop size chosen on val drivers (96 / 128 / 160 study, 2026-10-11): 160 had the best
+  # val macro-F1 (0.910 vs 0.899 at 128). models/ear_cls_128_ncnn_model is kept as fallback.
+  weights: models/ear_cls_160_ncnn_model
+  imgsz: 160
   grayscale: false       # colour crops (current target); must match training
 
 mouth_classifier:
-  enabled: true          # loads models/mouth_cls_128_ncnn_model once trained (drink / food)
+  enabled: true          # drink / food / none
+  # Crop size chosen on val drivers: 96 had the best val drink+none F1 (0.947 vs 0.939 at
+  # 128 / 160; val has only 4 food crops, so food is not used to choose).
+  weights: models/mouth_cls_96_ncnn_model
+  imgsz: 96
   grayscale: false
