@@ -26,6 +26,8 @@ configs/camera_fisheye.yaml
 
 # Ultralytics download cache (CLIP text encoder, AMP-check weights) written to the working dir.
 /weights/
+# Teacher / base weights Ultralytics downloads into the working dir (yolo26m, -pose, YOLO-World).
+/*.pt
 
 # Live-test summaries (scripts/live.py --guided): local results, not shared by default.
 reports/
