@@ -22,6 +22,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import time
 import zipfile
 import zlib
 from concurrent.futures import ThreadPoolExecutor
@@ -134,6 +135,22 @@ def extract_member(remote: Remote, zname: str, info: zipfile.ZipInfo, dest: Path
     return f"got  {dest.name} ({size / 1e9:.2f} GB)"
 
 
+def extract_retry(remote: Remote, zname: str, info: zipfile.ZipInfo, dest: Path,
+                  tries: int = 8) -> str:
+    """Network drops (DNS / connection resets) fail a transfer's size / CRC check; retry the
+    member from the start with a growing wait (30 s, 60 s, ... up to 5 min)."""
+    for k in range(1, tries + 1):
+        try:
+            return extract_member(remote, zname, info, dest)
+        except (RuntimeError, subprocess.CalledProcessError, OSError) as e:
+            if k == tries:
+                raise
+            wait = min(300, 30 * k)
+            print(f"   retry {k}/{tries - 1} in {wait} s: {e}", flush=True)
+            time.sleep(wait)
+    raise AssertionError("unreachable")
+
+
 def wanted(name: str) -> bool:
     base = Path(name).name
     return (not name.startswith("__MACOSX") and USER.search(name) is not None and
@@ -168,7 +185,14 @@ def main() -> int:
 
     done_users: list[str] = []
     for zname in zips:
-        zf = zipfile.ZipFile(RangeFile(remote, zname, sizes[zname]))
+        for k in range(8):  # the zip index is a few range reads; retry them on a network drop
+            try:
+                zf = zipfile.ZipFile(RangeFile(remote, zname, sizes[zname]))
+                break
+            except subprocess.CalledProcessError:
+                time.sleep(min(300, 30 * (k + 1)))
+        else:
+            raise SystemExit(f"{zname}: index unreadable after retries")
         members = [i for i in zf.infolist() if wanted(i.filename)]
         users = sorted({USER.search(i.filename).group(1) for i in members})
         print(f"{zname}: {len(zf.infolist())} entries, {len(users)} users, "
@@ -187,7 +211,7 @@ def main() -> int:
             mine = [i for i in members if USER.search(i.filename).group(1) == uid and
                     i.filename.lower().endswith(".mp4")]
             with ThreadPoolExecutor(args.jobs) as ex:
-                for msg in ex.map(lambda i, u=udir, z=zname: extract_member(
+                for msg in ex.map(lambda i, u=udir, z=zname: extract_retry(
                         remote, z, i, u / Path(i.filename).name), mine):
                     print(f"   user_id_{uid}: {msg}", flush=True)
             done_users.append(uid)
