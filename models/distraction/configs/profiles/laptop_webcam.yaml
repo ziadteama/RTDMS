@@ -41,25 +41,28 @@ pose:
   enabled: true          # wrist-at-ear evidence (yolo26n-pose @320, every 3rd frame); 'p' toggles
 
 ear_classifier:
-  # ON (2026-10-16): retrained with SynDD rear-view (mirror camera, front-right of the driver,
+  # OFF by default (2026-10-17): the default is now simple mode (one phone / drink / food
+  # detector, live.py --mode simple). Kept for --mode full; set enabled: true to load it.
+  # Trained 2026-10-16 with SynDD rear-view (mirror camera, front-right of the driver,
   # 69 drivers) as the main source + EBDD + Open Images hand-at-face; 3MDAD is not used for the
   # ear. Held-out SynDD drivers (10): phone P 0.983 / R 0.867, hand_no_phone 0.978 / 0.827,
   # none 0.904 / 0.991. SynDD is IR, so every crop is gray (live crops are converted too).
   # The 3MDAD-only colour model (off since the 2026-10-11 live test) is
   # models/ear_cls_160_ncnn_model.
-  enabled: true
+  enabled: false
   weights: models/ear_cls_160_syndd_ncnn_model
   imgsz: 160
   grayscale: true        # must match training (SynDD rear view is infrared)
 
 mouth_classifier:
-  # ON for testing (2026-10-16): SynDD rear-view drinking / eating + 3MDAD drink + EBDD and
+  # OFF by default (2026-10-17, simple mode is the default; see ear_classifier).
+  # Trained 2026-10-16: SynDD rear-view drinking / eating + 3MDAD drink + EBDD and
   # Open Images food, all gray. Held-out SynDD drivers: drink P 1.00 / R 0.771, food
   # 0.683 / 0.573 (75 crops, mostly one driver), none 0.815 / 0.974. Food is the weakest
   # class; 'c' turns both classifiers off. The colour v1 / v2 models failed on the frontal
   # webcam (2026-10-11: cup -> food, bare turned face -> food); this is the first one trained
   # on a camera in front of the driver.
-  enabled: true
+  enabled: false
   weights: models/mouth_cls_96_syndd_ncnn_model
   imgsz: 96
   grayscale: true

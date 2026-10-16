@@ -111,6 +111,16 @@ class DistractionPipeline:
         if hands is None and pcfg.hands.source == "mediapipe":
             from .hands import MediaPipeHands
             hands = MediaPipeHands(pcfg.hands)
+        # Simple mode: detector + face mesh only (no hands, pose or crop classifiers).
+        self.simple = None
+        if rcfg.mode == "simple":
+            from .simple_rules import SimpleRules
+
+            self.simple = SimpleRules(rcfg.simple)
+            hands = None
+            pcfg.hands.source = "off"
+            pcfg.pose.enabled = False
+            pcfg.ear_classifier.enabled = pcfg.mouth_classifier.enabled = False
         self.detector, self.facemesh, self.hands = detector, facemesh, hands
         if pose is None and pcfg.pose.enabled:
             try:
@@ -195,6 +205,9 @@ class DistractionPipeline:
         face = self.facemesh.process(face_in, t)
         tm["facemesh"] = (time.perf_counter() - t0) * 1000
 
+        if self.simple is not None:
+            return self._simple_result(view, face, t, tm, ran)
+
         t0 = time.perf_counter()
         if self.hands is not None and self._i % max(1, p.hands.every_n) == 0:
             self._hands = self.hands.detect(face_in, t)
@@ -269,6 +282,22 @@ class DistractionPipeline:
         return FrameResult(t, view, face, dets, ev, behaviours, level, baseline, tm, ran,
                            ear_levels, variant, self._person if self.pose_on else None, clf,
                            mouth, clf_alt)
+
+    def _simple_result(self, view, face, t: float, tm: dict, ran: bool) -> FrameResult:
+        t0 = time.perf_counter()
+        dets = [d for d in self._dets if d.cls in ("phone", "drink", "food")]
+        behaviours = self.simple.update(t, face, dets)
+        level = max((v["level"] for v in behaviours.values()), key=LEVEL_RANK.__getitem__)
+        zone = self.simple.zone
+        ev = FrameEvidence(behaviours={}, head_down=None, head_down_s=0.0, chewing=None,
+                           zones={"mouth": zone} if zone is not None else {},
+                           stale_face=face is None and zone is not None)
+        tm["rules"] = (time.perf_counter() - t0) * 1000
+        # No head-pose rule in simple mode, so no per-drive baseline to wait for.
+        baseline = {"ready": True, "progress": 1.0, "pitch": None, "yaw": None, "gaze": None}
+        self._i += 1
+        return FrameResult(t, view, face, dets, ev, behaviours, level, baseline, tm, ran,
+                           variant="simple")
 
     @property
     def variant(self) -> str:

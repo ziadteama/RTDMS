@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Live test on a laptop webcam (until the Pi camera arrives).
 
-    python scripts/live.py --profile laptop_webcam
+    python scripts/live.py                                             # simple mode (default)
+    python scripts/live.py --mode full                                 # rule engine (hands, pose)
     python scripts/live.py --profile laptop_webcam --guided            # scored prompt sequence
     python scripts/live.py --profile laptop_webcam --fps-cap 10        # mimic Pi speed
+
+Simple mode: one phone / drink / food detector; phone box >= 1 s -> phone ALERT, drink / food
+box over the lower face -> drinking / eating ALERT. Keys r / p / c only matter in full mode.
 
 Keys:  q quit   r redo head-pose baseline   g grayscale on/off   m next detector model
        [ / ] lower / raise detector confidence   d debug overlay on/off
@@ -76,6 +80,10 @@ EAR_BEHAVIOURS = ("phone_right_ear", "phone_left_ear")
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     p.add_argument("--profile", default="laptop_webcam")
+    p.add_argument("--mode", choices=["simple", "full"], default="simple",
+                   help="simple = detector + 3 rules (phone >= 1 s, drink / food at the lower "
+                        "face); full = rule engine with hands, pose, crop classifiers "
+                        "(--guided always uses full)")
     p.add_argument("--camera-index", type=int, default=0)
     p.add_argument("--fps-cap", type=float, help="override live.fps_cap")
     p.add_argument("--no-side-check", action="store_true")
@@ -443,6 +451,7 @@ def main() -> int:
     args = parse_args()
     pcfg = load_pipeline_config(profile=args.profile)
     rcfg = load_rules_config()
+    rcfg.mode = "full" if args.guided else args.mode  # guided scoring is built on the ear rules
     live = pcfg.live
     fps_cap = args.fps_cap if args.fps_cap is not None else live.fps_cap
     c = pcfg.capture
@@ -477,7 +486,10 @@ def main() -> int:
     log.session(source=src.describe(), profile=args.profile, model=models[mi].name, conf=conf,
                 gray=gray, fps_cap=fps_cap)
 
-    if live.side_check and not args.no_side_check:
+    if rcfg.mode == "simple":
+        print("[live] simple mode: phone box >= 1 s -> phone ALERT; drink / food box over the "
+              "lower face -> drinking / eating ALERT (hands, pose, classifiers off)", flush=True)
+    elif live.side_check and not args.no_side_check:
         side_check(src, pipe, live.side_check_s)
         announce("after side check")
     if getattr(pipe.facemesh, "locked", None) is False:

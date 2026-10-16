@@ -320,8 +320,30 @@ class SmoothingConfig:
     face_geometry_hold_s: float = 5.0
 
 
+SIMPLE_BEHAVIOURS = ("phone", "drinking", "eating")
+
+
+@dataclass
+class SimpleRulesConfig:
+    """rules mode `simple`: one phone / drink / food detector and three rules, no hands, pose,
+    crop classifiers or chewing. Distances in face widths (fw)."""
+
+    phone_window_s: float = 1.0  # phone box in >= on_ratio of the last second -> phone ALERT
+    object_window_s: float = 0.5  # drink / food box over the lower face, same smoothing
+    on_ratio: float = 0.6
+    off_ratio: float = 0.3
+    # Lower face = from the nose tip down to the chin + below_chin fw, across the face width
+    # widened by side_pad fw on each side.
+    below_chin: float = 0.35
+    side_pad: float = 0.25
+    face_hold_s: float = 1.0  # a cup or hand hides the face: reuse the last face this long
+
+
 @dataclass
 class RulesConfig:
+    # full = rule engine (hands, pose, crop classifiers, chewing); simple = SimpleRulesConfig
+    mode: str = "full"
+    simple: SimpleRulesConfig = field(default_factory=SimpleRulesConfig)
     baseline: BaselineConfig = field(default_factory=BaselineConfig)
     head_down: HeadDownConfig = field(default_factory=HeadDownConfig)
     ears: EarsConfig = field(default_factory=EarsConfig)
@@ -341,6 +363,8 @@ class RulesConfig:
     )
 
     def __post_init__(self) -> None:
+        if self.mode not in ("full", "simple"):
+            raise ValueError(f"mode: must be 'full' or 'simple', got {self.mode!r}")
         for name, level in self.levels.items():
             if name not in BEHAVIOURS:
                 raise ValueError(f"levels: unknown behaviour {name!r}")
