@@ -122,9 +122,11 @@ def main() -> int:
     p.add_argument("--imgsz", type=int, help="detector input size (default from pipeline.yaml)")
     p.add_argument("--conf", type=float, help="one detector threshold for every class")
     p.add_argument("--json")
+    p.add_argument("--profile", help="pipeline profile, e.g. laptop_webcam (classifiers, pose)")
+    p.add_argument("--workers", type=int, default=1, help="videos processed in parallel")
     args = p.parse_args()
 
-    pcfg, rcfg = load_pipeline_config(), load_rules_config()
+    pcfg, rcfg = load_pipeline_config(profile=args.profile), load_rules_config()
     pcfg.rectify.enabled = False
     pcfg.roi.rect = None
     if args.weights:
@@ -150,9 +152,19 @@ def main() -> int:
     segments = [s for s in segments if s.video in videos]
 
     events_by_video = {}
-    for i, v in enumerate(videos, 1):
-        events_by_video[v] = run_video(v, pcfg, rcfg)
-        print(f"[{i}/{len(videos)}] {v.name}: {len(events_by_video[v])} events", flush=True)
+    if args.workers > 1:  # one pipeline per video and process; videos are independent
+        from concurrent.futures import ProcessPoolExecutor
+
+        with ProcessPoolExecutor(args.workers) as ex:
+            futs = {v: ex.submit(run_video, v, pcfg, rcfg) for v in videos}
+            for i, (v, f) in enumerate(futs.items(), 1):
+                events_by_video[v] = f.result()
+                print(f"[{i}/{len(videos)}] {v.name}: {len(events_by_video[v])} events",
+                      flush=True)
+    else:
+        for i, v in enumerate(videos, 1):
+            events_by_video[v] = run_video(v, pcfg, rcfg)
+            print(f"[{i}/{len(videos)}] {v.name}: {len(events_by_video[v])} events", flush=True)
     result = {"dataset": args.dataset, "detector": f"{pcfg.detector.backend}:"
               f"{pcfg.detector.weights}", "hands": pcfg.hands.source, "videos": len(videos),
               "scores": score(segments, events_by_video, args.slack),
