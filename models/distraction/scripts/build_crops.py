@@ -326,10 +326,13 @@ def main() -> int:
     p.add_argument("--drink-min", type=float, default=0.97, help="CLIP P(drinking) for drink")
     p.add_argument("--limit-clips", type=int, help="clips per dataset (smoke test)")
     p.add_argument("--workers", type=int, default=1, help="clip worker processes")
-    p.add_argument("--reuse", help="earlier crops folder under the data root to copy crops of "
-                                   "--reuse-sources from (pass --no-openimages if it includes "
-                                   "openimages)")
-    p.add_argument("--reuse-sources", default="3mdad,openimages")
+    p.add_argument("--split-file", help="JSON {driver: train|val|test}; used for a dataset when "
+                                        "it covers all of that dataset's drivers")
+    p.add_argument("--drivers", help="only these drivers (comma list), e.g. a download batch")
+    p.add_argument("--reuse", action="append", default=[], metavar="FOLDER:SRC[,SRC]",
+                   help="copy crops of these sources from an earlier crops folder under the data "
+                        "root instead of re-cropping, e.g. crops:3mdad,openimages (pass "
+                        "--no-openimages when reusing openimages); repeatable")
     args = p.parse_args()
 
     dcfg = yaml.safe_load((ROOT / "configs" / "data.yaml").read_text(encoding="utf8"))
@@ -345,11 +348,22 @@ def main() -> int:
         clips += D.mdad3_front(args.mdad)[: args.limit_clips]
     if args.ebdd:
         clips += D.ebdd(args.ebdd)[: args.limit_clips]
-    if not clips and args.no_openimages:
-        raise SystemExit("nothing to do: pass --syndd, --3mdad and/or --ebdd")
+    if args.drivers:
+        keep = set(args.drivers.split(","))
+        clips = [c for c in clips if c.driver in keep]
+    if not clips and args.no_openimages and not args.reuse:
+        raise SystemExit("nothing to do: pass --syndd, --3mdad, --ebdd and/or --reuse")
+    # A fixed driver -> split file (e.g. configs/syndd_split.json, made from every annotated
+    # driver) keeps the split stable when a dataset is cropped in batches as it downloads.
+    fixed = json.loads(Path(args.split_file).read_text(encoding="utf8")) \
+        if args.split_file else {}
     splits = {}
     for src in {c.source for c in clips}:
-        splits.update(split_drivers({c.driver for c in clips if c.source == src}))
+        drivers = {c.driver for c in clips if c.source == src}
+        if drivers <= fixed.keys():
+            splits.update({d: fixed[d] for d in drivers})
+        else:
+            splits.update(split_drivers(drivers))
 
     # Clips are independent (one tracker each), so they run in worker processes; each worker
     # holds its own face mesh / pose / CLIP (CLIP ViT-L on the GPU is ~1 GB per worker).
@@ -371,9 +385,12 @@ def main() -> int:
 
     _setup(*setup, pose=False)  # crop settings for the Open Images steps below
     ec, mc = _W["ec"], _W["mc"]
-    if args.reuse:
-        rows += reuse_crops(Path(dcfg["root"]) / args.reuse, out,
-                            set(args.reuse_sources.split(",")), args.grayscale, ec.imgsz)
+    for spec in args.reuse:
+        folder, _, srcs = spec.partition(":")
+        if not srcs:
+            raise SystemExit(f"--reuse {spec}: expected FOLDER:SRC[,SRC]")
+        rows += reuse_crops(Path(dcfg["root"]) / folder, out, set(srcs.split(",")),
+                            args.grayscale, ec.imgsz)
     if not args.no_openimages:
         rows += openimages_hand_crops(dcfg, ec, out)
         rows += openimages_mouth_crops(dcfg, mc, out)
