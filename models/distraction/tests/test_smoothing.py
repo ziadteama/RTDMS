@@ -1,3 +1,5 @@
+import pytest
+
 from rtdms_distraction.config import SmoothingConfig
 from rtdms_distraction.smoothing import BehaviourSmoother
 
@@ -17,7 +19,7 @@ def test_activates_only_after_enough_history():
     assert not st.active  # 100% positive but only 0.5 s of window
     st, t = feed(s, t, 0.7, True)
     assert st.active
-    assert st.confidence == 0.8
+    assert st.confidence == pytest.approx(0.8)
 
 
 def test_needs_on_ratio():
