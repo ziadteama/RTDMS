@@ -98,6 +98,8 @@ def main() -> int:
     p.add_argument("--workers", type=int, default=3)
     p.add_argument("--eval-only", action="store_true")
     p.add_argument("--crops", default="crops", help="crops folder under the data root")
+    p.add_argument("--grayscale", action="store_true",
+                   help="crops are gray x3 (build_crops.py --grayscale): no hue / saturation aug")
     p.add_argument("--tag", default="",
                    help="run / model name suffix ('syndd' -> ear_cls_160_syndd); keeps older runs")
     p.add_argument("--report-source", action="append", default=[],
@@ -117,7 +119,7 @@ def main() -> int:
     if not args.eval_only:
         from ultralytics import YOLO
 
-        colour = dcfg.get("look", "color") == "color"
+        colour = dcfg.get("look", "color") == "color" and not args.grayscale
         model = YOLO(str(ROOT / "models" / "yolo26n-cls.pt"))
         model.train(data=str(data), imgsz=args.imgsz, epochs=args.epochs, batch=args.batch,
                     workers=args.workers, project=str(root / "runs"), name=name, exist_ok=True,

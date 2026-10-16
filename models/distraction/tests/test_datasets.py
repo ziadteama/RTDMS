@@ -54,6 +54,25 @@ def test_syndd_dashboard_only_csv_maps_to_rear_video(tmp_path):
     assert segs[0].video.name.startswith("Rear_view")
 
 
+def test_syndd_2024_class_numbers_and_loose_filenames(tmp_path):
+    """AIC24 A1 layout: generic Activity Type, 'Class <n>' labels, CSV filenames without
+    NoAudio and with inconsistent spelling; matched by view kind + block number."""
+    u = tmp_path / "A1" / "user_id_13522"
+    for v in ("Rear_view_user_id_13522_NoAudio_5", "Rear_view_user_id_13522_NoAudio_7"):
+        tiny_video(u / f"{v}.MP4")
+    (u / "user_id_13522.csv").write_text(
+        "Filename,Camera View,Activity Type,Start Time,End Time,Label (Primary),Appearance Block\n"
+        "Dashboard_user_id_13522_5,Dashboard,Distracted Behavior,00:00:11,00:00:31,Class 2,None\n"
+        "Rear_view_user_id_13522_5,Rearview,Distracted Behavior,00:00:11,00:00:31,Class 2,None\n"
+        "Rear_view_user_id_13522_5,Rearview,Distracted Behavior,00:01:25,00:01:48,Class 8,None\n"
+        "Rearview_User_id_13522_7,Rear View,Distracted behavior,00:02:03,00:02:24,Class 14,Hat\n",
+        encoding="utf8")
+    segs = D.syndd(tmp_path)
+    assert [(s.label, s.video.stem[-1]) for s in segs] == [("phone_right_ear", "5"),
+                                                           ("neg_hand_on_head", "7")]
+    assert segs[0].start_s == 11 and segs[0].end_s == 31 and segs[0].driver == "syndd_13522"
+
+
 def test_syndd_clips_read_only_their_span(tmp_path):
     u = tmp_path / "user_id_22222"
     tiny_video(u / "Rear_view_user_id_22222_NoAudio_1.MP4", seconds=4, fps=10)

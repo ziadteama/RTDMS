@@ -77,15 +77,37 @@ SYNDD_LABELS = {
     "talktopassengerattheright": "neg_talking",
     "talktopassengeratbackseat": "neg_talking",
 }
+# AI City 2024 track 3 (README in 2024-data_labelsAndinstructions.zip): the Activity Type
+# column is only "Distracted Behavior"; the activity is "Label (Primary)" = "Class <n>".
+SYNDD_CLASSES = {0: "normal", 1: "drinking", 2: "phone_right_ear", 3: "phone_left_ear",
+                 4: "eating", 5: "phone_in_hand", 6: "phone_in_hand",
+                 # 7 reaching behind, 8 adjust control panel, 9 / 10 pick up from floor: skipped
+                 11: "neg_talking", 12: "neg_talking", 13: "neg_yawning",
+                 14: "neg_hand_on_head", 15: "neg_singing"}
 REAR_VIEW = {"rearview", "rear", "rearviewmirror"}
+
+
+def _view_kind(s: str) -> str:
+    n = norm(s)
+    return "rear" if n.startswith("rear") else "dash" if n.startswith("dash") else \
+        "right" if n.startswith("right") else ""
+
+
+def _block(s: str) -> int | None:
+    """Recording block = last number of the name: Rear_view_user_id_13522_NoAudio_5 -> 5."""
+    nums = re.findall(r"\d+", s)
+    return int(nums[-1]) if len(nums) >= 2 else None
 
 
 def syndd(root: str | Path, view: str = "rear") -> list[Segment]:
     """SynDD1 / SynDD2 (AI City Challenge track 3). Per driver folder: videos for Dashboard,
-    Rear_view and Right_side_window, plus a CSV with Filename, Camera View, Activity Type,
-    Start Time, End Time. Filename is often only on the first row of a block (forward-filled).
-    If the CSV has no rear-view rows, the dashboard rows' times are applied to the rear-view
-    video with the same block number (the three views are synchronised)."""
+    Rear_view / Rearview and Right_side_window, plus a CSV with Filename, Camera View, Activity
+    Type, Start Time, End Time, Label (Primary). Filename is sometimes only on the first row of
+    a block (forward-filled). The 2024 CSV filenames drop "NoAudio" and vary in spelling
+    (Rear_view_user_id_13522_5, Rearview_User_id_60167_5, Right_side_window_id_14786_7), so a
+    row is matched to a video by view kind + block number. If the CSV has no rear-view rows,
+    the dashboard rows' times are applied to the rear-view video with the same block number
+    (the three views are synchronised)."""
     root = Path(root)
     csvs = sorted(root.rglob("*.csv"))
     if not csvs:
@@ -95,7 +117,8 @@ def syndd(root: str | Path, view: str = "rear") -> list[Segment]:
         folder = c.parent
         driver = re.search(r"(\d{4,6})", c.stem)
         driver = f"syndd_{driver.group(1)}" if driver else f"syndd_{norm(c.stem)}"
-        videos = {norm(v.stem): v for v in folder.rglob("*") if v.suffix.lower() in VIDEO_EXT}
+        videos = {(_view_kind(v.stem), _block(v.stem)): v for v in folder.rglob("*")
+                  if v.suffix.lower() in VIDEO_EXT}
         rows = list(csv.DictReader(open(c, encoding="utf-8-sig", newline="")))
         if not rows:
             continue
@@ -103,28 +126,33 @@ def syndd(root: str | Path, view: str = "rear") -> list[Segment]:
         k_file = keys.get("filename")
         k_view = keys.get("cameraview")
         k_act = keys.get("activitytype")
+        k_lab = keys.get("labelprimary")
         k_start, k_end = keys.get("starttime"), keys.get("endtime")
         if not (k_file and k_act and k_start and k_end):
             raise KeyError(f"SynDD: unexpected columns in {c}: {list(rows[0])}")
         last_file = last_view = ""
-        has_rear = any(norm(r.get(k_view, "")) in REAR_VIEW for r in rows if k_view)
+        has_rear = any(norm(r.get(k_view) or "") in REAR_VIEW or
+                       _view_kind(r.get(k_file) or "") == "rear" for r in rows if k_view)
         for r in rows:
-            last_file = r[k_file].strip() or last_file
+            last_file = (r[k_file] or "").strip() or last_file
             last_view = (r.get(k_view) or "").strip() or last_view
-            label = SYNDD_LABELS.get(norm(r[k_act]))
-            if label is None or not r[k_start].strip():
-                continue
-            is_rear = norm(last_view) in REAR_VIEW
-            if view == "rear":
-                if has_rear and not is_rear:
-                    continue
-                stem = norm(last_file)
-                if not has_rear:  # map a dashboard filename to its rear-view sibling
-                    stem = re.sub(r"^dashboard", "rearview", stem)
-                video = videos.get(stem) or next(
-                    (v for k, v in videos.items() if k.startswith(stem)), None)
+            act = norm(r[k_act] or "")
+            if act.startswith("distracted"):  # 2024: the label is "Class <n>"
+                m = re.search(r"(\d+)", (r.get(k_lab) or "") if k_lab else "")
+                label = SYNDD_CLASSES.get(int(m.group(1))) if m else None
             else:
-                video = videos.get(norm(last_file))
+                label = SYNDD_LABELS.get(act)
+            if label is None or not (r[k_start] or "").strip():
+                continue
+            kind = "rear" if norm(last_view) in REAR_VIEW else \
+                _view_kind(last_view) or _view_kind(last_file)
+            block = _block(last_file)
+            if view == "rear":
+                if has_rear and kind != "rear":
+                    continue
+                video = videos.get(("rear", block))  # no rear rows: dashboard times
+            else:
+                video = videos.get((kind, block))
             if video is None:
                 continue
             out.append(Segment("syndd", driver, video, hms(r[k_start]), hms(r[k_end]), label,

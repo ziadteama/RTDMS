@@ -42,6 +42,7 @@ import json
 import random
 import sys
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import cv2
@@ -169,6 +170,141 @@ def wrist_near(person, point, fw, max_fw=0.9) -> bool:
                max_fw * fw for w in WRISTS)
 
 
+_W: dict = {}  # per-process crop settings and models (pool worker or the main process)
+
+
+def _setup(store_size, grayscale, pose=True) -> None:
+    pcfg = load_pipeline_config(profile="laptop_webcam")
+    ec, mc = pcfg.ear_classifier, pcfg.mouth_classifier
+    if store_size:  # store larger crops; training / eval downscale (size study)
+        ec.imgsz = mc.imgsz = store_size
+    if grayscale:
+        ec.grayscale = mc.grayscale = True
+    _W.update(pcfg=pcfg, ec=ec, mc=mc)
+    if pose and "pose" not in _W:
+        _W["pose"] = PoseEstimator(pcfg.pose)
+
+
+def _rules(clip) -> tuple:
+    ear_rule, mouth_rule = RULES.get(clip.label, (None, None))
+    return (None if clip.source in NO_EAR else ear_rule), mouth_rule
+
+
+def crop_clip(clip, split, out, opts) -> list[dict]:
+    """Ear / mouth crops of one clip -> manifest rows (files are written here)."""
+    pcfg, ec, mc, pose = _W["pcfg"], _W["ec"], _W["mc"], _W["pose"]
+    ear_rule, mouth_rule = _rules(clip)
+    if mouth_rule == "drink_clip" and _W.get("teacher") is None:
+        _W["teacher"] = ClipDrinkTeacher()
+    rows: list[dict] = []
+
+    def save(kind, crop, label, name):
+        d = out / kind / split / label
+        d.mkdir(parents=True, exist_ok=True)
+        fn = f"{clip.source}__{clip.driver}__{name}.jpg"
+        cv2.imwrite(str(d / fn), crop, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        rows.append({"kind": kind, "file": f"{split}/{label}/{fn}", "split": split,
+                     "label": label, "source": clip.source, "driver": clip.driver,
+                     "action": clip.label})
+
+    mesh = None
+    next_t, k = 0.0, 0
+    held, held_t = None, -1e9
+    # The mesh sees every frame (its face search and tracker assume live frame rate); crops
+    # are saved every opts["every"] seconds. A hidden face (cup, phone) is held for
+    # face_hold_s, as live.py does.
+    for t, frame in clip.frames(0.0):
+        if mesh is None:  # one tracker per clip, sized to the clip, like live.py
+            h, w = frame.shape[:2]
+            mesh = FaceMesh(pcfg.facemesh, w, h, np.array([[w, 0, w / 2], [0, w, h / 2],
+                                                          [0, 0, 1.0]]))
+        face = mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), t)
+        if face is not None and clip.source not in NO_FACE_GUARD and not driver_face(face, w):
+            face = None  # a passenger: drop it and make the cropper search again
+            mesh.cropper.tracking = False
+        if face is not None:
+            held, held_t = face, t
+        elif held is not None and t - held_t <= mc.face_hold_s:
+            face = held
+        if face is None or t < next_t:
+            continue
+        next_t, k = t + opts["every"], k + 1
+        lm, fw = face.landmarks, face_scale(face)
+        needs_pose = ear_rule in ("phone_wrist", "hand_wrist") or mouth_rule == "food_wrist"
+        person = driver_person(pose.detect(frame), face.center) if needs_pose else None
+        name = f"{Path(clip.name).stem}_{k:05d}"
+        # ---- ears
+        ear_labels = {}
+        if ear_rule == "none":
+            ear_labels = {R_EAR: "none", L_EAR: "none"}
+        elif ear_rule in ("phone_R", "phone_L"):
+            right = ear_rule == "phone_R"
+            if clip.source in opts["mirrored"]:
+                right = not right
+            phone_ear = R_EAR if right else L_EAR
+            ear_labels = {R_EAR: "none", L_EAR: "none", phone_ear: "phone"}
+        elif ear_rule in ("phone_wrist", "hand_wrist"):
+            lab = "phone" if ear_rule == "phone_wrist" else "hand_no_phone"
+            at = [e for e in (R_EAR, L_EAR)
+                  if wrist_near(person, ear_center(lm, e, ec.outward, fw), fw)]
+            if len(at) == 1:
+                ear_labels = {at[0]: lab}
+                if lab == "phone":
+                    ear_labels[L_EAR if at[0] == R_EAR else R_EAR] = "none"
+        for e, lab in ear_labels.items():
+            if in_frame(ear_center(lm, e, ec.outward, fw), ec.scale * fw, w, h) < opts["min_in"]:
+                continue
+            crop = crop_ear(frame, lm, e, ec.imgsz, ec.scale, ec.outward, fw, ec.grayscale)
+            save("ear", crop, lab, f"{name}_{'R' if e == R_EAR else 'L'}")
+        # ---- mouth
+        mlab = None
+        if mouth_rule == "none":
+            mlab = "none"
+        elif mouth_rule == "drink_clip":
+            pd = _W["teacher"].p_drink(frame, mouth_center(lm, mc.down, fw), mc.scale * fw)
+            if pd >= opts["drink_min"]:
+                mlab = "drink"
+        elif mouth_rule == "food_wrist" and \
+                wrist_near(person, mouth_center(lm, mc.down, fw), fw):
+            mlab = "food"
+        if mlab and in_frame(mouth_center(lm, mc.down, fw), mc.scale * fw, w, h) >= \
+                opts["min_in"]:
+            save("mouth", crop_mouth(frame, lm, mc.imgsz, mc.scale, mc.down, fw, mc.grayscale),
+                 mlab, name)
+    if mesh is not None:
+        mesh.close()
+    return rows
+
+
+def reuse_crops(src: Path, out: Path, sources: set[str], grayscale: bool,
+                size: int) -> list[dict]:
+    """Copy earlier crops of `sources` (their manifest rows, splits and labels) instead of
+    re-cropping them; converted to gray x3 and resized to `size` to match this build."""
+    rows: list[dict] = []
+    for kind in ("ear", "mouth"):
+        man = src / kind / "manifest.csv"
+        if not man.is_file():
+            continue
+        for r in csv.DictReader(open(man, encoding="utf8", newline="")):
+            if r["source"] not in sources or (r["source"] in NO_EAR and kind == "ear"):
+                continue
+            img = cv2.imread(str(src / kind / r["file"]))
+            if img is None:
+                continue
+            if grayscale:
+                img = cv2.cvtColor(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
+            if img.shape[0] != size:
+                img = cv2.resize(img, (size, size), interpolation=cv2.INTER_AREA)
+            d = out / kind / r["file"]
+            d.parent.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(d), img, [cv2.IMWRITE_JPEG_QUALITY, 92])
+            rows.append({k: r[k] for k in ("kind", "file", "split", "label", "source", "driver",
+                                           "action")})
+    print(f"[reuse] {len(rows)} crops from {src} ({sorted(sources)}): "
+          f"{dict(Counter((r['kind'], r['source'], r['label']) for r in rows))}")
+    return rows
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     p.add_argument("--syndd", help="SynDD folder (per-driver CSVs + rear-view videos)")
@@ -176,6 +312,9 @@ def main() -> int:
                    help="SynDD rear-view frames are mirrored (driver's right ear at image right)")
     p.add_argument("--3mdad", dest="mdad", help="3MDAD front-view (day RGB) folder")
     p.add_argument("--ebdd", help="extracted EBDD folder")
+    p.add_argument("--grayscale", action="store_true",
+                   help="store every crop as gray x3 (SynDD is IR; set the profile's classifier "
+                        "grayscale: true to match)")
     p.add_argument("--out", default="crops",
                    help="output folder under the data root (a new name keeps older crops)")
     p.add_argument("--no-openimages", action="store_true")
@@ -186,17 +325,18 @@ def main() -> int:
                    help="min fraction of a crop inside the frame")
     p.add_argument("--drink-min", type=float, default=0.97, help="CLIP P(drinking) for drink")
     p.add_argument("--limit-clips", type=int, help="clips per dataset (smoke test)")
+    p.add_argument("--workers", type=int, default=1, help="clip worker processes")
+    p.add_argument("--reuse", help="earlier crops folder under the data root to copy crops of "
+                                   "--reuse-sources from (pass --no-openimages if it includes "
+                                   "openimages)")
+    p.add_argument("--reuse-sources", default="3mdad,openimages")
     args = p.parse_args()
 
-    pcfg = load_pipeline_config(profile="laptop_webcam")
-    ec, mc = pcfg.ear_classifier, pcfg.mouth_classifier
-    if args.store_size:  # store larger crops; training / eval downscale (size study)
-        ec.imgsz = mc.imgsz = args.store_size
     dcfg = yaml.safe_load((ROOT / "configs" / "data.yaml").read_text(encoding="utf8"))
     out = Path(dcfg["root"]) / args.out
-    pose = PoseEstimator(pcfg.pose)
     rows: list[dict] = []
-    mirrored = MIRRORED | ({"syndd"} if args.syndd_mirrored else set())
+    opts = {"every": args.every, "min_in": args.min_in, "drink_min": args.drink_min,
+            "mirrored": MIRRORED | ({"syndd"} if args.syndd_mirrored else set())}
 
     clips: list[D.Clip] = []
     if args.syndd:
@@ -207,99 +347,33 @@ def main() -> int:
         clips += D.ebdd(args.ebdd)[: args.limit_clips]
     if not clips and args.no_openimages:
         raise SystemExit("nothing to do: pass --syndd, --3mdad and/or --ebdd")
-    teacher = ClipDrinkTeacher() if any(
-        RULES.get(c.label, (None, None))[1] == "drink_clip" for c in clips) else None
     splits = {}
     for src in {c.source for c in clips}:
         splits.update(split_drivers({c.driver for c in clips if c.source == src}))
 
-    def save(kind, crop, label, split, clip, name):
-        d = out / kind / split / label
-        d.mkdir(parents=True, exist_ok=True)
-        fn = f"{clip.source}__{clip.driver}__{name}.jpg"
-        cv2.imwrite(str(d / fn), crop, [cv2.IMWRITE_JPEG_QUALITY, 92])
-        rows.append({"kind": kind, "file": f"{split}/{label}/{fn}", "split": split,
-                     "label": label, "source": clip.source, "driver": clip.driver,
-                     "action": clip.label})
+    # Clips are independent (one tracker each), so they run in worker processes; each worker
+    # holds its own face mesh / pose / CLIP (CLIP ViT-L on the GPU is ~1 GB per worker).
+    setup = (args.store_size, args.grayscale)
+    todo = [c for c in clips if _rules(c) != (None, None)]
+    if args.workers > 1:
+        with ProcessPoolExecutor(args.workers, initializer=_setup, initargs=setup) as ex:
+            futs = [ex.submit(crop_clip, c, splits[c.driver], out, opts) for c in todo]
+            for ci, f in enumerate(as_completed(futs), 1):
+                rows += f.result()
+                if ci % 20 == 0:
+                    print(f"[crops] {ci}/{len(todo)} clips, {len(rows)} crops", flush=True)
+    else:
+        _setup(*setup)
+        for ci, c in enumerate(todo, 1):
+            rows += crop_clip(c, splits[c.driver], out, opts)
+            if ci % 20 == 0:
+                print(f"[crops] {ci}/{len(todo)} clips, {len(rows)} crops", flush=True)
 
-    for ci, clip in enumerate(clips, 1):
-        ear_rule, mouth_rule = RULES.get(clip.label, (None, None))
-        if clip.source in NO_EAR:
-            ear_rule = None
-        if ear_rule is None and mouth_rule is None:
-            continue
-        split = splits[clip.driver]
-        mesh = None
-        next_t, k = 0.0, 0
-        held, held_t = None, -1e9
-        # The mesh sees every frame (its face search and tracker assume live frame rate);
-        # crops are saved every args.every seconds. A hidden face (cup, phone) is held for
-        # face_hold_s, as live.py does.
-        for t, frame in clip.frames(0.0):
-            if mesh is None:  # one tracker per clip, sized to the clip, like live.py
-                h, w = frame.shape[:2]
-                mesh = FaceMesh(pcfg.facemesh, w, h, np.array([[w, 0, w / 2], [0, w, h / 2],
-                                                              [0, 0, 1.0]]))
-            face = mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), t)
-            if face is not None and clip.source not in NO_FACE_GUARD and \
-                    not driver_face(face, w):
-                face = None  # a passenger: drop it and make the cropper search again
-                mesh.cropper.tracking = False
-            if face is not None:
-                held, held_t = face, t
-            elif held is not None and t - held_t <= mc.face_hold_s:
-                face = held
-            if face is None or t < next_t:
-                continue
-            next_t, k = t + args.every, k + 1
-            lm, fw = face.landmarks, face_scale(face)
-            needs_pose = (ear_rule in ("phone_wrist", "hand_wrist") or
-                          mouth_rule == "food_wrist")
-            person = driver_person(pose.detect(frame), face.center) if needs_pose else None
-            name = f"{Path(clip.name).stem}_{k:05d}"
-            # ---- ears
-            ear_labels = {}
-            if ear_rule == "none":
-                ear_labels = {R_EAR: "none", L_EAR: "none"}
-            elif ear_rule in ("phone_R", "phone_L"):
-                right = ear_rule == "phone_R"
-                if clip.source in mirrored:
-                    right = not right
-                phone_ear = R_EAR if right else L_EAR
-                ear_labels = {R_EAR: "none", L_EAR: "none", phone_ear: "phone"}
-            elif ear_rule in ("phone_wrist", "hand_wrist"):
-                lab = "phone" if ear_rule == "phone_wrist" else "hand_no_phone"
-                at = [e for e in (R_EAR, L_EAR)
-                      if wrist_near(person, ear_center(lm, e, ec.outward, fw), fw)]
-                if len(at) == 1:
-                    ear_labels = {at[0]: lab}
-                    if lab == "phone":
-                        ear_labels[L_EAR if at[0] == R_EAR else R_EAR] = "none"
-            for e, lab in ear_labels.items():
-                if in_frame(ear_center(lm, e, ec.outward, fw), ec.scale * fw, w, h) < args.min_in:
-                    continue
-                crop = crop_ear(frame, lm, e, ec.imgsz, ec.scale, ec.outward, fw, ec.grayscale)
-                save("ear", crop, lab, split, clip, f"{name}_{'R' if e == R_EAR else 'L'}")
-            # ---- mouth
-            mlab = None
-            if mouth_rule == "none":
-                mlab = "none"
-            elif mouth_rule == "drink_clip":
-                pd = teacher.p_drink(frame, mouth_center(lm, mc.down, fw), mc.scale * fw)
-                if pd >= args.drink_min:
-                    mlab = "drink"
-            elif mouth_rule == "food_wrist" and \
-                    wrist_near(person, mouth_center(lm, mc.down, fw), fw):
-                mlab = "food"
-            if mlab and in_frame(mouth_center(lm, mc.down, fw), mc.scale * fw, w, h) >= \
-                    args.min_in:
-                crop = crop_mouth(frame, lm, mc.imgsz, mc.scale, mc.down, fw, mc.grayscale)
-                save("mouth", crop, mlab, split, clip, name)
-        if mesh is not None:
-            mesh.close()
-        if ci % 20 == 0:
-            print(f"[crops] {ci}/{len(clips)} clips, {len(rows)} crops", flush=True)
-
+    _setup(*setup, pose=False)  # crop settings for the Open Images steps below
+    ec, mc = _W["ec"], _W["mc"]
+    if args.reuse:
+        rows += reuse_crops(Path(dcfg["root"]) / args.reuse, out,
+                            set(args.reuse_sources.split(",")), args.grayscale, ec.imgsz)
     if not args.no_openimages:
         rows += openimages_hand_crops(dcfg, ec, out)
         rows += openimages_mouth_crops(dcfg, mc, out)
