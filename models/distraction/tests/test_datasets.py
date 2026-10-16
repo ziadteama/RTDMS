@@ -54,6 +54,22 @@ def test_syndd_dashboard_only_csv_maps_to_rear_video(tmp_path):
     assert segs[0].video.name.startswith("Rear_view")
 
 
+def test_syndd_clips_read_only_their_span(tmp_path):
+    u = tmp_path / "user_id_22222"
+    tiny_video(u / "Rear_view_user_id_22222_NoAudio_1.MP4", seconds=4, fps=10)
+    (u / "user_id_22222.csv").write_text(
+        "Filename,Camera View,Activity Type,Start Time,End Time\n"
+        "Rear_view_user_id_22222_NoAudio_1,Rear view,Phone Call(left),0:00:01,0:00:03\n"
+        ",,Drinking,0:00:03,0:00:03.5\n", encoding="utf8")
+    clips = D.syndd_clips(tmp_path)
+    assert len(clips) == 1  # the 0.5 s drinking span is below min_s
+    c = clips[0]
+    assert c.label == "phone_left_ear" and c.source == "syndd"
+    assert c.name == "Rear_view_user_id_22222_NoAudio_1_0001000.MP4"
+    ts = [t for t, _ in c.frames(0.5)]
+    assert ts == pytest.approx([0.0, 0.5, 1.0, 1.5])  # 1 s .. 3 s, relative to the span
+
+
 def test_dmd_openlabel(tmp_path):
     d = tmp_path / "dmd" / "gA" / "1" / "s1"
     stem = "gA_1_s1_2019-03-08T09;31;15+01;00"

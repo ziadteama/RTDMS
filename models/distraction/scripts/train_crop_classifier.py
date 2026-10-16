@@ -43,14 +43,15 @@ def classifier(kind: str, weights: Path):
 
 
 def evaluate(kind: str, weights: Path, test_dir: Path, sheet: Path | None, imgsz: int,
-             per_class: int = 30):
+             per_class: int = 30, source: str | None = None):
+    """Per-class P / R on test_dir; `source` keeps only crops named '<source>__*'."""
     clf = classifier(kind, weights)
     clf.imgsz = imgsz
     conf = Counter()
     tiles = {c: [] for c in CLASSES[kind]}
     rng = random.Random(0)
     for true in CLASSES[kind]:
-        files = sorted((test_dir / true).glob("*.jpg"))
+        files = sorted((test_dir / true).glob(f"{source}__*.jpg" if source else "*.jpg"))
         show = set(rng.sample(range(len(files)), min(per_class, len(files))))
         for i, f in enumerate(files):
             img = cv2.imread(str(f))
@@ -96,12 +97,17 @@ def main() -> int:
     p.add_argument("--batch", type=int, default=128)
     p.add_argument("--workers", type=int, default=3)
     p.add_argument("--eval-only", action="store_true")
+    p.add_argument("--crops", default="crops", help="crops folder under the data root")
+    p.add_argument("--tag", default="",
+                   help="run / model name suffix ('syndd' -> ear_cls_160_syndd); keeps older runs")
+    p.add_argument("--report-source", action="append", default=[],
+                   help="also score the test crops of this source alone (e.g. syndd); repeatable")
     args = p.parse_args()
 
     dcfg = yaml.safe_load((ROOT / "configs" / "data.yaml").read_text(encoding="utf8"))
     root = Path(dcfg["root"])
-    data = root / "crops" / args.kind
-    name = f"{args.kind}_cls_{args.imgsz}"
+    data = root / args.crops / args.kind
+    name = f"{args.kind}_cls_{args.imgsz}" + (f"_{args.tag}" if args.tag else "")
     for split in ("train", "val", "test"):
         missing = [c for c in CLASSES[args.kind] if not any((data / split / c).glob("*.jpg"))]
         if missing:
@@ -135,6 +141,12 @@ def main() -> int:
     (run / "test_eval.json").write_text(json.dumps(res, indent=2), encoding="utf8", newline="\n")
     print("test", json.dumps(res, indent=2))
     print(f"contact sheet: {run / 'test_contact_sheet.jpg'}")
+    for src in args.report_source:
+        r = evaluate(args.kind, dest, data / "test", run / f"test_contact_sheet_{src}.jpg",
+                     args.imgsz, source=src)
+        (run / f"test_eval_{src}.json").write_text(json.dumps(r, indent=2), encoding="utf8",
+                                                   newline="\n")
+        print(f"test ({src} drivers only)", json.dumps(r, indent=2))
     return 0
 
 

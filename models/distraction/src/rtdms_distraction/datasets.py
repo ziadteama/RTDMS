@@ -296,13 +296,17 @@ class Clip:
     label: str
     path: Path  # video file or frame folder
     fps: float = 30.0
+    start_s: float | None = None  # a time span of a longer video (SynDD); None = whole clip
+    end_s: float | None = None
 
     @property
     def name(self) -> str:
-        return self.path.name
+        if self.start_s is None:
+            return self.path.name
+        return f"{self.path.stem}_{int(self.start_s * 1000):07d}{self.path.suffix}"
 
     def frames(self, every_s: float):
-        """Yield (t_seconds, BGR frame) every `every_s` seconds."""
+        """Yield (t_seconds, BGR frame) every `every_s` seconds; t counts from start_s."""
         import cv2
 
         if self.path.is_dir():
@@ -318,8 +322,14 @@ class Clip:
         cap = cv2.VideoCapture(str(self.path))
         fps = cap.get(cv2.CAP_PROP_FPS) or self.fps
         n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        first = 0
+        if self.start_s is not None:  # one seek to the span, then sequential reads
+            first = int(round(self.start_s * fps))
+            cap.set(cv2.CAP_PROP_POS_FRAMES, first)
+        if self.end_s is not None:
+            n = min(n, int(round(self.end_s * fps)))
         step = max(1, round(every_s * fps))
-        for i in range(n):  # sequential grab is faster and more reliable than seeking
+        for i in range(n - first):  # sequential grab is faster and more reliable than seeking
             if i % step:
                 if not cap.grab():
                     break
@@ -329,6 +339,14 @@ class Clip:
                 break
             yield i / fps, img
         cap.release()
+
+
+def syndd_clips(root: str | Path, min_s: float = 1.0) -> list[Clip]:
+    """SynDD rear-view (mirror) segments as crop-builder clips: one clip per annotated span.
+    Hard negatives keep their eval label (neg_*), which the crop builder maps to ear / mouth
+    none. Spans shorter than `min_s` are dropped (mostly annotation slips)."""
+    return [Clip("syndd", s.driver, s.label, s.video, start_s=s.start_s, end_s=s.end_s)
+            for s in syndd(root, view="rear") if s.end_s - s.start_s >= min_s]
 
 
 EBDD_LABELS = {"ATTENTIVE": "normal", "CELL_PHONE": "phone_unknown_ear", "EATING": "eating",

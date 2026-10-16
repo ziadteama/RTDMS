@@ -2,9 +2,16 @@
 """Build ear-crop (phone / hand_no_phone / none) and mouth-crop (drink / food / none) datasets
 from front-facing driver videos, cropped exactly like live.py (same face mesh + crop functions).
 
-    python scripts/build_crops.py --3mdad D:/rtdms-data/raw/3mdad/x --ebdd D:/rtdms-data/raw/ebdd/x
+    python scripts/build_crops.py --syndd D:/rtdms-data/public/syndd \
+        --3mdad D:/rtdms-data/raw/3mdad/front --ebdd D:/rtdms-data/raw/ebdd/x --out crops_v2
 
 Sources (adapters in rtdms_distraction.datasets; front / windshield views only):
+  SynDD rear-view (mirror) camera: the main source. Annotated spans of the rear-view videos
+    only (dashboard and right-window views are never read). Phone call right / left ->
+    phone at that ear (frames assumed NOT mirrored; --syndd-mirrored flips this, check the
+    ear-phone sheet), drinking -> drink while CLIP agrees, eating -> food while the wrist is
+    at the mouth, hand on head -> hand_no_phone at the ear the wrist is at, texting / yawning
+    / singing / talking -> none.
   3MDAD front view, day RGB. A7 / A8 phone (right / left hand) -> phone at that ear, the
     other ear none. RGB2 frames are mirrored (checked on contact sheets: A7 phones sit at
     image right), so the driver's right ear is landmark 454 there. A2 hair/makeup ->
@@ -79,8 +86,13 @@ RULES = {
     "smoking": ("none", "none"),
     "neg_talking": ("none", "none"),
     "neg_singing": ("none", "none"),
+    "neg_yawning": ("none", "none"),
+    "neg_hand_on_head": ("hand_wrist", "none"),
     "other_none": ("none", "none"),
 }
+# The rear-passenger guard (driver_face) was tuned on 3MDAD / EBDD frame layouts; SynDD's
+# mirror camera puts the driver elsewhere in a 1080p frame, and the cabin has no passenger.
+NO_FACE_GUARD = {"syndd"}
 
 
 class ClipDrinkTeacher:
@@ -159,8 +171,13 @@ def wrist_near(person, point, fw, max_fw=0.9) -> bool:
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    p.add_argument("--syndd", help="SynDD folder (per-driver CSVs + rear-view videos)")
+    p.add_argument("--syndd-mirrored", action="store_true",
+                   help="SynDD rear-view frames are mirrored (driver's right ear at image right)")
     p.add_argument("--3mdad", dest="mdad", help="3MDAD front-view (day RGB) folder")
     p.add_argument("--ebdd", help="extracted EBDD folder")
+    p.add_argument("--out", default="crops",
+                   help="output folder under the data root (a new name keeps older crops)")
     p.add_argument("--no-openimages", action="store_true")
     p.add_argument("--every", type=float, default=0.33, help="seconds between sampled frames")
     p.add_argument("--max-none-ratio", type=float, default=2.0)
@@ -176,17 +193,20 @@ def main() -> int:
     if args.store_size:  # store larger crops; training / eval downscale (size study)
         ec.imgsz = mc.imgsz = args.store_size
     dcfg = yaml.safe_load((ROOT / "configs" / "data.yaml").read_text(encoding="utf8"))
-    out = Path(dcfg["root"]) / "crops"
+    out = Path(dcfg["root"]) / args.out
     pose = PoseEstimator(pcfg.pose)
     rows: list[dict] = []
+    mirrored = MIRRORED | ({"syndd"} if args.syndd_mirrored else set())
 
     clips: list[D.Clip] = []
+    if args.syndd:
+        clips += D.syndd_clips(args.syndd)[: args.limit_clips]
     if args.mdad:
         clips += D.mdad3_front(args.mdad)[: args.limit_clips]
     if args.ebdd:
         clips += D.ebdd(args.ebdd)[: args.limit_clips]
     if not clips and args.no_openimages:
-        raise SystemExit("nothing to do: pass --3mdad and/or --ebdd")
+        raise SystemExit("nothing to do: pass --syndd, --3mdad and/or --ebdd")
     teacher = ClipDrinkTeacher() if any(
         RULES.get(c.label, (None, None))[1] == "drink_clip" for c in clips) else None
     splits = {}
@@ -221,7 +241,8 @@ def main() -> int:
                 mesh = FaceMesh(pcfg.facemesh, w, h, np.array([[w, 0, w / 2], [0, w, h / 2],
                                                               [0, 0, 1.0]]))
             face = mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), t)
-            if face is not None and not driver_face(face, w):
+            if face is not None and clip.source not in NO_FACE_GUARD and \
+                    not driver_face(face, w):
                 face = None  # a passenger: drop it and make the cropper search again
                 mesh.cropper.tracking = False
             if face is not None:
@@ -242,7 +263,7 @@ def main() -> int:
                 ear_labels = {R_EAR: "none", L_EAR: "none"}
             elif ear_rule in ("phone_R", "phone_L"):
                 right = ear_rule == "phone_R"
-                if clip.source in MIRRORED:
+                if clip.source in mirrored:
                     right = not right
                 phone_ear = R_EAR if right else L_EAR
                 ear_labels = {R_EAR: "none", L_EAR: "none", phone_ear: "phone"}
