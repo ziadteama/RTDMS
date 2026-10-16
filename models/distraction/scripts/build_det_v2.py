@@ -44,6 +44,11 @@ ROBOFLOW_MAP = {"phone": 0, "cell phone": 0, "cellphone": 0, "mobile": 0, "mobil
                 "drink": 1, "drinking": 1, "bottle": 1, "cup": 1, "can": 1,
                 "food": 2, "eating": 2}
 SPLITS = {"train": "train", "valid": "val", "val": "val", "test": "test"}
+# Roboflow sets mix object boxes with whole-action boxes (DMS_Project "drinking": median 4 % of
+# the image, top 3 % the whole frame). An image with a mapped box larger than this share of
+# the image is dropped, as is an image with no phone / drink / food box at all (its other
+# classes - seatbelt, yawn, closed eyes - often show an unlabelled phone in a hand).
+ROBOFLOW_MAX_AREA = {0: 0.12, 1: 0.08, 2: 0.12}
 IMG_EXT = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
 
 
@@ -188,6 +193,8 @@ def main() -> int:
                 rows = [[cmap[int(r[0])], *r[1:]] for r in
                         read_labels(d / rf_split / "labels" / f"{img.stem}.txt")
                         if int(r[0]) in cmap]
+                if not rows or any(r[3] * r[4] > ROBOFLOW_MAX_AREA[int(r[0])] for r in rows):
+                    continue
                 items.append((d.name, split, img, rows))
 
     stats = Counter()
