@@ -34,7 +34,10 @@ functions as `live.py`, split by driver within each dataset (70 / 15 / 15), then
   the **rear passenger** at the right image edge. Faces centred right of 0.85 w or narrower
   than 0.1 w are now rejected (the cropper searches again), and crops less than 75 % inside
   the frame are dropped (`--min-in`).
-- **EBDD**: downloaded, encrypted; waiting for the password from the author. Then phone ear =
+- **2026-10-16: SynDD rear view is now the main source, all crops gray** — see
+  [SYNDD_RETRAIN.md](SYNDD_RETRAIN.md). The EBDD zip password is kept out of the repo (user
+  environment variable `EBDD_ZIP_PASSWORD`).
+- **EBDD**: extracted 2026-10-16 (13 drivers). Phone ear =
   where the wrist is, eating -> food while the wrist is at the mouth (check sheets first).
 - **Open Images**: hand-at-face -> ear hand_no_phone; food within 0.15 fw of the lips -> mouth
   food (contact sheet ~30/36 eating), plus as many no-food faces -> mouth none.
@@ -71,7 +74,7 @@ functions as `live.py`, split by driver within each dataset (70 / 15 / 15), then
 |---|---|---|---|
 | Open Images V7 (boxes) | downloaded by `build_openimages.py` | train / val / test, all 4 classes | annotations CC BY 4.0; images listed as CC BY 2.0 by their authors |
 | YawDD, mirror set | to be placed in `data/public/yawdd` | background frames (train drivers) + false-alarm test (held-out drivers) | research use, on request from the authors |
-| SynDD1 / SynDD2, rear-view only | requested | frames per driver -> train/val/test by driver; event-level test | AI City Challenge research licence |
+| SynDD (AIC24 track 3, A1), rear-view only | **downloaded 2026-10-16** (69 drivers, `fetch_syndd.py`) | main source of the ear / mouth crop classifiers, split by driver ([SYNDD_RETRAIN.md](SYNDD_RETRAIN.md)); event-level test | AI City Challenge research licence |
 | 100-Driver | requested | same approach; camera to be confirmed | research licence |
 | DMD (IR streams) | requested | night / IR test (phone call, texting, drinking) | research licence |
 | State Farm, AUC | **not used** | passenger-side view | — |

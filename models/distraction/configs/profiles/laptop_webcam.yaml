@@ -41,26 +41,25 @@ pose:
   enabled: true          # wrist-at-ear evidence (yolo26n-pose @320, every 3rd frame); 'p' toggles
 
 ear_classifier:
-  # OFF (2026-10-11 live test): the only phone-at-ear training data was 3MDAD, a low dashboard
-  # camera at 30-45 deg that sees the phone from the side; from the front (mirror mount) the
-  # phone is hidden behind the hand and the model gave P(phone) 0.00. Hand-at-ear (hands +
-  # pose) carries the phone call until a frontal source (EBDD) exists.
-  enabled: false
-  # Last trained (3MDAD): crop size 160 chosen on val drivers (0.910 vs 0.899 at 128).
-  weights: models/ear_cls_160_ncnn_model
+  # ON (2026-10-16): retrained with SynDD rear-view (mirror camera, front-right of the driver,
+  # 69 drivers) as the main source + EBDD + Open Images hand-at-face; 3MDAD is not used for the
+  # ear. Held-out SynDD drivers (10): phone P 0.983 / R 0.867, hand_no_phone 0.978 / 0.827,
+  # none 0.904 / 0.991. SynDD is IR, so every crop is gray (live crops are converted too).
+  # The 3MDAD-only colour model (off since the 2026-10-11 live test) is
+  # models/ear_cls_160_ncnn_model.
+  enabled: true
+  weights: models/ear_cls_160_syndd_ncnn_model
   imgsz: 160
-  grayscale: false       # colour crops (current target); must match training
+  grayscale: true        # must match training (SynDD rear view is infrared)
 
 mouth_classifier:
-  # OFF (2026-10-11): neither mouth model transfers to the frontal webcam. On the S01 recording
-  # v1 (models/mouth_cls_96_v1_ncnn_model) called the cup at the lips "food" (48 % of the
-  # drinking segment) and never fired while eating; v2 (+ hand-at-face negatives) never
-  # fired on the cup and called a turned bare face "food" (26-32 % of phone-in-hand / nod).
-  # Training data is a 3/4 dashboard view (3MDAD) + Open Images photos; needs frontal driver
-  # video (EBDD, DMD). Drinking / eating fall back to detector boxes + chewing.
-  enabled: false
-  # Crop size chosen on val drivers: 96 had the best val drink+none F1 (0.947 vs 0.939 at
-  # 128 / 160; val has only 4 food crops, so food is not used to choose).
-  weights: models/mouth_cls_96_ncnn_model
+  # ON for testing (2026-10-16): SynDD rear-view drinking / eating + 3MDAD drink + EBDD and
+  # Open Images food, all gray. Held-out SynDD drivers: drink P 1.00 / R 0.771, food
+  # 0.683 / 0.573 (75 crops, mostly one driver), none 0.815 / 0.974. Food is the weakest
+  # class; 'c' turns both classifiers off. The colour v1 / v2 models failed on the frontal
+  # webcam (2026-10-11: cup -> food, bare turned face -> food); this is the first one trained
+  # on a camera in front of the driver.
+  enabled: true
+  weights: models/mouth_cls_96_syndd_ncnn_model
   imgsz: 96
-  grayscale: false
+  grayscale: true
