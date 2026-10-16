@@ -180,8 +180,12 @@ def main() -> int:
     # official annotation CSVs (labels zip -> nested A1.zip)
     lab = zipfile.ZipFile(io.BytesIO(remote.cat(LABELS_ZIP, 0, sizes[LABELS_ZIP])))
     inner = zipfile.ZipFile(io.BytesIO(lab.read("labels&instructions/A1.zip")))
-    csvs = {USER.search(n).group(1): n for n in inner.namelist()
-            if n.endswith(".csv") and not n.startswith("__MACOSX") and USER.search(n)}
+    # keyed by the user id in the rows: user_id_79775.csv annotates user_id_79755's videos
+    csvs = {}
+    for n in inner.namelist():
+        if n.endswith(".csv") and not n.startswith("__MACOSX") and USER.search(n):
+            m = USER.search(inner.read(n).decode("utf-8-sig").split("\n", 2)[1])
+            csvs[m.group(1) if m else USER.search(n).group(1)] = n
 
     done_users: list[str] = []
     for zname in zips:
