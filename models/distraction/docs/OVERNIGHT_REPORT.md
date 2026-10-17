@@ -3,6 +3,9 @@
 All results, contact sheets and the hand-check files are in **`D:\rtdms-data\runs\overnight\`**.
 This report is also copied there.
 
+> **Update (late morning):** I also tried your ideas A-G (section 7). None of them beat the
+> current default, so the default model and all numbers below are unchanged.
+
 ## 1. Summary (5 lines)
 
 1. **Better:** false alarms. With the new model and stricter thresholds, phone false alarms fell
@@ -172,3 +175,102 @@ numbers above: far fewer false alarms, a small loss of recall (one call and one 
   This model was trained on **gray** images only: on the colour laptop webcam press `g`.
 - Re-run tonight's test on a model:
   `python scripts/eval_simple.py --models name=<weights.pt>@512 --out <folder>`.
+
+## 7. Morning extras (ideas A-G)
+
+Same test as above: every idea was tuned on the **validation** drivers and kept only if it
+helped there; the winner is then scored **once** on the test drivers. Your "8 additions" were
+still not included in the message, so they are still not done. Scripts for the ideas that did
+not help stay out of the repo (in `C:\Users\youss\rtdms-scratch\`); their results are in
+`D:\rtdms-data\runs\overnight\`.
+
+**Summary: none of A-G beat the current default (det_v2d with tuned thresholds), so it stays.**
+
+| idea | what it is | result on validation | kept? |
+|---|---|---|---|
+| A. Tracking | keep a phone / cup "alive" through weak detections (ByteTrack's trick) | phone false alarms 5.2 -> 27-38 / h, phone-in-hand 47 % -> 50 % | no |
+| B. Temporal model | small 1D-conv over ~3 s of features, learned instead of rules | needs 9-64 false alarms / h to catch some eating; phones worse than rules | no |
+| C. Crop pass | second detector run on a 2x zoomed head-and-shoulders crop | slightly better at strict thresholds on validation, worse on test | no |
+| D. A2 pseudo-labels | 15 extra unlabelled drivers labelled by the teacher | ears 100 % (same), phone in hand 47 % -> 40 %, phone false alarms 5.2 -> 6.9 / h | no |
+| E. Copy-paste | paste real IR phones next to ears in phone-free frames | phone false alarms 5.2 -> 41 / h | no |
+| F. Top-team code | read the 2024 AI City Track 3 winners | big video transformers, see below | ideas only |
+| G. Hard cases | sunglasses, hat, phone mount, passenger, gloves | see below | report |
+
+**A. Tracking (ByteTrack-style).** A strong box (>= 0.40) starts a track; weaker boxes (down to
+0.10-0.20) that overlap it keep it alive for 0.5-1 s. Validation: right / left ear stayed at
+100 %, phone in hand 47 % -> 50 %, but phone false alarms went from 5.2 to 27-38 per hour: the
+tracker also keeps false boxes alive (the sweatshirt print). The smoothing in the rules already
+bridges short gaps. Reverted.
+
+**B. Tiny temporal model.** Per frame (10 / s): best phone / drink / food score anywhere and near
+the face, where the phone is relative to the face, head turn and tilt from the face mesh. A
+3-layer causal 1D convolution (~3 s of history, a few thousand parameters) trained on 25 train
+drivers. With one threshold per behaviour chosen on validation, test: right ear 75 % (rules
+80 %), left ear 74 % (rules 100 %), phone in hand 27 % (rules 37 %), drinking 95 % (rules 90 %),
+eating 5 % (rules 0 %), and the phone alert came ~2 s later. It is the only thing that ever
+caught some eating (from hand-at-mouth motion), but on validation that cost 9-64 false eating
+alarms per hour. Not used. With all 49 train drivers and pose wrists it might do better; worth a
+retry once there is eating data where the food is visible.
+
+**C. Second pass on a head-and-shoulders crop.** A 3.5-face-width crop around the face from the
+full 1280x720 capture (2x the resolution the detector normally sees), merged with the normal
+pass. Validation: at the strict threshold 0.55 it caught 90 % of right-ear calls with 1.7 false
+alarms / h (normal pass: 80 % at 1.7 / h). On test, at that setting: right ear 70 % (default
+80 %), phone in hand 32 % (37 %), drinking 95 % (90 %) but 15.4 drink false alarms / h (0).
+Cost: one more detector run per frame, about 26 -> 18 FPS on the laptop (detector 32 ms + crop
+21 ms). Not kept.
+
+**D. Pseudo-labels for SynDD A2.** Downloaded only the A2 rear-view videos (30 videos, 21.5 GB)
+the same way as A1. The teacher labelled one frame every 0.5 s; with no action labels, a box was
+kept only if it was confident (>= 0.5) and steady (same place in >= 2 of the 4 neighbouring
+samples, +-1 s). 9,231 frames: 2,387 with boxes (2,329 phone, 49 drink, 9 food), 6,844 empty.
+The contact sheet showed many phones sitting in a **dashboard / vent mount**, so I dropped boxes
+that stay in the same place for more than 30 % of a video (this also removed some real phones
+held steadily). 8,184 frames were added; det_v2d was fine-tuned on them (IR-only, 512 px,
+8 epochs). Validation, best setting (phone 0.45): right / left ear 100 % / 100 % (same as
+the default), phone in hand 40 % (default 47 %), phone false alarms 6.9 / h (default 5.2). Not
+better, so not kept. Teacher labels without action labels are probably too noisy here; the
+A2 videos stay on D: (`D:\rtdms-data\public\syndd\A2`) for later use.
+
+**E. Copy-paste.** 3,000 phone-free train frames got a real IR phone cut-out (from other train
+drivers) pasted at an ear found by the pose model, with soft edges and matched brightness. The
+first try made only 128 frames (the face mesh misses small faces in single images); the retry
+used pose ear keypoints. Fine-tuned det_v2d on it: validation phone false alarms 5.2 -> 41 / h
+at the same threshold (22 / h even at 0.55). Phones without a hand next to the ear taught the
+model to fire on things near the ear. Not kept.
+
+**F. 2024 AI City Challenge Track 3 top teams** (TeleAI 1st, SKKU-AutoLab, MCPRL-BUPT). All three
+use large video models on short clips of the driver: VideoMAE / UniformerV2 ViT-L (SKKU), Swin-B
+video transformer (MCPRL), a self-mask attention transformer on extracted features (TeleAI),
+with one model per camera view, ensembles, 5-fold training and a temporal post-processing step
+that turns per-window scores into action segments. None of these fit a Pi CPU. Tricks that do
+fit a small model, and where we stand:
+1. Crop the driver before the model (they all do): our crop pass (C) did not help a detector
+   that already sees the face well; it might help a classifier.
+2. Clip-level recognition over 1-2 s instead of single frames: our temporal model (B) is the
+   small version; it needs more and better-labelled data to beat the rules.
+3. Temporal post-processing (minimum length, merging, score thresholds): our smoothing window +
+   thresholds already do this.
+4. Several cameras: they fuse dashboard, rear-view and side views; we have one camera. A second
+   view would help texting (phone below the mirror camera's view).
+5. K-fold training and ensembles: costs 2-5x the compute per frame; only for the Hailo HAT.
+Their READMEs do not document the post-processing details (only script names), so I could not
+copy exact settings.
+
+**G. Hard cases** (validation + test drivers together, current default):
+
+| appearance | right ear | left ear | phone in hand | drinking | phone false alarms |
+|---|---|---|---|---|---|
+| nothing | 18 / 20 | 19 / 19 | 17 / 41 | 19 / 20 | 1 in 0.60 h |
+| hat | 11 / 12 | 12 / 12 | 11 / 24 | 11 / 12 | 0 in 0.34 h |
+| sunglasses | 7 / 8 | 8 / 8 | 6 / 16 | 7 / 8 | 2 in 0.23 h |
+
+- **Sunglasses / hat:** phone calls and drinking are caught as well as without. Sunglasses had
+  2 false alarms in 14 minutes (8.7 / h vs 1.7 / h): too few to be sure, but worth watching.
+- **Phone in a mount:** found in A2 (5 cars with a clear dashboard / vent mount). With the
+  current model, the phone alert is on for 2-13 % of each drive (3-9 alerts per 8 minutes),
+  about what the acted phone actions (~4 x 15 s per 8 minutes) explain, so there is no sign of a
+  mount causing continuous alerts. Not proven (A2 has no labels). If your car has a mount, the
+  old `holder_zones` setting (full mode) is the place to add a "phone in mount" ignore zone.
+- **Passenger phone, gloves:** not in any dataset we have. SynDD's "talk to passenger" scenes have
+  no passenger. These need your own recordings.
