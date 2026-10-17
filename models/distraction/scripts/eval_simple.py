@@ -230,6 +230,8 @@ def main() -> int:
     p.add_argument("--models", nargs="+", required=True, help="name=weights.pt[@imgsz]")
     p.add_argument("--fps", type=float, default=10.0, help="frames per second (Pi-like 10)")
     p.add_argument("--conf", type=float, default=0.25)
+    p.add_argument("--class-conf", help="per-class thresholds over --conf, e.g. "
+                   "phone=0.40,drink=0.45,food=0.40 (the live profile's)")
     p.add_argument("--cache", default="D:/rtdms-data/eval_cache")
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--out", required=True)
@@ -253,6 +255,10 @@ def main() -> int:
     rcfg = load_rules_config()
     rcfg.mode = "simple"
     conf = dict.fromkeys(NAMES, args.conf)
+    for kv in (args.class_conf or "").split(","):
+        if kv:
+            k, v = kv.split("=")
+            conf[k.strip()] = float(v)
     results = {}
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
