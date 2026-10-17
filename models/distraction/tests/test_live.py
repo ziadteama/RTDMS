@@ -20,9 +20,11 @@ def test_profile_merges_over_base():
     assert (prof.capture.width, prof.capture.height) == (1280, 720)
     assert prof.rectify.enabled is False and prof.roi.rect is None
     assert prof.capture.grayscale is False and prof.live.side_check is True  # colour target
-    assert [m.name for m in prof.live.models][:2] == ["det_v2b", "stock yolo26n"]
+    assert [m.name for m in prof.live.models][:3] == ["det_v2d", "det_v2b", "stock yolo26n"]
     assert prof.detector.weights == prof.live.models[0].weights  # the default detector first
-    assert [m.hands for m in prof.live.models][1:4] == ["mediapipe", "detector", "detector"]
+    assert prof.detector.imgsz == prof.live.models[0].imgsz == 512
+    assert prof.detector.conf["phone"] == 0.40 and prof.detector.conf["drink"] == 0.45
+    assert [m.hands for m in prof.live.models][2:5] == ["mediapipe", "detector", "detector"]
     # untouched keys come from pipeline.yaml
     assert prof.facemesh.crop_size == base.facemesh.crop_size
     assert base.capture.width == 1296

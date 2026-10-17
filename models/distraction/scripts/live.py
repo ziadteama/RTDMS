@@ -157,11 +157,14 @@ def ear_lines(res) -> list[str]:
     return out
 
 
-def build_detector(base_cfg, m: LiveModel, conf: float):
+def build_detector(base_cfg, m: LiveModel, conf: float | None):
+    """conf None keeps the profile's per-class thresholds (phone / drink / food may differ);
+    a number (set with [ / ]) applies one threshold to every class."""
     cfg = copy.deepcopy(base_cfg)
     cfg.weights, cfg.backend, cfg.imgsz = m.weights, m.backend, m.imgsz
     det = make_detector(cfg)
-    det.set_conf(conf)
+    if conf is not None:
+        det.set_conf(conf)
     return det
 
 
@@ -465,8 +468,9 @@ def main() -> int:
                                                         pcfg.hands.source)]
     mi = 0
     conf = min(pcfg.detector.conf.values()) if pcfg.detector.conf else 0.25
+    conf_user = False  # True once [ / ] set one threshold for every class
     pcfg.hands.source = models[0].hands
-    det = build_detector(pcfg.detector, models[0], conf)
+    det = build_detector(pcfg.detector, models[0], None)
     pipe = DistractionPipeline(pcfg, rcfg, src.size, detector=det)
     log = EventLog(resolve_path(pcfg.eventlog.dir), per_frame=False, tag="live")
     debug = True
@@ -585,12 +589,14 @@ def main() -> int:
                 announce("ear classifier toggled")
             elif k == ord("m") and len(models) > 1:
                 mi = (mi + 1) % len(models)
-                pipe.set_detector(build_detector(pcfg.detector, models[mi], conf), models[mi].hands)
+                pipe.set_detector(build_detector(pcfg.detector, models[mi],
+                                                 conf if conf_user else None), models[mi].hands)
                 models_used.add(models[mi].name)
                 announce("model switched")
             elif k in (ord("["), ord("]")):
                 conf = float(np.clip(conf + (live.conf_step if k == ord("]") else
                                              -live.conf_step), 0.05, 0.9))
+                conf_user = True
                 pipe.detector.set_conf(conf)
                 announce("confidence changed")
     except KeyboardInterrupt:
