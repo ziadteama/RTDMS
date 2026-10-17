@@ -13,8 +13,8 @@ Scoring per labelled behaviour (phone right ear / left ear / in hand -> 'phone' 
 eating): recall = share of segments with an alert overlapping them (1 s slack); time to alert =
 first alert start - segment start (0 if already on); false alarms = alert events that start
 inside a negative segment (normal driving and look-alikes: talking, singing, yawning, hand on
-head, reaching, control panel, pick-up) and overlap no positive segment of that behaviour; per
-hour of negative time. Ranges: 5-95 % over 1000 bootstrap resamples of the drivers.
+head, reaching, control panel; pick-up is ignored) and overlap no positive segment of that
+behaviour; per hour of negative time. Ranges: 5-95 % over 1000 bootstrap resamples of drivers.
 """
 
 from __future__ import annotations
@@ -42,6 +42,13 @@ CAPTURE = (1280, 720)
 ROWS = {"phone_right_ear": "phone", "phone_left_ear": "phone", "phone_in_hand": "phone",
         "drinking": "drinking", "eating": "eating"}
 NAMES = ["phone", "drink", "food"]
+# SynDD "pick up from floor" often involves a phone (the teacher saw a real phone in 40 of 83
+# frames the detector flagged there), so it is neither a positive nor phone-free time.
+IGNORED = {"neg_pickup"}
+
+
+def is_negative(label: str) -> bool:
+    return label == "normal" or (label.startswith("neg_") and label not in IGNORED)
 
 
 def frames(video: Path, fps: float):
@@ -166,7 +173,7 @@ def score(segs: list[D.Segment], events_by_video: dict, slack: float = 1.0) -> d
             if hit:
                 pd["rows"][s.label][0] += 1
                 pd["rows"][s.label][2].append(max(0.0, min(e[0] for e in hit) - s.start_s))
-        elif s.label == "normal" or s.label.startswith("neg_"):
+        elif is_negative(s.label):
             pd["neg_s"] += s.end_s - s.start_s
     # false alarms: alert starts inside a negative segment, overlaps no positive segment
     for video, ev in events_by_video.items():
@@ -176,7 +183,7 @@ def score(segs: list[D.Segment], events_by_video: dict, slack: float = 1.0) -> d
         pd = per_driver[vsegs[0].driver]
         for b, alerts in ev.items():
             pos = [s for s in vsegs if ROWS.get(s.label) == b]
-            neg = [s for s in vsegs if s.label == "normal" or s.label.startswith("neg_")]
+            neg = [s for s in vsegs if is_negative(s.label)]
             for a0, a1 in alerts:
                 if any(a0 < s.end_s + slack and a1 > s.start_s - slack for s in pos):
                     continue
