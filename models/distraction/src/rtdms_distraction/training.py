@@ -6,6 +6,7 @@ can unpickle it.
 
 from __future__ import annotations
 
+import cv2
 import numpy as np
 from ultralytics.data.dataset import YOLODataset
 from ultralytics.models.yolo.detect import DetectionTrainer
@@ -25,6 +26,9 @@ class IRPhotometric:
         rng = np.random.default_rng()
         if rng.random() < self.p:
             labels["img"] = LOOKS[self.look](labels["img"], rng, self.strength)
+        elif self.look == "ir":  # IR target: every image is gray, half also get the IR traits
+            g = cv2.cvtColor(labels["img"], cv2.COLOR_BGR2GRAY)
+            labels["img"] = cv2.cvtColor(g, cv2.COLOR_GRAY2BGR)
         return labels
 
 
