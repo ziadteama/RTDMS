@@ -85,7 +85,8 @@ def render(res: FrameResult, fps: float | None = None, holder_zones=None, *, deb
         _text(panel, msg, 12, y, (40, 40, 240))
         y += 20
     elif debug:
-        dp = (f.pitch_deg - bl["pitch"]) if bl["ready"] and f.pitch_deg is not None else None
+        dp = (f.pitch_deg - bl["pitch"]) if bl["ready"] and f.pitch_deg is not None and \
+            bl["pitch"] is not None else None  # simple mode keeps no head-pose baseline
         _text(panel, f"pitch {_f(f.pitch_deg)}  d {_f(dp)}  yaw {_f(f.yaw_deg)}", 12, y)
         y += 18
         _text(panel, f"gaze_down {_f(f.gaze_down, 2)} ({f.gaze_source})  "
