@@ -166,16 +166,18 @@ def main() -> int:
     p.add_argument("--users", type=int, help="stop after this many users (layout check)")
     p.add_argument("--jobs", type=int, default=3, help="parallel member transfers")
     p.add_argument("--list", action="store_true")
+    p.add_argument("--set", default="A1", choices=["A1", "A2"],
+                   help="A1 = annotated (default), A2 = 15 drivers without annotations")
     args = p.parse_args()
 
     root = Path(yaml.safe_load((ROOT / "configs" / "data.yaml").read_text(encoding="utf8"))
                 ["root"]) / "public" / "syndd"
-    out = root / "A1"
+    out = root / args.set
     remote = Remote(args.rclone, args.remote, args.folder_id)
     sizes = remote.sizes()
-    zips = sorted(n for n in sizes if re.fullmatch(r"A1_\d+\.zip", n))
+    zips = sorted(n for n in sizes if re.fullmatch(rf"{args.set}(_\d+)?\.zip", n))
     if not zips:
-        raise SystemExit(f"no A1_*.zip in the folder (found: {sorted(sizes)})")
+        raise SystemExit(f"no {args.set}*.zip in the folder (found: {sorted(sizes)})")
 
     # official annotation CSVs (labels zip -> nested A1.zip)
     lab = zipfile.ZipFile(io.BytesIO(remote.cat(LABELS_ZIP, 0, sizes[LABELS_ZIP])))
