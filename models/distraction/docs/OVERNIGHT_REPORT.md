@@ -290,7 +290,7 @@ by the teacher or by SAM 2 are **teacher-labelled** (not checked by you).
 | 3 | fisheye (160 deg) + driver-ROI training | better on validation, a trade-off on test (below) | not as default; first model to try on the Pi camera |
 | 4 | "phone visible" column | added; needs your hand-check | n/a |
 | 5 | per-class thresholds | kept (phone 0.40, drink 0.45, food 0.40) | yes |
-| 6 | 5-fold cross-validation by driver | PENDING_ITEM6 | n/a |
+| 6 | 5-fold cross-validation by driver | paused by you (fold 1 at 6 of 8 epochs); resume any time | n/a |
 | 7 | INT8 + Hailo | INT8 matches FP32 and is 20-23 % faster; YOLO26 is supported on Hailo-8 | INT8 ready; Hailo compile needs you |
 | 8 | eating | not detectable from object boxes in this view (below) | n/a |
 | A | texting rule (head down + hand low) | texting 36.6 % -> 41.5 % (46.3 % with warnings) on test, 1.7 false warnings / h | **yes** |
@@ -424,7 +424,22 @@ is scored the same way.
 
 ### Addition 6: 5-fold cross-validation by driver
 
-PENDING_ITEM6_TEXT
+**Paused at your request** (17 Oct, 21:30). Set-up: the 59 train + validation drivers are split
+into 5 groups of 11-12 (the 10 test drivers stay untouched). For each group, a fresh yolo26n
+(COCO weights, IR-only, 512 px, 8 epochs) is trained on everything except that group's SynDD
+frames, then scored on that group's drivers with the same alert test and thresholds; the 5
+results give a mean and a range per behaviour. Fold 1 had reached 6 of its 8 epochs and its
+checkpoint is saved, so nothing is lost. Each fold takes about 55 min on the laptop (about 4 h
+left in total). To finish it:
+
+```bash
+C:\Users\youss\venvs\rtdms-train\Scripts\python.exe C:\Users\youss\rtdms-scratch\cv5.py all
+```
+
+This resumes fold 1, trains folds 2-5, scores all of them and prints the summary. Note: the
+folds use a shorter, one-stage recipe than det_v2d (which was trained in three stages), so the
+cross-validation numbers show how much results vary between drivers, not det_v2d's exact
+numbers.
 
 ### Addition 7: INT8 and Hailo
 
