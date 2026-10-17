@@ -81,7 +81,8 @@ SYNDD_LABELS = {
 # column is only "Distracted Behavior"; the activity is "Label (Primary)" = "Class <n>".
 SYNDD_CLASSES = {0: "normal", 1: "drinking", 2: "phone_right_ear", 3: "phone_left_ear",
                  4: "eating", 5: "phone_in_hand", 6: "phone_in_hand",
-                 # 7 reaching behind, 8 adjust control panel, 9 / 10 pick up from floor: skipped
+                 # look-alikes, used as negatives (hard negatives, false-alarm time)
+                 7: "neg_reaching", 8: "neg_control_panel", 9: "neg_pickup", 10: "neg_pickup",
                  11: "neg_talking", 12: "neg_talking", 13: "neg_yawning",
                  14: "neg_hand_on_head", 15: "neg_singing"}
 REAR_VIEW = {"rearview", "rear", "rearviewmirror"}

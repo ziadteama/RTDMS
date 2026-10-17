@@ -69,6 +69,7 @@ def test_syndd_2024_class_numbers_and_loose_filenames(tmp_path):
         encoding="utf8")
     segs = D.syndd(tmp_path)
     assert [(s.label, s.video.stem[-1]) for s in segs] == [("phone_right_ear", "5"),
+                                                           ("neg_control_panel", "5"),
                                                            ("neg_hand_on_head", "7")]
     assert segs[0].start_s == 11 and segs[0].end_s == 31 and segs[0].driver == "syndd_13522"
 
