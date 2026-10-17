@@ -111,15 +111,17 @@ class DistractionPipeline:
         if hands is None and pcfg.hands.source == "mediapipe":
             from .hands import MediaPipeHands
             hands = MediaPipeHands(pcfg.hands)
-        # Simple mode: detector + face mesh only (no hands, pose or crop classifiers).
+        # Simple mode: detector + face mesh, plus pose for the texting rule (no hands or crop
+        # classifiers).
         self.simple = None
         if rcfg.mode == "simple":
             from .simple_rules import SimpleRules
 
-            self.simple = SimpleRules(rcfg.simple)
+            self.simple = SimpleRules(rcfg.simple, rcfg.baseline.duration_s,
+                                      rcfg.baseline.min_samples)
             hands = None
             pcfg.hands.source = "off"
-            pcfg.pose.enabled = False
+            pcfg.pose.enabled = pcfg.pose.enabled and rcfg.simple.texting
             pcfg.ear_classifier.enabled = pcfg.mouth_classifier.enabled = False
         self.detector, self.facemesh, self.hands = detector, facemesh, hands
         if pose is None and pcfg.pose.enabled:
@@ -285,19 +287,33 @@ class DistractionPipeline:
 
     def _simple_result(self, view, face, t: float, tm: dict, ran: bool) -> FrameResult:
         t0 = time.perf_counter()
+        if self.pose is not None and self.pose_on and self._i % max(1, self.pcfg.pose.every_n) == 0:
+            from .pose import driver_person
+
+            det_in = view if view.ndim == 3 else cv2.cvtColor(view, cv2.COLOR_GRAY2RGB)
+            self._person = driver_person(self.pose.detect(det_in),
+                                         face.center if face is not None else None)
+        tm["pose"] = (time.perf_counter() - t0) * 1000
+        t0 = time.perf_counter()
         dets = [d for d in self._dets if d.cls in ("phone", "drink", "food")]
-        behaviours = self.simple.update(t, face, dets)
+        person = self._person if self.pose_on else None
+        behaviours = self.simple.update(t, face, dets, person.kpts if person is not None else None)
         level = max((v["level"] for v in behaviours.values()), key=LEVEL_RANK.__getitem__)
         zone = self.simple.zone
         ev = FrameEvidence(behaviours={}, head_down=None, head_down_s=0.0, chewing=None,
                            zones={"mouth": zone} if zone is not None else {},
                            stale_face=face is None and zone is not None)
         tm["rules"] = (time.perf_counter() - t0) * 1000
-        # No head-pose rule in simple mode, so no per-drive baseline to wait for.
-        baseline = {"ready": True, "progress": 1.0, "pitch": None, "yaw": None, "gaze": None}
+        tx = self.simple.texting
+        if tx is None:  # no head-pose rule, so no per-drive baseline to wait for
+            baseline = {"ready": True, "progress": 1.0, "pitch": None, "yaw": None, "gaze": None}
+        else:
+            bl = tx.baseline
+            baseline = {"ready": bl.ready, "progress": round(bl.progress(t), 2),
+                        "pitch": bl.pitch, "yaw": bl.yaw, "gaze": bl.gaze}
         self._i += 1
         return FrameResult(t, view, face, dets, ev, behaviours, level, baseline, tm, ran,
-                           variant="simple")
+                           variant="simple", person=person)
 
     @property
     def variant(self) -> str:

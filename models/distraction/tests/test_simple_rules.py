@@ -1,5 +1,7 @@
 """Simple mode: phone box >= 1 s -> ALERT; drink / food over the lower face -> ALERT."""
 
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -79,3 +81,57 @@ def test_food_at_the_lower_face():
 
 def test_rules_yaml_mode():
     assert load_rules_config().mode in ("full", "simple")
+
+
+def kpts(wrist_y=520.0, wrist_x=320.0):
+    """COCO-17: shoulders at y 300, 200 px apart; both wrists at (wrist_x, wrist_y)."""
+    k = np.zeros((17, 3))
+    k[5], k[6] = (220, 300, 0.9), (420, 300, 0.9)
+    k[9] = k[10] = (wrist_x, wrist_y, 0.9)
+    return k
+
+
+def run_tx(rules, seconds, f, k, t0=0.0):
+    out = None
+    for i in range(int(seconds * FPS)):
+        out = rules.update(t0 + i / FPS, f, [], k)
+    return out, t0 + int(seconds * FPS) / FPS
+
+
+def texting_rules():
+    r = SimpleRules(SimpleRulesConfig(), baseline_s=1.0, baseline_n=10)
+    _, t = run_tx(r, 1.5, face(), kpts(wrist_y=420))  # baseline: pitch 0
+    assert r.texting.baseline.ready
+    return r, t
+
+
+def test_texting_head_down_and_hand_low_warns_then_alerts():
+    r, t = texting_rules()
+    down = dataclasses.replace(face(), pitch_deg=20.0)
+    out, t = run_tx(r, 1.5, down, kpts(), t)
+    assert out["phone_in_hand"]["level"] == "none"
+    out, t = run_tx(r, 1.0, down, kpts(), t)
+    assert out["phone_in_hand"]["level"] == "warning"
+    out, t = run_tx(r, 1.0, down, kpts(), t)
+    assert out["phone_in_hand"]["level"] == "alert" and out["phone"]["level"] == "none"
+    out, _ = run_tx(r, 1.0, face(), kpts(), t)  # head back up
+    assert out["phone_in_hand"]["level"] == "none"
+
+
+def test_texting_needs_both_head_down_and_a_low_central_wrist():
+    r, t = texting_rules()
+    down = dataclasses.replace(face(), pitch_deg=20.0)
+    out, t = run_tx(r, 4.0, down, kpts(wrist_y=380), t)  # wrist at chest height
+    assert out["phone_in_hand"]["level"] == "none"
+    out, t = run_tx(r, 4.0, down, kpts(wrist_x=600), t)  # low but off to the side (gear stick)
+    assert out["phone_in_hand"]["level"] == "none"
+    out, t = run_tx(r, 4.0, down, None, t)  # no pose
+    assert out["phone_in_hand"]["level"] == "none"
+    out, _ = run_tx(r, 4.0, dataclasses.replace(face(), pitch_deg=10.0), kpts(), t)
+    assert out["phone_in_hand"]["level"] == "none"  # only 10 deg down
+
+
+def test_texting_rule_can_be_turned_off():
+    r = SimpleRules(SimpleRulesConfig(texting=False))
+    out, _ = run(r, 0.5, [], face())
+    assert "phone_in_hand" not in out

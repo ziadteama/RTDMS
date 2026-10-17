@@ -320,13 +320,14 @@ class SmoothingConfig:
     face_geometry_hold_s: float = 5.0
 
 
-SIMPLE_BEHAVIOURS = ("phone", "drinking", "eating")
+SIMPLE_BEHAVIOURS = ("phone", "phone_in_hand", "drinking", "eating")
 
 
 @dataclass
 class SimpleRulesConfig:
-    """rules mode `simple`: one phone / drink / food detector and three rules, no hands, pose,
-    crop classifiers or chewing. Distances in face widths (fw)."""
+    """rules mode `simple`: one phone / drink / food detector and three box rules, plus the
+    head-down + wrist-low texting rule (pose only, when `texting`). No hands, crop
+    classifiers or chewing. Distances in face widths (fw)."""
 
     phone_window_s: float = 1.0  # phone box in >= on_ratio of the last second -> phone ALERT
     object_window_s: float = 0.5  # drink / food box over the lower face, same smoothing
@@ -337,6 +338,20 @@ class SimpleRulesConfig:
     below_chin: float = 0.35
     side_pad: float = 0.25
     face_hold_s: float = 1.0  # a cup or hand hides the face: reuse the last face this long
+    # Texting without a visible phone (rule A): head pitched down >= texting_pitch_deg from the
+    # drive's baseline AND a pose wrist low (>= texting_wrist_low shoulder widths below the
+    # shoulders) and central (within texting_wrist_central sw of their midpoint), held
+    # texting_warn_s -> phone_in_hand WARNING, texting_alert_s -> ALERT. Gaps up to
+    # texting_gap_s are bridged. Tuned on the 10 validation drivers (docs/OVERNIGHT_REPORT.md
+    # section 8); gaze was left out: it added false warnings while talking / singing.
+    texting: bool = True
+    texting_pitch_deg: float = 15.0
+    texting_wrist_low: float = 1.0
+    texting_wrist_central: float = 0.8
+    texting_kp_conf: float = 0.3
+    texting_warn_s: float = 2.0
+    texting_alert_s: float = 3.0
+    texting_gap_s: float = 0.5
 
 
 @dataclass

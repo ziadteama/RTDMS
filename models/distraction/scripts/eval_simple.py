@@ -20,6 +20,7 @@ behaviour; per hour of negative time. Ranges: 5-95 % over 1000 bootstrap resampl
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import hashlib
 import json
 import random
@@ -141,7 +142,8 @@ def replay(face_npz: Path, det_npy: Path, conf: dict[str, float], rcfg) -> dict[
         if cf >= conf[NAMES[int(k)]]:
             by_t.setdefault(round(float(t), 4), []).append(
                 Detection(NAMES[int(k)], float(cf), Box(float(a), float(b), float(c), float(d))))
-    rules = SimpleRules(rcfg.simple)
+    # box rules only: the texting rule needs head pose + pose keypoints (scored apart)
+    rules = SimpleRules(dataclasses.replace(rcfg.simple, texting=False))
     events: dict[str, list] = {"phone": [], "drinking": [], "eating": []}
     open_: dict[str, float] = {}
     t = 0.0
