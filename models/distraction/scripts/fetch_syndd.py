@@ -6,10 +6,12 @@ WITHOUT downloading the 40 GB zips: the zip index is read through byte-range req
     python scripts/fetch_syndd.py --list                       # zips and their members
     python scripts/fetch_syndd.py --users 1                    # first user only (layout check)
     python scripts/fetch_syndd.py                              # every A1 user
+    python scripts/fetch_syndd.py --set A2                     # unlabelled A2 drivers
+    python scripts/fetch_syndd.py --views dash,right --only-users 14786,16080
 
 Needs an rclone remote with read access to the folder (default: gdrive, read-only scope).
 Output: <data root>/public/syndd/A1/user_id_XXXXX/{user_id_XXXXX.csv, Rearview_*.MP4}.
-Dashboard and right-side-window videos and A2 (no annotations) are never read.
+Only the rear view is read unless --views asks for the dashboard / right-side-window views.
 Existing files with the right size are skipped, so the script can be rerun after a break.
 """
 
@@ -151,11 +153,14 @@ def extract_retry(remote: Remote, zname: str, info: zipfile.ZipInfo, dest: Path,
     raise AssertionError("unreachable")
 
 
-def wanted(name: str) -> bool:
-    base = Path(name).name
+VIEW_PREFIX = {"rear": ("rear",), "dash": ("dash",), "right": ("right",)}
+
+
+def wanted(name: str, views: tuple[str, ...] = ("rear",)) -> bool:
+    base = Path(name).name.lower()
+    prefixes = tuple(p for v in views for p in VIEW_PREFIX[v])
     return (not name.startswith("__MACOSX") and USER.search(name) is not None and
-            (base.lower().endswith(".csv") or
-             (base.lower().startswith("rear") and base.lower().endswith(".mp4"))))
+            (base.endswith(".csv") or (base.startswith(prefixes) and base.endswith(".mp4"))))
 
 
 def main() -> int:
@@ -168,7 +173,11 @@ def main() -> int:
     p.add_argument("--list", action="store_true")
     p.add_argument("--set", default="A1", choices=["A1", "A2"],
                    help="A1 = annotated (default), A2 = 15 drivers without annotations")
+    p.add_argument("--views", default="rear", help="comma list of rear, dash, right")
+    p.add_argument("--only-users", help="comma list of user ids (e.g. 13522,20507)")
     args = p.parse_args()
+    views = tuple(args.views.split(","))
+    only = set(args.only_users.split(",")) if args.only_users else None
 
     root = Path(yaml.safe_load((ROOT / "configs" / "data.yaml").read_text(encoding="utf8"))
                 ["root"]) / "public" / "syndd"
@@ -199,8 +208,10 @@ def main() -> int:
                 time.sleep(min(300, 30 * (k + 1)))
         else:
             raise SystemExit(f"{zname}: index unreadable after retries")
-        members = [i for i in zf.infolist() if wanted(i.filename)]
+        members = [i for i in zf.infolist() if wanted(i.filename, views)]
         users = sorted({USER.search(i.filename).group(1) for i in members})
+        if only is not None:
+            users = [u for u in users if u in only]
         print(f"{zname}: {len(zf.infolist())} entries, {len(users)} users, "
               f"{sum(i.file_size for i in members) / 1e9:.1f} GB rear-view + csv", flush=True)
         if args.list:
