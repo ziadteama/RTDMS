@@ -152,12 +152,14 @@ def syndd(root: str | Path, view: str = "rear") -> list[Segment]:
                 if has_rear and kind != "rear":
                     continue
                 video = videos.get(("rear", block))  # no rear rows: dashboard times
-            else:
+            else:  # dash / right: that view's own rows (each view has its own times)
+                if kind != view:
+                    continue
                 video = videos.get((kind, block))
             if video is None:
                 continue
             out.append(Segment("syndd", driver, video, hms(r[k_start]), hms(r[k_end]), label,
-                               "rear"))
+                               view))
     return out
 
 
@@ -370,12 +372,13 @@ class Clip:
         cap.release()
 
 
-def syndd_clips(root: str | Path, min_s: float = 1.0) -> list[Clip]:
-    """SynDD rear-view (mirror) segments as crop-builder clips: one clip per annotated span.
-    Hard negatives keep their eval label (neg_*), which the crop builder maps to ear / mouth
-    none. Spans shorter than `min_s` are dropped (mostly annotation slips)."""
+def syndd_clips(root: str | Path, min_s: float = 1.0, view: str = "rear") -> list[Clip]:
+    """SynDD segments of one camera view (rear = mirror, dash, right) as crop-builder clips: one
+    clip per annotated span. Hard negatives keep their eval label (neg_*), which the crop
+    builder maps to ear / mouth none. Spans shorter than `min_s` are dropped (mostly
+    annotation slips)."""
     return [Clip("syndd", s.driver, s.label, s.video, start_s=s.start_s, end_s=s.end_s)
-            for s in syndd(root, view="rear") if s.end_s - s.start_s >= min_s]
+            for s in syndd(root, view=view) if s.end_s - s.start_s >= min_s]
 
 
 EBDD_LABELS = {"ATTENTIVE": "normal", "CELL_PHONE": "phone_unknown_ear", "EATING": "eating",

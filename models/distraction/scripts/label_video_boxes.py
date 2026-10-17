@@ -318,10 +318,12 @@ def main() -> int:
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--drivers", help="comma list (smoke test)")
     p.add_argument("--limit", type=int, help="clips (smoke test)")
+    p.add_argument("--view", default="rear", choices=["rear", "dash", "right"],
+                   help="SynDD camera view (rear = mirror, the deployment view)")
     args = p.parse_args()
 
     if args.dataset == "syndd":
-        clips = [c for c in D.syndd_clips(args.src) if c.label in POS | NEG]
+        clips = [c for c in D.syndd_clips(args.src, view=args.view) if c.label in POS | NEG]
     else:
         clips = [c for c in D.ebdd(args.src) if c.label in EBDD_MAP]
     if args.drivers:
