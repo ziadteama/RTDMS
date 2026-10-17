@@ -20,6 +20,7 @@ behaviour; per hour of negative time. Ranges: 5-95 % over 1000 bootstrap resampl
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 import sys
@@ -259,7 +260,12 @@ def main() -> int:
         name, w = spec.split("=", 1)
         w, _, sz = w.partition("@")
         imgsz = int(sz) if sz else 416
-        dets = {v: str(cache / "dets" / f"{name}_{imgsz}" / tag / f"{Path(v).stem}.npy")
+        # Key the cache by the weights file itself (path + size + mtime), not the model name:
+        # a retrained model under the same name must never reuse old detections.
+        st = Path(w).stat()
+        key = hashlib.sha1(f"{Path(w).resolve()}|{st.st_size}|{st.st_mtime_ns}".encode()) \
+            .hexdigest()[:10]
+        dets = {v: str(cache / "dets" / f"{name}_{imgsz}_{key}" / tag / f"{Path(v).stem}.npy")
                 for v in videos}
         with ProcessPoolExecutor(min(args.workers, 3)) as ex:
             list(ex.map(det_pass, videos, [args.fps] * len(videos), [w] * len(videos),
