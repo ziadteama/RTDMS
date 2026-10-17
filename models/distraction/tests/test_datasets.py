@@ -74,6 +74,24 @@ def test_syndd_2024_class_numbers_and_loose_filenames(tmp_path):
     assert segs[0].start_s == 11 and segs[0].end_s == 31 and segs[0].driver == "syndd_13522"
 
 
+def test_syndd_other_views_use_their_own_rows(tmp_path):
+    u = tmp_path / "A1" / "user_id_14786"
+    for v in ("Dashboard", "Rearview", "Right_side_window"):
+        tiny_video(u / f"{v}_user_id_14786_NoAudio_5.MP4")
+    (u / "user_id_14786.csv").write_text(
+        "Filename,Camera View,Activity Type,Start Time,End Time,Label (Primary),Appearance Block\n"
+        "Dashboard_user_id_14786_5,Dashboard,Distracted Behavior,00:00:01,00:00:03,Class 2,None\n"
+        "Rearview_user_id_14786_5,Rearview,Distracted Behavior,00:00:00,00:00:02,Class 2,None\n"
+        "Right_side_window_user_id_14786_5,Rightside Window,Distracted Behavior,00:00:02,"
+        "00:00:04,Class 2,None\n", encoding="utf8")
+    for view, name, start in (("rear", "Rearview", 0), ("dash", "Dashboard", 1),
+                              ("right", "Right_side_window", 2)):
+        segs = D.syndd(tmp_path, view=view)
+        assert len(segs) == 1 and segs[0].video.name.startswith(name)
+        assert segs[0].start_s == start and segs[0].view == view
+        assert D.syndd_clips(tmp_path, view=view)[0].label == "phone_right_ear"
+
+
 def test_syndd_clips_read_only_their_span(tmp_path):
     u = tmp_path / "user_id_22222"
     tiny_video(u / "Rear_view_user_id_22222_NoAudio_1.MP4", seconds=4, fps=10)
