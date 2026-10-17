@@ -35,7 +35,11 @@ def main() -> int:
     p.add_argument("--patience", type=int, default=15)
     p.add_argument("--look", choices=["color", "ir"], default=None,
                    help="photometric augmentation target (default: configs/data.yaml look)")
+    p.add_argument("--lr0", type=float, help="initial learning rate (fine-tuning: ~0.002)")
+    p.add_argument("--warmup-epochs", type=float, help="Ultralytics warmup_epochs (default 3)")
     args = p.parse_args()
+    extra = {k: v for k, v in (("lr0", args.lr0), ("warmup_epochs", args.warmup_epochs))
+             if v is not None}
 
     from ultralytics import YOLO
 
@@ -55,7 +59,7 @@ def main() -> int:
         hsv_h=0.015 if colour else 0.0, hsv_s=0.6 if colour else 0.0, hsv_v=0.4,
         fliplr=0.5, flipud=0.0, degrees=5.0, translate=0.1, scale=0.5,
         mosaic=1.0, close_mosaic=10, mixup=0.0,
-        plots=True, val=True,
+        plots=True, val=True, **extra,
     )
     return 0
 
