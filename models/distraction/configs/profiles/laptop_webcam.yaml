@@ -17,8 +17,13 @@ roi:
   rect: null             # whole frame; narrow it with scripts/select_roi.py --profile laptop_webcam
 
 detector:
+  # det_v2b (2026-10-17): yolo26n phone / drink / food, fine-tuned on SynDD rear view (IR) +
+  # EBDD + Open Images + Roboflow DMS_Project / ADMS_FINAL_3, gray + hand-occlusion copies.
+  # Held-out SynDD drivers: phone found in 72 % / 92 % of right / left phone-call frames
+  # (stock yolo26n: 3 %), false phone on 0 % of normal and 0.7 % of hand-on-head frames.
+  # See docs/DETECTOR_V2.md.
   backend: ncnn
-  weights: models/yolo26n_coco_416_ncnn_model
+  weights: models/det_v2b_416_ncnn_model
   imgsz: 416
 
 hands:
@@ -32,6 +37,7 @@ live:
   conf_step: 0.05
   # 'm' cycles through these, then any other models/*_ncnn_model folder found.
   models:
+    - {name: det_v2b, weights: models/det_v2b_416_ncnn_model, imgsz: 416, hands: mediapipe}
     - {name: stock yolo26n, weights: models/yolo26n_coco_416_ncnn_model, imgsz: 416,
        hands: mediapipe}
     - {name: v1_416, weights: models/v1_416_ncnn_model, imgsz: 416, hands: detector}
