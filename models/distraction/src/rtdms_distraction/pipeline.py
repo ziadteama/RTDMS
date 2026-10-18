@@ -108,11 +108,8 @@ class DistractionPipeline:
         if facemesh is None:
             from .facemesh import FaceMesh
             facemesh = FaceMesh(pcfg.facemesh, vw, vh, self.roi.intrinsics)
-        if hands is None and pcfg.hands.source == "mediapipe":
-            from .hands import MediaPipeHands
-            hands = MediaPipeHands(pcfg.hands)
         # Simple mode: detector + face mesh, plus pose for the texting rule (no hands or crop
-        # classifiers).
+        # classifiers). Decided before loading anything, so hand_landmarker.task is not needed.
         self.simple = None
         if rcfg.mode == "simple":
             from .simple_rules import SimpleRules
@@ -123,6 +120,9 @@ class DistractionPipeline:
             pcfg.hands.source = "off"
             pcfg.pose.enabled = pcfg.pose.enabled and rcfg.simple.texting
             pcfg.ear_classifier.enabled = pcfg.mouth_classifier.enabled = False
+        if hands is None and pcfg.hands.source == "mediapipe":
+            from .hands import MediaPipeHands
+            hands = MediaPipeHands(pcfg.hands)
         self.detector, self.facemesh, self.hands = detector, facemesh, hands
         if pose is None and pcfg.pose.enabled:
             try:

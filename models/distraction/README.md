@@ -39,6 +39,7 @@ python -m venv .venv
 # Windows: .venv\Scripts\activate     Linux / macOS: source .venv/bin/activate
 pip install -e ".[mediapipe,ncnn,dev]"
 python -m pytest                               # ~120 tests, no camera or network needed
+python scripts/fetch_models.py                 # optional: hand model (live.py side check, full mode)
 ```
 
 Run it:

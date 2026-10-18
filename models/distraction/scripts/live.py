@@ -176,7 +176,12 @@ def side_check(src: WebcamSource, pipe: DistractionPipeline, seconds: float) -> 
     from rtdms_distraction.config import HandsConfig
     from rtdms_distraction.hands import MediaPipeHands
 
-    hands = MediaPipeHands(HandsConfig(model_path=pipe.pcfg.hands.model_path))
+    try:
+        hands = MediaPipeHands(HandsConfig(model_path=pipe.pcfg.hands.model_path))
+    except FileNotFoundError:
+        print("[live] side check skipped: hand_landmarker.task missing "
+              "(python scripts/fetch_models.py)", flush=True)
+        return
     votes = {234: 0, 454: 0}
     t_end = time.monotonic() + seconds
     while time.monotonic() < t_end:

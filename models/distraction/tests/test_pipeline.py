@@ -118,3 +118,17 @@ def test_hand_at_ear_warning_after_dwell_then_alert_with_phone():
     assert 3.9 <= first_warn <= 4.1, first_warn
     assert levels[4.9] == "warning"
     assert levels[6.9] == "alert"
+
+
+def test_simple_mode_needs_no_hand_model(tmp_path):
+    """A fresh clone has no hand_landmarker.task (fetch_models.py): simple mode must not load it."""
+    p = PipelineConfig()
+    p.rectify.enabled = False
+    p.hands.source = "mediapipe"
+    p.hands.model_path = str(tmp_path / "missing_hand_landmarker.task")
+    p.pose.enabled = False
+    r = RulesConfig()
+    r.mode = "simple"
+    s = Script(timeline)
+    pipe = DistractionPipeline(p, r, (640, 640), detector=s, facemesh=s)
+    assert pipe.hands is None and pipe.simple is not None
