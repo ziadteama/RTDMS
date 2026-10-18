@@ -5,6 +5,11 @@ This report is also copied there.
 
 > **Update (late morning):** I also tried your ideas A-G (section 7). None of them beat the
 > current default, so the default model and all numbers below are unchanged.
+>
+> **Update (17-18 Oct):** your 8 additions and rules A / B are in **section 8**. One change is
+> kept: a texting rule (head down + hand low) that raises texting alerts on the test drivers
+> from 37 % to 41.5 % (46 % with warnings) at 1.7 false warnings / h. The detector stays
+> det_v2d. The 5-fold cross-validation shows results swing 10-25 points between driver groups.
 
 ## 1. Summary (5 lines)
 
@@ -290,7 +295,7 @@ by the teacher or by SAM 2 are **teacher-labelled** (not checked by you).
 | 3 | fisheye (160 deg) + driver-ROI training | better on validation, a trade-off on test (below) | not as default; first model to try on the Pi camera |
 | 4 | "phone visible" column | added; needs your hand-check | n/a |
 | 5 | per-class thresholds | kept (phone 0.40, drink 0.45, food 0.40) | yes |
-| 6 | 5-fold cross-validation by driver | paused by you (fold 1 at 6 of 8 epochs); resume any time | n/a |
+| 6 | 5-fold cross-validation by driver | done: calls 89-97 % mean, but results swing 10-25 points between driver groups (below) | n/a |
 | 7 | INT8 + Hailo | INT8 matches FP32 and is 20-23 % faster; YOLO26 is supported on Hailo-8 | INT8 ready; Hailo compile needs you |
 | 8 | eating | not detectable from object boxes in this view (below) | n/a |
 | A | texting rule (head down + hand low) | texting 36.6 % -> 41.5 % (46.3 % with warnings) on test, 1.7 false warnings / h | **yes** |
@@ -424,22 +429,42 @@ is scored the same way.
 
 ### Addition 6: 5-fold cross-validation by driver
 
-**Paused at your request** (17 Oct, 21:30). Set-up: the 59 train + validation drivers are split
-into 5 groups of 11-12 (the 10 test drivers stay untouched). For each group, a fresh yolo26n
-(COCO weights, IR-only, 512 px, 8 epochs) is trained on everything except that group's SynDD
-frames, then scored on that group's drivers with the same alert test and thresholds; the 5
-results give a mean and a range per behaviour. Fold 1 had reached 6 of its 8 epochs and its
-checkpoint is saved, so nothing is lost. Each fold takes about 55 min on the laptop (about 4 h
-left in total). To finish it:
+Set-up: the 59 train + validation drivers were split into 5 groups of 11-12 (the 10 test
+drivers stayed untouched). For each group, a fresh yolo26n (COCO weights, IR-only, 512 px,
+8 epochs) was trained on everything except that group's SynDD frames, then scored on that
+group's drivers with the same alert test and thresholds (phone 0.40, drink 0.45). The last
+epoch's weights were used, so nothing was chosen on the held-out drivers. (Paused once at
+your request and resumed from the saved checkpoint with the same settings.)
 
-```bash
-C:\Users\youss\venvs\rtdms-train\Scripts\python.exe C:\Users\youss\rtdms-scratch\cv5.py all
-```
+| behaviour | fold 1 | fold 2 | fold 3 | fold 4 | fold 5 | **mean** | **range** |
+|---|---|---|---|---|---|---|---|
+| phone at right ear | 73 % | 96 % | 100 % | 83 % | 91 % | **89 %** | 73-100 % |
+| phone at left ear | 95 % | 100 % | 100 % | 88 % | 100 % | **97 %** | 88-100 % |
+| phone in hand (boxes only) | 69 % | 65 % | 58 % | 58 % | 75 % | **65 %** | 58-75 % |
+| drinking | 75 % | 52 % | 54 % | 79 % | 68 % | **66 %** | 52-79 % |
+| eating | 0 % | 0 % | 0 % | 0 % | 0 % | **0 %** | 0 % |
+| phone false alarms / h | 2.8 | 22.4 | 5.7 | 11.0 | 3.0 | **9.0** | 2.8-22.4 |
+| drink false alarms / h | 0 | 0 | 0 | 7.8 | 0 | **1.6** | 0-7.8 |
 
-This resumes fold 1, trains folds 2-5, scores all of them and prints the summary. Note: the
-folds use a shorter, one-stage recipe than det_v2d (which was trained in three stages), so the
-cross-validation numbers show how much results vary between drivers, not det_v2d's exact
-numbers.
+(22-25 calls, 44-52 texting actions, 22-24 drinks per fold; 0.64-0.71 h of non-phone driving
+per fold.)
+
+What this says:
+- **Which drivers you test on matters a lot.** The same recipe catches 73 % of right-ear calls
+  on one group and 100 % on another, and gives 2.8 false alarms / h on one group and 22 / h on
+  another. A single 10-driver test (like our test group) can be off by 10-20 points, so treat
+  every single-group number in this report as roughly +-10-15 points.
+- **Left-ear calls are the most reliable** (88-100 %), right-ear calls next (73-100 %).
+- **Texting from boxes alone** is 58-75 % here, higher than det_v2d's 37-47 % on the test /
+  validation groups: those two groups happen to be harder for texting.
+- **Drinking** is lower here (52-79 %) than det_v2d (90-95 %): the folds use a shorter,
+  one-stage recipe (8 epochs from COCO) than det_v2d (three stages, ~60 epochs), and drinking
+  needs the longer training. So these numbers show the **spread between drivers**, not
+  det_v2d's exact accuracy.
+- **Eating: 0 % in every fold**, which confirms addition 8.
+
+To rerun: `C:\Users\youss\venvs\rtdms-train\Scripts\python.exe C:\Users\youss\rtdms-scratch\cv5.py all`
+(skips finished folds). Per-fold results: `D:\rtdms-data\runs\overnight\cv5_eval_fold*`.
 
 ### Addition 7: INT8 and Hailo
 
