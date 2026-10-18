@@ -20,7 +20,8 @@ consume them. Code lives in `models/`; see `models/README.md` for on-disk conven
 |---|---|---|---|---|
 | Physiology | [[Physiology Subsystem]] | `models/physiology/` | Fatigue/stress from HR + PRV | **Replay pipeline implemented** |
 | Face (drowsiness + gaze) | [[Face Subsystem]] | `models/face/` | Eye closure, PERCLOS, blink, gaze, head pose | **Core + demo runner** |
-| Phone / eating | [[Phone Subsystem]] | `models/phone/` | Phone + eating distraction scores | **ONNX wired** (Safe-Drive-TN) |
+| Phone / eating | [[Phone Subsystem]] | `models/phone/` | Phone + eating distraction scores | **ONNX wired** (Safe-Drive-TN); superseded for the IR camera by Distraction |
+| Distraction (IR camera) | [[Distraction Subsystem]] | `models/distraction/` | Phone, phone in hand (texting), drinking, eating | **Release models shipped** (YOLO26n on IR + face mesh + pose rules) |
 | Decision fusion | *(stub)* | `fusion/` | Combines models → alert pattern | **Stub `decide()`** |
 | Alert subsystem | *(pending)* | *(pending)* | Buzzer + vibration patterns | Planned (Phase 4) |
 | Wearable firmware | *(pending)* | *(pending)* | ESP32-C3 + MAX30102, BLE only | Planned (Phase 1) |
@@ -38,6 +39,7 @@ consume them. Code lives in `models/`; see `models/README.md` for on-disk conven
 | Face | Youssef | `models/face/` | `face/<topic>` |
 | Physiology | Ziad | `models/physiology/` | `physio/<topic>` |
 | Phone | TBD | `models/phone/` | `phone/<topic>` |
+| Distraction | TBD | `models/distraction/` | `phone/<topic>` |
 | Fusion | Joint | `fusion/` | `fusion/<topic>` |
 | Shared status docs | Tiny PRs only | root README, `models/README.md`, this note, `CLAUDE.md` | `docs/<topic>` |
 

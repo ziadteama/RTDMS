@@ -7,7 +7,8 @@ fusion layer that will combine them.
 |---|---|---|---|---|
 | Physiology | `physiology/` | Fatigue/stress from HR + PRV | Wrist PPG → filter → peaks → features → logistic regression | **Implemented** (replay pipeline) |
 | Face (drowsiness + gaze) | `face/` | Eye closure, PERCLOS, blink, gaze, head pose | MediaPipe Face Landmarker → arithmetic channels → `StateReport` | **Implemented** (core + demo runner) |
-| Vision — phone / eating | `phone/` | Phone + eating distraction | YOLOv8n-cls ONNX (Safe-Drive-TN) @ ~5 Hz → `PhoneOutput` | **ONNX wired** (open weights) |
+| Vision — phone / eating | `phone/` | Phone + eating distraction | YOLOv8n-cls ONNX (Safe-Drive-TN) @ ~5 Hz → `PhoneOutput` | **ONNX wired** (open weights); superseded for the IR camera by `distraction/` |
+| Distraction (IR camera) | `distraction/` | Phone, phone in hand (texting), drinking, eating | YOLO26n phone / drink / food detector trained on IR + face mesh + YOLO26n-pose rules | **Release models shipped** (on `phone/distraction-baseline` until merged) |
 | Decision fusion | `../fusion/` | Combines models → alert pattern | Consumes scores + quality; owns alerts | **Stub** (`decide()`) |
 
 Decision fusion consumes model outputs and owns the alert decision. No individual model owns
@@ -30,6 +31,7 @@ trunk-based, zone-scoped short-lived branches defined in `.cursor/rules/git-bran
 | Face vision | Youssef | `models/face/` | `face/` |
 | Physiology | Ziad | `models/physiology/` | `physio/` |
 | Phone / eating | TBD | `models/phone/` | `phone/` |
+| Distraction | TBD | `models/distraction/` | `phone/` |
 | Fusion + production alerts | Joint | `fusion/` | `fusion/` |
 | Shared status docs | Anyone, **tiny PRs only** | `models/README.md`, root `README.md`, `CLAUDE.md`, `Subsystems/Models Index.md` | `docs/` |
 
