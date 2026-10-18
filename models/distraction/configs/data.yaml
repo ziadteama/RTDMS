@@ -1,0 +1,63 @@
+# Training-data configuration. Datasets and derived images live OUTSIDE the repo (C: is nearly
+# full); point `root` at a drive with space. Nothing under root is ever committed.
+root: D:/rtdms-data
+
+classes: [phone, drink, food, hand]
+
+# Target camera look for conversion and training augmentation.
+#   color = laptop webcam, daylight / indoor (CURRENT TARGET, 2026-10-11): blur, brightness /
+#           contrast, noise, JPEG + occlusion; no fisheye, no IR look.
+#   ir    = grayscale IR fisheye camera (parked): adds fisheye geometry and the IR look.
+look: color
+
+openimages:
+  # Open Images V7 boxable classes -> our classes. Boxes are labelled with the most specific
+  # class, so leaf food classes are listed explicitly (a burger is often only "Hamburger").
+  class_map:
+    Mobile phone: phone
+    Coffee cup: drink
+    Mug: drink
+    Bottle: drink
+    Drink: drink
+    Tin can: drink
+    Sandwich: food
+    Snack: food
+    Food: food
+    Fast food: food
+    Hamburger: food
+    Hot dog: food
+    French fries: food
+    Cookie: food
+    Doughnut: food
+    Banana: food
+    Apple: food
+    Baked goods: food
+    Human hand: hand
+  # Only used to rank images (prefer people actually holding / using the object).
+  person_classes: [Person, Man, Woman, Boy, Girl]
+  face_class: Human face
+  # Images per class (an image counts for every class it contains).
+  cap_train: 4000
+  cap_val: 400
+  cap_test: 400
+  # Stored size; the 1280 px teacher works on these, the domain-converted copies are smaller.
+  max_side: 1024
+
+teacher:
+  # COCO teacher for phone / drink (+ COCO foods), at high resolution with test-time augmentation.
+  coco_model: yolo26m.pt
+  coco_imgsz: 1280
+  coco_conf: 0.35
+  # Open-vocabulary teacher for food (COCO's foods are narrow). YOLO-World v2 beat YOLOE-26l on
+  # a 40-image check against Open Images GT (fewer unmatched boxes); YOLOE also overflowed 8 GB.
+  open_vocab_model: yolov8l-worldv2.pt
+  open_vocab_prompts:
+    food: [food, snack, sandwich, burger, chips bag, fruit, cookie, chocolate bar]
+  open_vocab_conf: 0.10
+  open_vocab_imgsz: 640
+  max_det: 100
+  # Hands: MediaPipe Hand Landmarker (COCO has no hand class; YOLOE found few hands).
+  hand_min_conf: 0.3
+  hand_pad: 0.1
+  # A teacher box is added only if no existing box of the same class overlaps it this much.
+  dedup_iou: 0.4
