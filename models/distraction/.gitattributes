@@ -1,1 +1,4 @@
+# Model files are byte-exact (checksums in models/README.md): never convert their line endings.
+models/** -text
+# Shell scripts run on the Pi.
 *.sh text eol=lf

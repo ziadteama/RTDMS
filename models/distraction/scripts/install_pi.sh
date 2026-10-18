@@ -5,8 +5,8 @@
 #   cd models/distraction && bash scripts/install_pi.sh
 #
 # Installs only RUNTIME pieces: MediaPipe (face mesh + hands) and the ncnn wheel (detector).
-# No PyTorch / Ultralytics on the Pi: the NCNN model is exported on the PC
-# (scripts/export_ncnn.py) and copied to models/yolo26n_coco_416_ncnn_model/.
+# No PyTorch / Ultralytics on the Pi: the trained NCNN models ship in git (models/README.md);
+# new ones are exported on the PC (scripts/export_ncnn.py, scripts/quantize_int8.py).
 #
 # Wheel availability (checked 2026-10-10 on PyPI):
 #   mediapipe 1.1.0  py3-none-manylinux_2_28_aarch64  -> any Python 3, glibc >= 2.28
@@ -44,10 +44,13 @@ pip install -e ".[mediapipe,ncnn,bench,dev]"
 
 say "Model assets"
 python scripts/fetch_models.py
-if [ ! -f models/yolo26n_coco_416_ncnn_model/model.ncnn.param ]; then
-    warn "detector missing: on the PC run 'python scripts/export_ncnn.py', then copy"
-    warn "models/yolo26n_coco_416_ncnn_model/ to this Pi's models/ folder."
-fi
+for m in det_v2d_ir_512_ncnn_model det_v2d_ir_512_det_aciq_mixed_ncnn_model yolo26n_pose_320_ncnn_model; do
+    if [ -f "models/$m/model.ncnn.param" ]; then
+        echo "    have models/$m"
+    else
+        warn "missing models/$m: it ships in git, run 'git pull' (or copy it from the PC)"
+    fi
+done
 
 say "Verify"
 python - <<'PY'

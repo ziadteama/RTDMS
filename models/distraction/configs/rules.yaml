@@ -2,6 +2,12 @@
 # rectified driver view), so they do not depend on seat position, driver size or mount distance.
 # Angles are degrees RELATIVE to the per-drive baseline. Times are seconds.
 
+# simple (default) = the release setup: phone box >= 1 s -> phone ALERT; drink / food box over the
+#   lower face -> drinking / eating ALERT; head down + wrist low -> phone_in_hand WARNING 2 s,
+#   ALERT 3 s (texting with the phone out of view). Settings: SimpleRulesConfig in config.py.
+# full = the older rule engine (hands, ear zones, crop classifiers, chewing), kept for comparison.
+mode: simple
+
 baseline:
   # Median pitch/yaw/gaze over the first `duration_s` seconds that have a face.
   duration_s: 10.0

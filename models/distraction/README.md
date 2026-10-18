@@ -1,138 +1,142 @@
 # rtdms-distraction
 
-> **Current target (2026-10-11): laptop webcam, colour, daylight / indoor lighting only.**
-> The mirror-mounted fisheye IR Pi camera is parked; its settings (fisheye rectification,
-> grayscale, IR-look training) stay as config switches. See
-> [docs/LAPTOP_TESTING.md](docs/LAPTOP_TESTING.md).
+Driver distraction from an **infrared cabin camera at the centre mirror** (Raspberry Pi 5 + 160°
+NoIR camera). It also runs on a PC with a video file or a webcam.
 
-Driver distraction (originally designed for the mirror-mounted fisheye IR cabin camera on a
-Raspberry Pi 5 CPU):
-
-| Behaviour | Evidence |
+| Behaviour | How it is detected (default `simple` mode) |
 |---|---|
-| `phone_right_ear` | phone box in the ear zone beside landmark 234 (eye line to jaw line) → ALERT; or a hand at that ear ≥ 3 s → WARNING, ALERT if a phone box / the ear-crop classifier says phone meanwhile |
-| `phone_left_ear` | same at landmark 454 (the far ear, zone reaching behind the head) |
-| `phone_in_hand` | phone below the face, next to a hand, not in a holder → WARNING; head/gaze down > 2 s → ALERT |
-| `drinking` | drink box over the mouth region; head tilted back raises confidence |
-| `eating` | food at the mouth in the last 5 s **and** chewing (jaw at 0.8–2.5 Hz, lips mostly closed) |
+| `phone` | a phone box in ≥ 60 % of the last second → **ALERT** |
+| `phone_in_hand` | head ≥ 15° down from the driver's own baseline + a wrist low and central (pose model) → **WARNING** after 2 s, **ALERT** after 3 s (texting with the phone out of view) |
+| `drinking` | a drink box over the lower face for 0.5 s → **ALERT** |
+| `eating` | a food box over the lower face → ALERT (**not reliable**: food is rarely visible) |
 
-`left`/`right` are the **driver's** ears. Which ear is the "far", partly hidden one follows
-`driver_side` (right = left-hand-drive car). Design, contracts and failure policy:
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). What has actually been measured:
-[docs/EVIDENCE.md](docs/EVIDENCE.md).
+One small detector (**YOLO26n**, trained on gray / IR images) finds phone, drink and food boxes; the
+face mesh (shared with `models/face`) gives the lower-face zone and head pose; YOLO26n-pose gives the
+wrists. **The trained models are in git** ([models/README.md](models/README.md): which file to use,
+results, checksums), so a fresh clone runs straight away.
+
+**Where things stand (2026-10-19):** on 10 unseen SynDD drivers, 80–100 % of phone calls and 90 % of
+drinks raise an alert, with 0 phone false alarms per hour. On cameras it never saw, phones are still
+found, but false alarms depend on where the camera sits (up to 69 per hour on a close-up camera that
+sees the steering wheel large). Eating is not supported. Full story:
+[docs/OVERNIGHT_REPORT.md](docs/OVERNIGHT_REPORT.md).
 
 ```
-frame 1296x972 gray → rectify driver ROI (fisheye → virtual pinhole) → YOLO26n (NCNN, 416)
-                                                                    → face mesh on a face crop
-                                                                    → MediaPipe hands (baseline)
-                    → rules (face-size units, per-drive baseline) → sliding window + hysteresis
-                    → per-frame states + JSONL event log (+ debug overlay)
+camera frame (gray) → driver area (fisheye rectified, or a crop) → YOLO26n 512 px (NCNN)
+                    → face mesh (MediaPipe)  → YOLO26n-pose 320 px (every 3rd frame)
+                    → rules (seconds, face-width units, per-drive baseline) → ALERT / WARNING
+                    → overlay + JSONL event log
 ```
+
+## Quick start on a PC (Windows, Linux or macOS, Python 3.11+)
+
+```bash
+git clone https://github.com/ziadteama/RTDMS.git
+cd RTDMS
+git checkout phone/distraction-baseline        # until this branch is merged into main
+cd models/distraction
+python -m venv .venv
+# Windows: .venv\Scripts\activate     Linux / macOS: source .venv/bin/activate
+pip install -e ".[mediapipe,ncnn,dev]"
+python -m pytest                               # ~120 tests, no camera or network needed
+```
+
+Run it:
+
+```bash
+# a recorded video (IR or colour); a source without a fisheye lens needs --no-rectify
+python scripts/run.py --video my_clip.mp4 --no-rectify --roi full
+# headless, events only (what the Pi does)
+python scripts/run.py --video my_clip.mp4 --no-rectify --roi full --no-display --log-dir logs
+# the laptop webcam
+python scripts/live.py
+```
+
+`live.py` keys: `q` quit, `r` redo the head-pose baseline, `g` gray on / off (the model is trained on
+gray images: keep it on for a colour webcam), `m` next model, `[` / `]` lower / raise the threshold,
+`d` debug overlay.
+
+Events go to `logs/drive_*.jsonl` (one line per start, level change and end). The first ~10 s with a
+face are the per-drive head-pose baseline: sit normally, eyes on the road.
+
+`ncnn` pulls `opencv-python` and `mediapipe` pulls `opencv-contrib-python`; they share the `cv2`
+folder. If `import cv2` breaks after an upgrade, reinstall both at the same version.
+
+## Raspberry Pi 5 (Raspberry Pi OS, aarch64)
+
+```bash
+git clone https://github.com/ziadteama/RTDMS.git && cd RTDMS && git checkout phone/distraction-baseline
+cd models/distraction && bash scripts/install_pi.sh   # venv (picamera2 from apt) + MediaPipe + ncnn
+```
+
+Bring-up on the car, once per camera mount:
+
+```bash
+# 1. fisheye intrinsics: print a 9x6 checkerboard, measure the square size
+python scripts/calibrate_fisheye.py --headless --views 25 --pattern 9x6 --square 0.025 --save-views data/calib
+# 2. driver area: grab a frame, then draw a box around head, both ears, hands, lap and wheel rim
+python scripts/select_roi.py --grab data/cabin.png
+python scripts/select_roi.py --image data/cabin.png
+# 3. run (events -> logs/drive_*.jsonl) and measure the speed with everything on
+python scripts/run.py --no-display
+python scripts/bench.py --duration 60 --json bench_pi.json
+```
+
+Faster detector on the Pi: set `detector.weights: models/det_v2d_ir_512_det_aciq_mixed_ncnn_model`
+in `configs/pipeline.yaml` (INT8, same accuracy within noise). Alternative worth trying on the real
+fisheye camera: `models/det_v2h_fish_512_ncnn_model` with thresholds phone 0.35 / drink 0.55.
+
+## Configuration
+
+| File | What it holds |
+|---|---|
+| `configs/pipeline.yaml` | camera, driver side, ROI, rectification, **detector weights + thresholds**, face mesh, pose, logging |
+| `configs/rules.yaml` | `mode: simple` (default) or `full` (older engine: hands, ear zones, crop classifiers); every timing and distance |
+| `configs/profiles/laptop_webcam.yaml` | overrides for `live.py` on a laptop (the model list for the `m` key) |
+| `configs/data.yaml` | where training data lives (`root`, default `D:/rtdms-data`) |
+| `configs/syndd_split.json` | the fixed SynDD driver split (49 train / 10 validation / 10 test) |
+
+`left` / `right` always mean the **driver's** ears; `driver_side: right` = left-hand-drive car. Never
+mirror the input (selfie view): it swaps the ears.
 
 ## Layout
 
 ```
-configs/pipeline.yaml   capture, driver_side, ROI, rectification, detector, face mesh, hands, log
-configs/rules.yaml      every behaviour threshold, smoothing, levels
-src/rtdms_distraction/  capture  calibration  roi  detector  hands  facemesh  rules  smoothing
-                        pipeline  viz  eventlog  config  types
-scripts/                run, bench, calibrate_fisheye, select_roi, export_ncnn,
-                        check_detector_parity, fetch_models, install_pi.sh
-tests/                  rules / smoothing / ROI / decode / config / pose / pipeline (no camera, no NN)
-models/                 weights (gitignored; regenerate with the scripts)
-data/  logs/            recordings and event logs (gitignored)
+configs/      settings (table above)
+src/rtdms_distraction/   capture, calibration, roi, detector, facemesh, pose, hands, simple_rules,
+                         rules, smoothing, pipeline, viz, eventlog, datasets, training, config
+scripts/      run.py (Pi / video), live.py (webcam), bench.py, calibrate_fisheye.py, select_roi.py
+              data:   fetch_syndd.py, build_openimages.py, label_video_boxes.py, build_det_v2.py
+              train:  train.py   export: export_ncnn.py, quantize_int8.py
+              eval:   eval_simple.py, eval_events.py, hand_check_sheets.py
+experiments/  every experiment behind the report (unseen-data tests, cross-validation, rule
+              tuning, SAM 2, fisheye, ...): see experiments/README.md
+models/       shipped models (in git) + regenerated ones (git-ignored): see models/README.md
+docs/         see below
+tests/        unit tests (rules, smoothing, ROI, decoding, config, datasets, live tools)
 ```
 
-The face landmarker bundle is shared with `models/face/models/face_landmarker.task`.
+## Documentation
 
-## Environments
+| Document | Read it for |
+|---|---|
+| [models/README.md](models/README.md) | the shipped models: which to use, results, speed, checksums, licences |
+| [docs/REPRODUCE.md](docs/REPRODUCE.md) | **rebuilding everything**: datasets → labels → training → export → INT8 → evaluation |
+| [docs/OVERNIGHT_REPORT.md](docs/OVERNIGHT_REPORT.md) | every experiment and its numbers in plain English: what helped, what did not |
+| [experiments/README.md](experiments/README.md) | the scripts behind each experiment and how to run them |
+| [docs/DETECTOR_V2.md](docs/DETECTOR_V2.md) | how the detector's training set was built |
+| [docs/DATA.md](docs/DATA.md) | datasets, licences, class mapping |
+| [docs/IN_CAR_TEST_PROTOCOL.md](docs/IN_CAR_TEST_PROTOCOL.md) | recording volunteers in the car (the deciding test) |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | design, contracts, failure policy |
+| [docs/EVIDENCE.md](docs/EVIDENCE.md), [docs/LAPTOP_TESTING.md](docs/LAPTOP_TESTING.md) | earlier measurements and the webcam test |
 
-### PC: development + training (x86-64, NVIDIA GPU)
-
-```bash
-py -3.14 -m venv ../../../venvs/rtdms-train          # any location; outside the repo
-../../../venvs/rtdms-train/Scripts/python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
-../../../venvs/rtdms-train/Scripts/python -m pip install -e ".[train,mediapipe,ncnn,onnx,bench,dev]"
-python scripts/fetch_models.py                        # hand_landmarker.task
-python scripts/export_ncnn.py --onnx                  # yolo26n.pt -> NCNN + ONNX at imgsz 416
-python scripts/check_detector_parity.py --images some.jpg --pt models/yolo26n_coco_416.onnx
-```
-
-`ncnn` pulls `opencv-python` and `mediapipe` pulls `opencv-contrib-python`; they share the `cv2`
-folder and work together only at the same version. If `import cv2` breaks after an upgrade,
-reinstall both at one version.
-
-### Raspberry Pi 5 (aarch64, Raspberry Pi OS)
+## Evaluate a model
 
 ```bash
-cd models/distraction && bash scripts/install_pi.sh
-```
-
-The venv is created with `--system-site-packages` (picamera2 comes from apt). Runtime only:
-MediaPipe + `ncnn` + OpenCV, no PyTorch. Copy `models/yolo26n_coco_416_ncnn_model/` from the PC.
-MediaPipe ships `py3-none-manylinux_2_28_aarch64` wheels from 1.0 on, so Bookworm (3.11) and Trixie
-(3.13) both work; the fallback if that ever changes is in the script header.
-
-## Bring-up on the car
-
-```bash
-# 1. Fisheye intrinsics (print a checkerboard; 9x6 inner corners, measure the square size)
-python scripts/calibrate_fisheye.py --headless --views 25 --pattern 9x6 --square 0.025 --save-views data/calib
-# 2. Driver ROI (grab a frame on the Pi, draw on a PC, or pass numbers)
-python scripts/select_roi.py --grab data/cabin.png
-python scripts/select_roi.py --image data/cabin.png                          # draw; saves roi.rect
-python scripts/select_roi.py --image data/cabin.png --rect 820,120,420,560 --preview roi.png
-# 3. Run
-python scripts/run.py --no-display                 # events -> logs/drive_*.jsonl
-python scripts/bench.py --duration 60 --json bench_pi.json
-```
-
-The first ~10 s with a face is the per-drive head-pose baseline: sit normally, eyes on the road.
-
-## Running on recordings and public datasets
-
-```bash
-python scripts/run.py --video clip.mp4 --save-video overlay.mp4 --no-display
-# Non-fisheye sources (laptop webcam, SynDD rear-view, YawDD mirror, DMD): no rectification
-python scripts/run.py --video syndd_rear.mp4 --no-rectify --roi full --driver-side right
-```
-
-Keys in the overlay window: `q`/`Esc` quit, `space` pause, `b` restart the baseline.
-Never mirror the input (webcam "selfie" views): mirroring swaps the driver's ears.
-
-## Live test on a laptop webcam
-
-```bash
-python scripts/live.py --profile laptop_webcam            # keys: q r g m [ ] d p c
-python scripts/live.py --profile laptop_webcam --guided   # scored prompt sequence -> reports/
-```
-
-Hand at ear = MediaPipe hand box in the ear zone or a YOLO26n-pose wrist at the ear; the guided
-report compares hands / hands+pose / hands+pose+classifier on the same frames. How to sit, the
-keys, the ear-crop classifier, and what webcam results can and cannot tell us:
-[docs/LAPTOP_TESTING.md](docs/LAPTOP_TESTING.md).
-
-## Training data and evaluation
-
-The detector is fine-tuned on **public data only** (Open Images now; SynDD, 100-Driver, DMD and
-YawDD as they arrive), converted to look like our camera. Our own clips are test data. Details,
-sources, licences, teacher labelling and caveats: [docs/DATA.md](docs/DATA.md). One-time in-car
-test session: [docs/IN_CAR_TEST_PROTOCOL.md](docs/IN_CAR_TEST_PROTOCOL.md).
-
-Datasets used so far:
-
-- **Open Images V7** (boxes): detector fine-tune, Open Images crops for the crop classifiers.
-- **3MDAD** (front view, day RGB): ear / mouth crop classifiers. I. Jegham, A. Ben Khalifa,
-  I. Alouani, M. A. Mahjoub, "A novel public dataset for multimodal multiview and multispectral
-  driver distraction analysis: 3MDAD", *Signal Processing: Image Communication*, vol. 88,
-  art. 115960, 2020. doi:10.1016/j.image.2020.115960
-
-```bash
-python scripts/build_openimages.py                     # download + balanced subset (D:/rtdms-data)
-PY=python bash scripts/run_oiv_pipeline.sh v1          # teacher -> convert -> train 416/512 -> eval
-python scripts/review_sample.py make --labels <root>/openimages/labels_meta/train \
-    --images <root>/openimages/images/train            # label-quality review page
-python scripts/eval_events.py s01 --src data/recordings/S01_guided_<utc>.mp4 --weights <ncnn dir>
+# alert-level test on the 10 held-out SynDD drivers (needs the SynDD videos: docs/REPRODUCE.md)
+pip install -e ".[train]"
+python scripts/eval_simple.py --split test --models det_v2d=models/det_v2d_ir_512.pt@512 \
+    --class-conf phone=0.40,drink=0.45,food=0.40 --out reports/eval_test
 ```
 
 ## Verify

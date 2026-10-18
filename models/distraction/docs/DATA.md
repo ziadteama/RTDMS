@@ -78,6 +78,10 @@ functions as `live.py`, split by driver within each dataset (70 / 15 / 15), then
 | 100-Driver | requested | same approach; camera to be confirmed | research licence |
 | DMD (IR streams) | requested | night / IR test (phone call, texting, drinking) | research licence |
 | State Farm, AUC | **not used** | passenger-side view | — |
+| Roboflow DMS_Project v2, ADMS_FINAL_3 v1 | **used** (2026-10-17, detector v2) | detector training (phone / drink / food boxes) | CC BY 4.0 |
+| EBDD (13 drivers) | **used** (2026-10-16) | detector training + test, split by driver | research use, password-protected download |
+| 3MDAD (front view, 50 drivers) | **test only** for the detector (2026-10-18) | unseen-data test (`experiments/mdad3_eval.py`) | CC BY-NC-ND 4.0 |
+| DAD (TU Munich, part 1 = 3 drivers, IR) | **test only** (2026-10-18) | unseen real-IR test (`experiments/dad_eval.py`) | academic licence |
 | S01 webcam clip (developer) | `data/recordings/` | **test only** | own, local |
 
 ### Open Images class mapping (`configs/data.yaml`)

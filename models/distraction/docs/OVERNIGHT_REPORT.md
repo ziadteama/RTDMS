@@ -10,6 +10,12 @@ This report is also copied there.
 > kept: a texting rule (head down + hand low) that raises texting alerts on the test drivers
 > from 37 % to 41.5 % (46 % with warnings) at 1.7 false warnings / h. The detector stays
 > det_v2d. The 5-fold cross-validation shows results swing 10-25 points between driver groups.
+>
+> **Update (18-19 Oct):** tested on two datasets never used in training (**section 9**): phones
+> are still found (80-96 % of calls on 50 new drivers), but false alarms depend on the camera
+> position (8 % of clips on 3MDAD, 69 per hour on DAD's close-up IR camera). Release models,
+> documentation and the experiment scripts are now in git (`models/README.md`,
+> `docs/REPRODUCE.md`, `experiments/README.md`).
 
 ## 1. Summary (5 lines)
 
@@ -410,7 +416,8 @@ tested on the **rear view only**:
 More texting is caught, but phone false alarms go up 5x at every threshold (a higher threshold
 breaks a long false alert into several short ones, so the count does not fall). Seeing phones
 on laps and near the door from other angles teaches the model to fire on similar shapes in
-the mirror view. Not kept. The dash / side videos stay in `D:tdms-data\public\syndd\A1`.
+the mirror view. Not kept. The dash / side videos stay in `D:
+tdms-data\public\syndd\A1`.
 
 ### Addition 4: "phone visible" column
 
@@ -487,3 +494,50 @@ account), which only you can set up. Ready for it: `models/det_v2d_ir_512.onnx` 
 512x512 input, raw head output 1x7x5376 = 4 box + 3 class scores per anchor; decode on the
 host, no NMS needed), and the same 1,000 IR calibration frames
 (`C:\Users\youss\rtdms-tools\int8\calib.txt`).
+
+## 9. Test on data never used in training (18 Oct)
+
+Two public datasets the detector never saw, run through the same live simple-mode pipeline
+(deployed NCNN model, phone 0.40 / drink 0.45). Scripts: `experiments/mdad3_eval.py`,
+`experiments/dad_eval.py`; results in `<data root>/runs/unseen_3mdad/` and `unseen_dad/`.
+
+**3MDAD**: 50 drivers, a camera near the A-pillar / dashboard, daytime **colour converted to
+gray** (not real IR). 13 actions × 50 drivers = 650 short clips. "Caught" = share of clips with the
+right alert; for no-phone actions it is the share with a false alert.
+
+| action | det_v2d (default) | det_v2h (fisheye) |
+|---|---|---|
+| phone at right ear | 80 % [70–88] | 90 % |
+| phone at left ear | 92 % [86–98] | 90 % |
+| texting, right hand | 96 % [92–100] | 96 % |
+| texting, left hand | 16 % (phone hidden behind the wheel) | 42 % |
+| drinking, right / left hand | 80 % / 68 % | 72 % / 64 % |
+| **false phone alert, normal driving** | **8 %** | 18 % |
+| false phone alert, radio / GPS / talking / singing / make-up | 4–6 % | 4–18 % |
+| false phone alert, smoking | 16 % | 28 % |
+
+**DAD** (TU Munich): **real infrared**, 3 drivers (the first of 10 archive parts), front camera
+(face and upper body, close up) and top camera (hands, from above), 224 × 171 px, 66 min of normal
+driving per camera.
+
+| | det_v2d front | det_v2h front | det_v2d top | det_v2h top |
+|---|---|---|---|---|
+| phone calls caught | 4 / 5 | 3 / 5 | 4 / 5 | 0 / 5 |
+| texting caught | 5 / 6 | 5 / 6 | 5 / 6 | 5 / 6 |
+| drinking caught | 2 / 2 | 2 / 2 | 0 / 2 (no face in view) | 0 / 2 |
+| **false phone alarms per hour, normal driving** | **69** | **53** | **258** | **27** |
+
+On DAD's close-up cameras the main false alarm is the **steering wheel rim** (dark, in the hand)
+read as a phone; per frame, det_v2d puts a phone box on 9 % (front) and 19 % (top) of normal
+frames, det_v2h on 2 % and 1 %, the stock COCO model on 0–3 %.
+
+**What this means**
+
+1. **Finding phones carries over** to new drivers and cameras: 80–96 % of calls and right-hand
+   texting on 50 unseen drivers, and phones are found on real IR.
+2. **False alarms depend on the camera position.** Low on the mirror view (0–9 per hour) and on
+   3MDAD (8 % of clips), very high on DAD's close-up views. No model wins everywhere: det_v2h has far
+   fewer wheel false alarms on DAD but more on 3MDAD, so the default stays det_v2d.
+3. **The deciding test is the project's own camera in the car.** Recording 20–30 min of normal
+   driving there and adding it to training as "no phone" is the most effective next step; a
+   steering-wheel ignore zone is a cheap extra.
