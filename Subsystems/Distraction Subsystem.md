@@ -10,7 +10,7 @@ aliases:
   - rtdms-distraction
   - distraction detection
   - IR distraction
-status: release-models-shipped
+status: v2-live-on-pi
 code_path: models/distraction
 language: Python 3.11+
 owner: TBD
@@ -26,8 +26,8 @@ on gray / IR images) finds phone, drink and food boxes; the face mesh (shared wi
 [[Face Subsystem]]) gives the lower-face zone and head pose; YOLO26n-pose gives the wrists. Rules
 in seconds and face-width units turn these into ALERT / WARNING events (JSONL log).
 
-**Code:** `models/distraction/` — on branch `phone/distraction-baseline` until merged; release
-models shipped 2026-10-19.
+**Code:** `models/distraction/` (in main). Release detector shipped 2026-10-19; **v2 (action
+classifier + phone checks) is what the Pi stream runs** — see [v2](#v2-what-the-pi-runs) below.
 
 **Supersedes [[Phone Subsystem]] for the IR camera.** `models/phone/` (State Farm classifier) is
 kept, not deleted.
@@ -37,7 +37,33 @@ Model card: [`models/README.md`](../models/distraction/models/README.md) ·
 Rebuild: [`docs/REPRODUCE.md`](../models/distraction/docs/REPRODUCE.md) ·
 Experiments: [`docs/OVERNIGHT_REPORT.md`](../models/distraction/docs/OVERNIGHT_REPORT.md)
 
-## What it detects (default `simple` mode)
+## v2: what the Pi runs
+
+Instead of finding the phone as a box, v2 classifies what the driver is doing from a crop around
+the face (face mesh), then confirms a phone where it should be. Run with
+`scripts/stream.py --hybrid --no-detect` (MJPEG stream with face mesh overlay and drowsiness /
+PERCLOS on the same page). Code: `scripts/hybrid.py`, `scripts/hybrid_alerts.py`; research and
+reports: `models/distraction/action_v1/` (`REPORT_v2.md`, `DECISIONS.md`).
+
+| Model (`models/action_v2/`, INT8 NCNN, 1.6 MB each) | Input | Output |
+|---|---|---|
+| `action_n224` (YOLO26n-cls) | upper-body crop, 2.5 × face size, 224 px | normal, call, texting, drinking, eating, hand_on_face, other |
+| `phone_ear_n128` | crop just outside each ear, 128 px | phone_in_hand / empty_hand |
+| `phone_lap_n128` | square under the chin, 2.5 × face size, 128 px | phone_in_hand / empty_hand |
+
+| Alert | Rule |
+|---|---|
+| Call | action = call in ≥ 70 % of the last 2 s **and** mean ear phone probability > 0.5 |
+| Texting | action = texting in ≥ 70 % of 1.5 s **and** mean lap phone probability > 0.4 |
+| Hand on face, other | never alert |
+
+Results against the release detector (same clips): SynDD test calls 37/39 vs 34/39, texting
+18/41 vs 14/41, 0 false alarms per hour for both; 3MDAD calls 30/30 vs 24/30, texting 24/30 vs
+17/30, false alarms 19.6 vs 14.2 per hour; DAD real IR calls 5/5 vs 4/5, false alarms **3.6 vs
+79.2 per hour**. The Pi stream runs without the box detector (`--no-detect`), so drinking and
+eating alerts are off there.
+
+## Release detector: what it detects (default `simple` mode)
 
 | Behaviour | Rule |
 |---|---|
@@ -76,7 +102,8 @@ Speed (laptop CPU, NCNN, 4 threads): FP32 28.3 ms, INT8 22.6 ms per frame.
 |---|---|
 | Detector + rules + tests | **Done** |
 | Release models in git (FP32 / INT8 / ONNX / pose) | **Done** (2026-10-19) |
-| Pi 5 concurrent bench | Open |
+| v2 action classifier + phone checks, live on the Pi with face mesh | **Done** (2026-11) |
+| Pi 5 bench with every model running (incl. drinking detector) | Open |
 | In-car volunteer recording | Open (`docs/IN_CAR_TEST_PROTOCOL.md`) |
 | Eating | Unsupported |
 

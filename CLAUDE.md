@@ -174,8 +174,10 @@ new model must follow (including **ownership zones for parallel work**).
   `models/distraction/` (kept, not deleted).
 - `models/distraction/` — IR-camera distraction: YOLO26n phone / drink / food detector trained on
   gray (IR) images + face mesh + YOLO26n-pose rules → phone, texting, drinking alerts (eating
-  unsupported). **Release models shipped** in git (NCNN FP32 default, INT8, ONNX); Pi concurrent
-  bench pending. On branch `phone/distraction-baseline` until merged. Notes:
+  unsupported). **Release models shipped** in git (NCNN FP32 default, INT8, ONNX). **v2 runs on the
+  Pi**: an action classifier on a face-mesh crop + phone-at-ear / phone-in-lap checks (three INT8
+  NCNN models in `models/distraction/models/action_v2/`, `scripts/stream.py --hybrid`) for call and
+  texting alerts. Notes:
   [Subsystems/Distraction Subsystem.md](Subsystems/Distraction%20Subsystem.md).
 - `fusion/` — decision stub (`decide()` → alert patterns). GPIO wiring still pending.
 - Wearable firmware and the app: not yet created.
