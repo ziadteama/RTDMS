@@ -141,3 +141,24 @@
   boxes with mouth filter for drinking / eating, detector every 2nd frame on the Pi.
 - Raw datasets, det_v2\ and the release model were only read. Disk: see below.
 - action_v1 folder now 4.6 GB in total; 128 GB free on D:.
+
+## 2026-11-08: held object near face — Phase A partial, stopped before Phase B
+
+- Added `_held_data/` to the worktree-local ignore file before generating any data.
+- Read Agent Guide, REPORT_v2, D1-D22, Rule B / Addition 8, architecture/evidence/validation,
+  split/extraction/release code and cache provenance. Runtime call/texting/Pi scripts unchanged.
+- Required Python and pytest launchers cannot execute their base Python (direct call: Access
+  is denied). No new venv, training, or GPU inference. Standalone Ruff works: new Python files
+  pass; broad repo lint has five pre-existing hybrid/stream issues (not changed).
+- Ran the read-only .NET/PowerShell SynDD cache audit. Actual counts are in ignored
+  `_held_data/syndd_cache_{segments,summary}.csv`; 40 cached videos, 320 selected annotated
+  segments, 98 training video blocks missing rich pose caches. No crop/image outputs exist.
+- SynDD-val at K=1: drinking 311/680, eating 284/2360, normal 134/3790; weak negative candidates
+  2,082 (normal/talk/yawn/hand-on-head/singing). These are candidate frames, not saved crops.
+- Added unexecuted preparation scripts `src/held_wrist.py` and `src/build_held.py`, plus the
+  actually executed fallback `src/held_cache_audit.ps1`. Full methodology, tables, partial
+  ledger evidence, provisional geometry, source parity caveat and resume steps: HELD_OBJECT.md.
+- 3MDAD/EBDD/DAD pose checks and all wrist/class contact sheets remain open due to Python
+  execution failure. Pi frames: open (to be done by orchestrator). Phase B not started.
+- Staging/commit attempts fail: parent checkout worktree index.lock permission denied. No
+  commit or push; the requested Co-Authored-By trailer was included in the failed commit command.

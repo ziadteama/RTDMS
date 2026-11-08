@@ -75,3 +75,22 @@ D22. **Detector on every 2nd frame for the Pi.** Full hybrid with det_v2d every 
     on 3MDAD whose stored frames are 1/3 s apart (re-used boxes stretch drink evidence a lot more
     than at a live ~20 FPS): 3MDAD FA/h 19.6 -> 28.5, DAD 3.6 -> 4.5, SynDD 0 -> 0; drinking recall
     goes up (SynDD 15 -> 16/18, 3MDAD 22 -> 25/30).
+
+D23. **Held-object Phase A remains partial (2026-11-08).** The existing Python launcher cannot
+    execute its base interpreter (Access is denied), so a read-only PowerShell/.NET audit of
+    the supplied SynDD rich cache was used. It covers 40 val/test videos; 98 training video
+    blocks lack rich pose caches. The cache generator used PyTorch pose, not the deployed NCNN
+    export; these numbers are geometry coverage, not localization accuracy or NCNN parity.
+    No crops/sheets/inference/training ran. See HELD_OBJECT.md for actual counts and blockers.
+D24. **Provisional held crop: K=1.0, side=2.0 face heights, midpoint of wrist and mouth.**
+    On SynDD-val, K=.75 / 1 / 1.5 admits 5.29 / 45.74 / 76.18% of drinking frames and
+    0 / 3.54 / 26.73% of normal frames. K=1 is the starting compromise, pending image review,
+    not a validated final threshold. Face height is Euclidean landmark 10-152; mouth is mean
+    13/14; confident wrist means >=0.3 as in release. Gray 128px crops use D9 normalization.
+D25. **Held-object weak labels retain original driver splits and explicit negative labels.**
+    New preparation scripts accept drinking/eating only with wrist geometry, and normal,
+    hand_on_face, talk/sing/yawn plus 3MDAD fatigue and smoking as negatives. They do not map
+    all of "other" to empty_hand. Test geometry may be audited, but the crop builder excludes
+    all test records; only SynDD-val tunes. Nothing was trained. These scripts are statically
+    checked only; the build and human contact-sheet check remain open. Git commits were also
+    blocked by the read-only parent worktree index, and no permission workaround was attempted.
