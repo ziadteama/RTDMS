@@ -29,6 +29,8 @@ from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any, TextIO
 
+from .garmin_hrv import UPDATE_S, RrHrv
+from .garmin_live import LiveState, serve
 from .garmin_rr import (
     CHARACTERISTIC_UUID,
     SERVICE_UUID,
@@ -238,14 +240,36 @@ async def _main(args: argparse.Namespace) -> None:
     path = Path(args.csv or f"logs/garmin_rr_{time.strftime('%Y%m%d_%H%M%S')}.csv")
     log = RrCsvLog(path)
     rx = GarminRrReceiver(log)
+    hrv = RrHrv()
+    live = LiveState(rx.tracker)
     print(f"[garmin] logging to {path}", flush=True)
+    if args.http:
+        serve(live, args.http)
+        print(f"[garmin] live page on http://<this machine>:{args.http}/", flush=True)
 
     async def show() -> None:
         async for f in rx.frames():
+            hrv.add(f)
+            live.on_frame(f)
+            live.decode_errors = rx.decode_errors
+            if args.quiet:
+                continue
             p = f.packet
             note = " NEW SESSION" if f.arrival == Arrival.NEW_SESSION else ""
             note += f" lost {f.lost_before}" if f.lost_before else ""
             print(f"[garmin] seq {p.seq:5d} hr {p.hr_bpm or '--':>3} rr {list(p.rr_ms)}{note}",
+                  flush=True)
+
+    async def hrv_timer() -> None:
+        # The HRV window is computed on the Pi clock every UPDATE_S, whether or not beats came.
+        while True:
+            await asyncio.sleep(UPDATE_S)
+            snap = hrv.compute(time.monotonic(), time.time())
+            live.on_hrv(snap)
+            d = snap.to_dict()
+            print(f"[hrv] {d['state']:8} HR {d['mean_hr_bpm']} RMSSD {d['rmssd_ms']} "
+                  f"SDNN {d['sdnn_ms']} pNN50 {d['pnn50']} | quality {d['quality']} "
+                  f"beats {d['valid_beats']} coverage {d['coverage']} loss {d['packet_loss']}",
                   flush=True)
 
     async def stale() -> None:
@@ -257,7 +281,8 @@ async def _main(args: argparse.Namespace) -> None:
                 print(f"[garmin] no data for {age:.0f} s (watch away / app closed)", flush=True)
             warned = age is not None and age > args.stale_s
 
-    tasks = [asyncio.create_task(show()), asyncio.create_task(stale())]
+    tasks = [asyncio.create_task(show()), asyncio.create_task(stale()),
+             asyncio.create_task(hrv_timer())]
     try:
         await rx.run(args.name)
     finally:
@@ -276,6 +301,9 @@ def main() -> None:
     p.add_argument("--csv", help="raw log file (default logs/garmin_rr_<time>.csv)")
     p.add_argument("--name", default="RTDMS", help="advertised Bluetooth name")
     p.add_argument("--stale-s", type=float, default=5.0, help="warn after this long without data")
+    p.add_argument("--http", type=int, default=8081,
+                   help="port of the live page + /status JSON (0 = off)")
+    p.add_argument("--quiet", action="store_true", help="no line per packet (HRV lines only)")
     logging.basicConfig(level=logging.INFO, format="[garmin] %(message)s")
     with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(_main(p.parse_args()))
