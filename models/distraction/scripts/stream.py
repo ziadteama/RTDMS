@@ -119,7 +119,7 @@ def draw_mesh(frame, lm) -> None:
 
 
 def pipeline_loop(args, shared: Shared) -> None:
-    pcfg = load_pipeline_config(args.config)
+    pcfg = load_pipeline_config(args.config, args.profile)
     rcfg = load_rules_config(args.rules)
     apply_overrides(pcfg, args)
     if args.no_texting:  # no head-down texting rule -> no pose model
@@ -313,6 +313,7 @@ def parse_args(argv=None):
     p.add_argument("--host", default="::", help="address to listen on (:: = every IPv4 + IPv6)")
     p.add_argument("--port", type=int, default=8080)
     p.add_argument("--config", help="pipeline.yaml (default configs/pipeline.yaml)")
+    p.add_argument("--profile", help="configs/profiles/<name>.yaml merged over the config (e.g. pi)")
     p.add_argument("--rules", help="rules.yaml (default configs/rules.yaml)")
     p.add_argument("--video", help="video file instead of the camera (testing)")
     p.add_argument("--loop", action="store_true", help="restart the video at its end")

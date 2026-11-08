@@ -3,5 +3,5 @@
 # Extra arguments go to scripts/stream.py.
 cd "$(dirname "$0")/distraction"
 export PYTHONPATH="$PWD/src:$PWD/../face/src"
-exec ../.venv/bin/python scripts/stream.py --no-rectify --roi full --detect-every 2 \
+exec ../.venv/bin/python scripts/stream.py --profile pi --no-rectify --roi full --detect-every 2 \
     --drowsiness --no-texting "$@"

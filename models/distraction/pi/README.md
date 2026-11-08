@@ -30,7 +30,9 @@ The scripts expect this folder (`~/rtdms` on the Pi), not the repo layout:
   .venv/            <- made by install.sh
 ```
 
-`configs/pipeline.yaml` points at `../face/models/face_landmarker.task`, which resolves the same way
+Pi-only settings (LiteRT face mesh, INT8 detector, no fisheye correction, slower pose) live in
+`configs/profiles/pi.yaml`; both start scripts pass `--profile pi`, so the Pi runs the repo's
+`configs/pipeline.yaml` unchanged. `configs/pipeline.yaml` points at `../face/models/face_landmarker.task`, which resolves the same way
 in the repo (`models/face/models/`) and on the Pi (`~/rtdms/face/models/`).
 
 ## Run
