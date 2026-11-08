@@ -188,7 +188,7 @@ def load_cache(job):
             if p.exists():
                 with np.load(p) as z:
                     poses = z["kp"] if "kp" in z.files else None
-                    return kind, {round(float(t), 3): (bool(ok), lm.copy(),
+                    return kind, {round(float(t), 1): (bool(ok), lm.copy(),
                         poses[i].copy() if poses is not None else None)
                         for i, (t, ok, lm) in enumerate(zip(z["t"], z["ok"], z["lm"], strict=True))}
         return "missing", {}
@@ -241,7 +241,12 @@ def audit_job(job):
     dest = OUT / "geometry" / f"{ds}_{job['clip']}.json"
     if dest.exists():
         data = json.loads(dest.read_text(encoding="utf8"))
-        if data.get("version") == VERSION and data["job"] == job:
+        reuse = data.get("version") == VERSION and data["job"] == job
+        if ds == "syndd" and any(r["face_source"] == "new_mesh" for r in data["records"]):
+            reuse = False  # Reuse existing face cache after the timestamp-grid correction.
+        if ds == "syndd" and job["split"] == "val":
+            reuse = reuse and len({r["t"] for r in data["parity"]}) == 10
+        if reuse:
             log(f"Resume audit {ds} {job['clip']}: {len(data['records'])} cached frames")
             return str(dest)
     kind, cache = load_cache(job)
