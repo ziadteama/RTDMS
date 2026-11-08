@@ -72,7 +72,12 @@ python run.py --no-display --duration 60
 python run.py --ir
 python bench.py --source image --resolutions --json bench_pi5.json
 python calibrate_camera.py
+python stream.py --host <pi-ip>            # headless Pi: HUD + live metrics in a browser, port 8000
 ```
+
+`stream.py` defaults to the `litert` backend (no MediaPipe install on the Pi —
+needs `ai-edge-litert`, `opencv-python-headless`, system `python3-picamera2`).
+Calibrate from the page; profiles land in `profiles/` as with `run.py`.
 
 Keys while running: `q` quit · `c` recalibrate · `m` full mesh ·
 `i` show EAR landmark indices · `r` reset counters · `s` snapshot · `space` pause.
@@ -87,6 +92,7 @@ models/face/
 ├─ tests/            deterministic unit suite
 ├─ docs/             ARCHITECTURE / VALIDATION / EVIDENCE
 ├─ run.py            live / video entrypoint
+├─ stream.py         same pipeline served over HTTP (MJPEG + /stats JSON)
 ├─ bench.py          throughput measurement
 ├─ calibrate_camera.py
 └─ install_pi.sh

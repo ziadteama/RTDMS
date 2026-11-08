@@ -172,9 +172,16 @@ class OpenCVSource(ThreadedCapture):
 
 
 class PiCameraSource(ThreadedCapture):
-    """Raspberry Pi. Uses the `lores` stream so the ISP does the downscale in
-    hardware -- resizing a 1280x720 frame in OpenCV on the CPU is pure waste
-    when the models only consume 192x192 and 256x256 anyway."""
+    """Raspberry Pi. The ISP scales the sensor straight to the requested size
+    in hardware -- resizing a larger frame in OpenCV on the CPU is pure waste
+    when the models only consume 128x128 and 256x256 anyway.
+
+    Two traps this avoids:
+      - picamera2's "BGR888" is the one that yields R,G,B byte order (its
+        "RGB888" is B,G,R), and the whole pipeline assumes RGB.
+      - one stream at the target size, not a 16:9 main plus a 4:3 lores: the
+        ISP stretches lores to fit, which squashes the face horizontally and
+        biases EAR (a horizontal denominator) before any arithmetic runs."""
 
     def __init__(self, cfg):
         super().__init__(cfg)
@@ -182,16 +189,16 @@ class PiCameraSource(ThreadedCapture):
 
         self._picam = Picamera2()
         config = self._picam.create_video_configuration(
-            main={"size": (1280, 720), "format": "RGB888"},
-            lores={"size": (cfg.width, cfg.height), "format": "RGB888"},
+            main={"size": (cfg.width, cfg.height), "format": "BGR888"},
             controls={"FrameRate": cfg.fps},
+            buffer_count=4,
         )
         self._picam.configure(config)
         self._picam.start()
         time.sleep(0.5)  # let AE/AWB settle
 
     def _grab(self):
-        return self._picam.capture_array("lores")
+        return self._picam.capture_array("main")
 
     def stop(self):
         super().stop()
@@ -199,7 +206,7 @@ class PiCameraSource(ThreadedCapture):
         self._picam.close()
 
     def describe(self):
-        return f"Picamera2 lores @ {self.cfg.width}x{self.cfg.height}"
+        return f"Picamera2 @ {self.cfg.width}x{self.cfg.height}"
 
 
 class VideoFileSource(FrameSource):
