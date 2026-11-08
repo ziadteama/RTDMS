@@ -20,6 +20,7 @@ models/*
 !models/det_v2h_fish_512_ncnn_model/
 !models/det_v2h_fish_512.pt
 !models/yolo26n_pose_320_ncnn_model/
+!models/action_v2/
 runs/
 
 # Recordings, datasets, event logs and calibration captures stay on the machine.
