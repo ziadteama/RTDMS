@@ -2,7 +2,7 @@
 
 No training. Test geometry is never included in the crop set. K is an explicit argument,
 to avoid silently treating the provisional K in HELD_OBJECT.md as visually validated.
-This script has NOT been executed in the restricted sandbox.
+Progress is appended to _held_data/LIVE.log; no classifier is trained here.
 """
 # ruff: noqa: E402
 import argparse
@@ -10,13 +10,14 @@ import csv
 import json
 import random
 import sys
+import time
 from collections import Counter, defaultdict
 
 sys.dont_write_bytecode = True
 
 import cv2
 import numpy as np
-from held_wrist import DATA, OUT, VERSION, extract, target
+from held_wrist import DATA, OUT, VERSION, extract, log, target
 
 
 def read_source(source, caps):
@@ -25,9 +26,16 @@ def read_source(source, caps):
     else:
         video = source["video"]
         if video not in caps:
-            caps[video] = cv2.VideoCapture(video)
+            caps[video] = cv2.VideoCapture(video, cv2.CAP_FFMPEG, [cv2.CAP_PROP_N_THREADS, 1])
         cap = caps[video]
-        cap.set(cv2.CAP_PROP_POS_FRAMES, source["frame"])
+        current = round(cap.get(cv2.CAP_PROP_POS_FRAMES))
+        delta = source["frame"] - current
+        if 0 <= delta <= 90:
+            for _ in range(delta):
+                if not cap.grab():
+                    raise OSError(f"Cannot advance to {source}")
+        else:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, source["frame"])
         ok, bgr = cap.read()
         gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if ok else None
     if gray is None:
@@ -40,6 +48,8 @@ def main():
     ap.add_argument("--k", type=float, choices=(.75, 1.0, 1.5), required=True)
     ap.add_argument("--side", type=float, choices=(1.5, 1.75, 2.0), default=2.0)
     args = ap.parse_args()
+    log(f"Starting held-object crop build: K={args.k}, side={args.side} face heights, "
+        "train and SynDD-val only; expected roughly 10–20 minutes, no training")
     run = OUT / f"crops_k{args.k:g}_side{args.side:g}"
     # Refuse mixing stale crops into a future classifier directory.
     if run.exists():
@@ -59,7 +69,8 @@ def main():
     run.mkdir(parents=True)
     counts, negatives, samples, rows = Counter(), Counter(), defaultdict(list), []
     skipped_test = 0
-    for p in inputs:
+    last_log = time.monotonic()
+    for job_index, p in enumerate(inputs, 1):
         data = json.loads(p.read_text(encoding="utf8"))
         if data["version"] != VERSION:
             raise ValueError(f"Unsupported geometry version: {p}")
@@ -98,9 +109,14 @@ def main():
                 if label == "empty_hand":
                     negatives[(ds, split, r["label"])] += 1
                 samples[(split, label)].append(dest)
+                if time.monotonic() - last_log >= 60:
+                    log(f"Crop build: {job_index}/{len(inputs)} inputs, {len(rows)} crops; "
+                        f"currently {ds} {job['clip']}")
+                    last_log = time.monotonic()
         finally:
             for cap in caps.values():
                 cap.release()
+        log(f"Finished crops {ds} {job['clip']}: {len(rows)} total crops so far")
     if rows:
         with open(run / "manifest.csv", "w", newline="", encoding="utf8") as f:
             writer = csv.DictWriter(f, fieldnames=list(rows[0]))
@@ -135,6 +151,15 @@ def main():
                   negatives=[dict(dataset=d, split=s, label=lab, count=n)
                              for (d, s, lab), n in sorted(negatives.items())])
     (run / "build.json").write_text(json.dumps(result, indent=2), encoding="utf8")
+    saved = json.loads((run / "build.json").read_text(encoding="utf8"))
+    log(f"Read build.json: {saved['count']} crops; "
+        f"{saved['skipped_test_geometry_records']} test geometry records excluded")
+    with open(run / "balance.csv", encoding="utf8") as f:
+        for r in csv.DictReader(f):
+            log(f"Read balance.csv: {r['dataset']} {r['split']} {r['target']}={r['count']}")
+    for key, status in saved["sheets"].items():
+        log(f"Read sheet coverage {key}: shown={status['shown']}, "
+            f"available={status['available']}, >=48 satisfied={status['requirement_met']}")
     print(json.dumps(result, indent=2), flush=True)
 
 
