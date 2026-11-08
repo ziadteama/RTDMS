@@ -1,0 +1,6 @@
+# Connect IQ build output and signing keys never go into git.
+bin/
+*.prg
+*.iq
+*.der
+*.pem
