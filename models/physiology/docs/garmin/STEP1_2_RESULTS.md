@@ -61,3 +61,18 @@ What it took (each one blocked the link on its own):
 5. Profile registration in the watch app copies Garmin's sample (no `:descriptors` entry for a
    write-only characteristic), and the app keeps looking for the characteristic for 8 s after
    connecting before giving up.
+
+## First HRV numbers from the watch (src/dms_physiology/garmin_hrv.py, tools/replay_rr.py)
+
+5-minute session, resting, watch on the wrist part of the time (receiver log
+garmin_rr_20261011_221839.csv, replayed with `python tools/replay_rr.py <log>`):
+
+- 321 packets, 0 lost, 0 artifacts rejected after the watch was put on.
+- **156 of 321 packets carried no RR at all**: the wrist sensor reports beats in bursts with
+  silences of several seconds. Coverage (accepted beat time / 60 s window) was 0.3-0.9, so many
+  windows are DEGRADED or BAD by design.
+- Beats on either side of a silence are not neighbours, so successive differences are only
+  taken when `elapsed between packets <= RR + 1 s batch + 0.15 s`; RMSSD / pNN50 need >= 10
+  true pairs.
+- Last window (VALID, coverage 0.88, 60 beats): HR 68.4 bpm, RMSSD 43.4 ms, SDNN 36.9 ms,
+  pNN50 0.21 - normal resting values. No reference recording yet (chest strap) to check them.
