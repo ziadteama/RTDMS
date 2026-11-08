@@ -42,3 +42,5 @@ configs/camera_fisheye.yaml
 
 # Live-test summaries (scripts/live.py --guided): local results, not shared by default.
 reports/
+# Per-driver drowsiness calibration (stream.py --drowsiness): personal, stays on the machine.
+profiles/
