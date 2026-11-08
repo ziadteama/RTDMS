@@ -27,6 +27,16 @@ On the Raspberry Pi (from this directory):
 ./install_pi.sh
 ```
 
+### What the Pi runs today
+
+On the RTDMS Pi the face subsystem runs **inside the camera stream of `models/distraction/`**, so
+one process owns the camera: `models/distraction/scripts/stream.py --drowsiness --mesh` draws the
+face mesh and feeds this package's EAR, blink state machine, PERCLOS and calibration
+(`models/distraction/scripts/drowsiness.py`), next to the phone alerts. The face model is
+`models/face/models/face_landmarker.task` (LiteRT backend, `dms_face/landmarker_litert.py`). Start
+scripts and the Pi folder layout: [`../distraction/pi/README.md`](../distraction/pi/README.md).
+`stream.py` in this folder is the face-only stream.
+
 Docker (canonical verify gate, mirrors physiology):
 
 ```bash
@@ -37,7 +47,7 @@ docker compose run --rm verify
 
 | This package covers | Still separate |
 |---|---|
-| EAR / openness / blink FSM | Phone-usage detection (`models/phone/` — not yet created) |
+| EAR / openness / blink FSM | Phone-usage detection (`models/distraction/` for the IR camera) |
 | PERCLOS (P80) | Physiology (`models/physiology/`) |
 | Gaze deviation + head pose | DMS decision fusion + production alerts (Phase 4) |
 
