@@ -1,0 +1,81 @@
+# Live testing on a Windows laptop webcam until the Pi camera arrives.
+#   python scripts/live.py --profile laptop_webcam [--guided] [--fps-cap 10]
+# Deep-merged over configs/pipeline.yaml: only the keys below change.
+
+capture:
+  width: 1280
+  height: 720
+  fps: 30
+  backend: auto          # MSMF first, then DSHOW
+  grayscale: false       # colour: the current target. true = IR-camera-like; 'g' toggles
+  flip_horizontal: false # the startup side check corrects this if the webcam is mirrored
+
+rectify:
+  enabled: false         # not a fisheye lens
+
+roi:
+  rect: null             # whole frame; narrow it with scripts/select_roi.py --profile laptop_webcam
+
+detector:
+  # det_v2d (2026-10-17 overnight): det_v2b fine-tuned IR-only (every image gray) at 512 px.
+  # Thresholds chosen on the 10 validation drivers (phone 0.40, drink 0.45), applied once to
+  # the 10 test drivers: phone calls caught 80 % right ear / 100 % left ear, 0 phone false
+  # alarms in 0.58 h (validation: 100 % / 100 %, 5.2 / h instead of 36 / h at 0.25).
+  # 25.6 FPS on the laptop (det_v2b @416: 34.5). See docs/OVERNIGHT_REPORT.md.
+  # det_v2b (second in the 'm' list) is the 416 px model it started from.
+  backend: ncnn
+  weights: models/det_v2d_ir_512_ncnn_model
+  imgsz: 512
+  conf:
+    phone: 0.40
+    drink: 0.45
+    food: 0.40
+    hand: 0.30
+
+hands:
+  source: mediapipe
+
+live:
+  fps_cap: null          # e.g. 10 to mimic the Pi (smoothing windows are in seconds, so the
+                         # number of frames per decision drops the way it will on the Pi)
+  side_check: true
+  side_check_s: 5.0
+  conf_step: 0.05
+  # 'm' cycles through these, then any other models/*_ncnn_model folder found.
+  models:
+    - {name: det_v2d, weights: models/det_v2d_ir_512_ncnn_model, imgsz: 512, hands: mediapipe}
+    - {name: det_v2b, weights: models/det_v2b_416_ncnn_model, imgsz: 416, hands: mediapipe}
+    - {name: stock yolo26n, weights: models/yolo26n_coco_416_ncnn_model, imgsz: 416,
+       hands: mediapipe}
+    - {name: v1_416, weights: models/v1_416_ncnn_model, imgsz: 416, hands: detector}
+    - {name: v1_512, weights: models/v1_512_ncnn_model, imgsz: 512, hands: detector}
+
+pose:
+  enabled: true          # wrist-at-ear evidence (yolo26n-pose @320, every 3rd frame); 'p' toggles
+
+ear_classifier:
+  # OFF by default (2026-10-17): the default is now simple mode (one phone / drink / food
+  # detector, live.py --mode simple). Kept for --mode full; set enabled: true to load it.
+  # Trained 2026-10-16 with SynDD rear-view (mirror camera, front-right of the driver,
+  # 69 drivers) as the main source + EBDD + Open Images hand-at-face; 3MDAD is not used for the
+  # ear. Held-out SynDD drivers (10): phone P 0.983 / R 0.867, hand_no_phone 0.978 / 0.827,
+  # none 0.904 / 0.991. SynDD is IR, so every crop is gray (live crops are converted too).
+  # The 3MDAD-only colour model (off since the 2026-10-11 live test) is
+  # models/ear_cls_160_ncnn_model.
+  enabled: false
+  weights: models/ear_cls_160_syndd_ncnn_model
+  imgsz: 160
+  grayscale: true        # must match training (SynDD rear view is infrared)
+
+mouth_classifier:
+  # OFF by default (2026-10-17, simple mode is the default; see ear_classifier).
+  # Trained 2026-10-16: SynDD rear-view drinking / eating + 3MDAD drink + EBDD and
+  # Open Images food, all gray. Held-out SynDD drivers: drink P 1.00 / R 0.771, food
+  # 0.683 / 0.573 (75 crops, mostly one driver), none 0.815 / 0.974. Food is the weakest
+  # class; 'c' turns both classifiers off. The colour v1 / v2 models failed on the frontal
+  # webcam (2026-10-11: cup -> food, bare turned face -> food); this is the first one trained
+  # on a camera in front of the driver.
+  enabled: false
+  weights: models/mouth_cls_96_syndd_ncnn_model
+  imgsz: 96
+  grayscale: true

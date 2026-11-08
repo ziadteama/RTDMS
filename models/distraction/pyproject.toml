@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rtdms-distraction"
+version = "0.1.0"
+description = "Driver distraction (phone at ear / in hand, drinking, eating) from a fisheye cabin camera: object detector + face mesh + rules."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "DMS Graduation Project" }]
+# Core = what the unit tests and the rule engine need. Each neural backend is an
+# extra, so the Pi installs only the runtime it actually uses.
+dependencies = [
+  "numpy>=1.24,<3",
+  "opencv-python>=4.8",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Face mesh + hands (MediaPipe Tasks). Has ARM64 wheels from 1.0 on.
+mediapipe = ["mediapipe>=1.0.0"]
+# Pi detector runtime.
+ncnn = ["ncnn>=1.0.20240410"]
+# Alternative detector runtime (repo convention elsewhere).
+onnx = ["onnxruntime>=1.18"]
+bench = ["psutil>=5.9"]
+# Training / export only. Never installed on the Pi.
+train = ["ultralytics>=8.4"]
+dev = [
+  "pytest>=8.3",
+  "ruff>=0.8,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rtdms_distraction"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Verbatim dataset annotation rows used as fixtures.
+"tests/test_datasets.py" = ["E501"]

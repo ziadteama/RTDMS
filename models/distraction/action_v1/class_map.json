@@ -1,0 +1,65 @@
+{
+ "classes": [
+  "normal",
+  "call",
+  "texting",
+  "drinking",
+  "eating",
+  "hand_on_face",
+  "other"
+ ],
+ "note": "call_L / call_R are trained as one class 'call' (EBDD has no side; output merges them anyway). Side is kept in the CSV.",
+ "SynDD (CSV 'Class N' -> our label name in datasets.py)": {
+  "0 normal forward driving": "normal",
+  "1 drinking": "drinking",
+  "2 phone call right": "call (R)",
+  "3 phone call left": "call (L)",
+  "4 eating": "eating",
+  "5 text right": "texting",
+  "6 text left": "texting",
+  "13 yawning": "hand_on_face",
+  "14 hand on head": "hand_on_face",
+  "7 reaching behind": "other",
+  "8 adjust control panel": "other",
+  "11 talk to passenger right": "other",
+  "12 talk to passenger backseat": "other",
+  "15 singing / dancing": "other",
+  "9 / 10 pick up from floor": "SKIPPED (often shows a real phone)"
+ },
+ "3MDAD (AC1-AC16)": {
+  "AC1 safe driving": "normal",
+  "AC2 hair and makeup": "hand_on_face",
+  "AC3 adjusting radio": "other",
+  "AC4 GPS operating": "other",
+  "AC5 writing message right hand": "texting",
+  "AC6 writing message left hand": "texting",
+  "AC7 talking phone right hand": "call (R)",
+  "AC8 talking phone left hand": "call (L)",
+  "AC9 having picture": "SKIPPED (phone use but not a call/text)",
+  "AC10 talking to passenger": "other",
+  "AC11 singing or dancing": "other",
+  "AC12 fatigue and somnolence": "hand_on_face",
+  "AC13 drinking right hand": "drinking",
+  "AC14 drinking left hand": "drinking",
+  "AC15 reaching behind": "other",
+  "AC16 smoking": "other"
+ },
+ "EBDD (file name suffix)": {
+  "ATTENTIVE": "normal",
+  "CELL_PHONE": "call (side unknown)",
+  "TEXT": "texting",
+  "EATING": "eating",
+  "UNATTENTIVE": "other"
+ },
+ "DAD front_IR (folder, TEST ONLY)": {
+  "normal_driving_1..6": "normal",
+  "talking_with_phone_left": "call (L)",
+  "talking_with_phone_right": "call (R)",
+  "messaging_left": "texting",
+  "messaging_right": "texting",
+  "drinking": "drinking",
+  "adjusting_radio": "other",
+  "reaching_behind": "other",
+  "talking_with_passenger": "other"
+ }
+}

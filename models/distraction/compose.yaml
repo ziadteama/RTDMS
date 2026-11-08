@@ -1,0 +1,19 @@
+services:
+  verify:
+    build:
+      context: .
+      target: development
+    command: sh -c "pytest && ruff check src tests scripts"
+    volumes:
+      - .:/app
+    environment:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+
+  verify-py313:  # the Pi's Python
+    build:
+      context: .
+      target: development
+      args:
+        PYTHON_VERSION: "3.13"
+    command: sh -c "pytest && ruff check src tests scripts"

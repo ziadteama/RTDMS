@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label review</title>
+<style>
+  :root { --bg: #f6f6f4; --fg: #1d1d1b; --muted: #6b6b66; --card: #fff; --line: #ddd;
+          --ok: #1f8a3b; --bad: #c0392b; --warn: #b9770e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --fg: #ececea; --muted: #9b9b95; --card: #212120; --line: #3a3a38; }
+  }
+  body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  header { position: sticky; top: 0; background: var(--bg); padding: 12px 16px;
+           border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center;
+           flex-wrap: wrap; z-index: 2; }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+          padding: 12px; display: grid; grid-template-columns: minmax(0, 560px) 1fr; gap: 16px; }
+  @media (max-width: 760px) { .card { grid-template-columns: 1fr; } }
+  img { max-width: 100%; border-radius: 4px; }
+  .legend span { margin-right: 10px; font-size: 13px; }
+  .box { display: flex; align-items: center; gap: 6px; padding: 4px 0;
+         border-bottom: 1px dashed var(--line); flex-wrap: wrap; }
+  .tag { font-size: 12px; color: var(--muted); }
+  button { font: inherit; padding: 4px 9px; border-radius: 5px; border: 1px solid var(--line);
+           background: transparent; color: var(--fg); cursor: pointer; }
+  button.on.correct { background: var(--ok); color: #fff; border-color: var(--ok); }
+  button.on.wrong_class { background: var(--warn); color: #fff; border-color: var(--warn); }
+  button.on.not_object { background: var(--bad); color: #fff; border-color: var(--bad); }
+  .missed { display: grid; grid-template-columns: repeat(4, auto); gap: 6px; margin-top: 10px; }
+  .missed input { width: 52px; font: inherit; }
+  .nav { display: flex; gap: 8px; margin-top: 12px; }
+  .primary { background: var(--fg); color: var(--bg); }
+  .k { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <strong>Label review</strong>
+  <span id="progress"></span>
+  <span class="legend"><span style="color:#3cc83c">■ ground truth</span>
+    <span style="color:#ff9600">■ COCO teacher</span>
+    <span style="color:#dc3cdc">■ open-vocab teacher</span></span>
+  <button class="primary" id="save">Save results</button>
+</header>
+<main id="main"></main>
+<script>
+const DATA = /*DATA*/[];
+const KEY = "label-review-" + (DATA.length ? DATA[0].id : "x");
+const VERDICTS = [["correct", "correct"], ["wrong_class", "wrong class"], ["not_object", "not an object"]];
+let state = { i: 0, cards: DATA.map(c => ({ id: c.id, reviewed: false, missed: {},
+  boxes: c.boxes.map(b => ({ i: b.i, cls: b.cls, src: b.src, verdict: null })) })) };
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.cards.length === DATA.length) state = s; } catch (e) {}
+function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+function render() {
+  const c = DATA[state.i], s = state.cards[state.i];
+  const done = state.cards.filter(x => x.reviewed).length;
+  document.getElementById("progress").textContent = `image ${state.i + 1} / ${DATA.length} · reviewed ${done}`;
+  const rows = c.boxes.map((b, j) => `<div class="box"><b>#${b.i}</b> ${b.cls}
+      <span class="tag">${b.src} ${b.conf.toFixed(2)}</span>
+      ${VERDICTS.map(([v, t]) => `<button data-j="${j}" data-v="${v}" class="${v} ${s.boxes[j].verdict === v ? "on" : ""}">${t}</button>`).join("")}</div>`).join("");
+  const missed = ["phone", "drink", "food", "hand"].map(k =>
+    `<label>${k} <input type="number" min="0" data-m="${k}" value="${s.missed[k] || 0}"></label>`).join("");
+  document.getElementById("main").innerHTML = `<div class="card">
+    <div><img src="data:image/jpeg;base64,${c.img}" alt="review image ${c.id}"></div>
+    <div>${rows || "<p>No boxes on this image.</p>"}
+      <p class="k">Objects of our 4 classes with NO box:</p><div class="missed">${missed}</div>
+      <div class="nav"><button id="prev">← prev</button>
+        <button class="primary" id="next">mark reviewed, next →</button></div>
+      <p class="k">Keys: 1/2/3 set the first unset box · Enter = reviewed + next</p></div></div>`;
+  document.querySelectorAll("button[data-v]").forEach(b => b.onclick = () => {
+    s.boxes[+b.dataset.j].verdict = b.dataset.v; persist(); render(); });
+  document.querySelectorAll("input[data-m]").forEach(inp => inp.onchange = () => {
+    s.missed[inp.dataset.m] = +inp.value; persist(); });
+  document.getElementById("prev").onclick = () => { state.i = Math.max(0, state.i - 1); persist(); render(); };
+  document.getElementById("next").onclick = next;
+}
+function next() {
+  const s = state.cards[state.i];
+  s.reviewed = true;
+  s.boxes.forEach(b => { if (!b.verdict) b.verdict = "correct"; });
+  state.i = Math.min(DATA.length - 1, state.i + 1); persist(); render();
+}
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  const s = state.cards[state.i];
+  if (["1", "2", "3"].includes(e.key)) {
+    const b = s.boxes.find(x => !x.verdict); if (b) { b.verdict = VERDICTS[+e.key - 1][0]; persist(); render(); }
+  } else if (e.key === "Enter") next();
+});
+document.getElementById("save").onclick = () => {
+  const blob = new Blob([JSON.stringify(state, null, 1)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = "review_results.json"; a.click();
+};
+render();
+</script>
+</body>
+</html>
