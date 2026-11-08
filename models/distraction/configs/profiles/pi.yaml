@@ -1,0 +1,15 @@
+# Raspberry Pi 5 (RTDMS car unit): used by pi/start_stream.sh and pi/start_stream_v1.sh.
+#   python scripts/stream.py --profile pi ...
+# Deep-merged over configs/pipeline.yaml: only the keys below change.
+
+rectify:
+  enabled: false         # off until scripts/calibrate_fisheye.py has been run on this camera
+
+detector:
+  weights: models/det_v2d_ir_512_det_aciq_mixed_ncnn_model   # INT8 (only used by start_stream_v1.sh)
+
+facemesh:
+  backend: dms_face      # LiteRT face mesh from models/face; MediaPipe is not installed on the Pi
+
+pose:
+  every_n: 6             # texting-rule pose on every 6th frame to save CPU
