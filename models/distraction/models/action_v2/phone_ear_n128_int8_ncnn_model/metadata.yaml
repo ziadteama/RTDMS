@@ -1,0 +1,21 @@
+description: Ultralytics YOLO26n-cls model trained on D:/rtdms-data/action_v1/data/phone
+author: Ultralytics
+date: '2026-10-26T04:40:24.188134+03:00'
+version: 8.4.178
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 1
+task: classify
+head: Classify
+batch: 1
+imgsz:
+- 128
+- 128
+names:
+  0: empty_hand
+  1: phone_in_hand
+args:
+  batch: 1
+  quantize: null
+channels: 3
+end2end: false

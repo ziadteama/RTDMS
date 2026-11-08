@@ -16,6 +16,7 @@ or match on Pi 5, not as a deployment claim.
 |---|---|---|
 | Upstream ship | local | 31+ unit tests in `tests/test_core.py` |
 | Monorepo adoption | TBD — run `docker compose run --rm verify` and record here | |
+| 2026-10-10, branch `face/pi-litert-stream` | Windows laptop, root `.venv`, Python 3.14 — **not** the Docker gate | 43 passed (`test_core.py` + new `test_litert.py`) |
 
 ## G4 — Fixed-image throughput (laptop baseline)
 
@@ -37,9 +38,36 @@ Observations already argued in upstream docs (keep when citing):
 
 ## G4 — Pi 5
 
-| When | Throttled? | Result |
-|---|---|---|
-| — | — | **Not yet measured on the project Pi.** Run G4 and paste a table here. |
+Measured 2026-10-10 on the project Pi 5 (8 GB, Raspberry Pi OS trixie, kernel
+6.18, Python 3.13), `litert` backend (`ai-edge-litert`, XNNPACK), camera OV5647
+at 640×480 @ 30 fps. `vcgencmd get_throttled` = `0x0` throughout, SoC 48–51 °C.
+**Standalone face process only** — this does not close G6.
+
+Per-network latency, fixed image, median of 300 runs after warm-up:
+
+| Network | 1 thread | 2 threads |
+|---|---:|---:|
+| `face_landmarks_detector` (478 pts, 256×256), tracking | 13.4 ms | 8.0 ms |
+| `face_detector` (BlazeFace, 128×128), reacquire only | 5.0 ms | 3.7 ms |
+
+Live, `stream.py` defaults (1 thread), driver in frame, one browser viewer:
+
+| Metric | Value |
+|---|---:|
+| Pipeline FPS | 30.0 (camera-bound) |
+| Mesh inference | 13.5 ms |
+| Post-inference arithmetic (EAR → state) | 0.4 ms |
+| Pipeline total | 14.1 ms of the 33 ms frame budget |
+| HUD draw + JPEG (only with a viewer) | 4.3 ms |
+| Process CPU | 73 % of one core |
+| System CPU | ~21 % of four cores |
+| RSS | 133 MB |
+
+No face in view (detector every frame): 6.7 ms/frame, ~48 % of one core.
+
+Open items: the same table for the ONNX path (`tflite2onnx` on the bundle);
+G6 with phone + physiology live; the `mediapipe` backend on the Pi for an
+apples-to-apples baseline.
 
 ## Camera intrinsics sensitivity (methodology)
 

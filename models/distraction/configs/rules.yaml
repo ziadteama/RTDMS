@@ -1,0 +1,138 @@
+# Rule engine thresholds. Distances are in FACE WIDTHS (fw = |landmark 234 - landmark 454| in the
+# rectified driver view), so they do not depend on seat position, driver size or mount distance.
+# Angles are degrees RELATIVE to the per-drive baseline. Times are seconds.
+
+# simple (default) = the release setup: phone box >= 1 s -> phone ALERT; drink / food box over the
+#   lower face -> drinking / eating ALERT; head down + wrist low -> phone_in_hand WARNING 2 s,
+#   ALERT 3 s (texting with the phone out of view). Settings: SimpleRulesConfig in config.py.
+# full = the older rule engine (hands, ear zones, crop classifiers, chewing), kept for comparison.
+mode: simple
+
+baseline:
+  # Median pitch/yaw/gaze over the first `duration_s` seconds that have a face.
+  duration_s: 10.0
+  min_samples: 30
+
+head_down:
+  # Head pitched down (positive = chin toward chest) beyond the baseline by this much.
+  pitch_deg: 15.0
+  # Gaze-down score above baseline (blendshape eyeLookDown, or iris ratio when blendshapes
+  # are unavailable).
+  gaze_down: 0.25
+  gaze_down_iris: 0.12
+
+ears:
+  # The ear nearer the camera (driver's right in a LHD car / laptop at the front-right).
+  near:
+    # Zone centre = ear landmark + outward * fw (away from the face centre), + down * fw.
+    outward: 0.30
+    down: 0.15
+    half_width: 0.45
+    half_height: 0.65
+  # The far ear is partly hidden behind the head: the zone also reaches inward behind it.
+  far:
+    outward: 0.20
+    down: 0.15
+    half_width: 0.50
+    half_height: 0.65
+    inward: 0.35
+  # Overlap = intersection / min(box area, zone area).
+  min_overlap: 0.25
+  # Vertical extent of both zones = eye line .. jaw line (+ margins, in fw). A hand above the
+  # eye line (temple, top of the head = elbow-on-door posture) is outside the zone.
+  eye_to_jaw: true
+  eye_margin: 0.0
+  jaw_margin: 0.10
+
+# Phone call without a visible phone, either ear:
+#   hand at the ear >= dwell_s           -> WARNING
+#   ... and during that episode a phone box in the ear zone, or the ear-crop classifier's
+#   smoothed P(phone) >= classifier_phone -> ALERT
+# A phone box in the zone on its own (smoothed) is an ALERT as before.
+# "Hand at ear" = a hand box (MediaPipe Hands or the detector's hand class) with its centre in
+# the ear zone, OR the pose wrist rule below.
+hand_at_ear:
+  dwell_s: 3.0           # scratching / adjusting glasses is usually shorter
+  gap_s: 0.7             # brief detection misses do not end the episode
+  # Hand box at the ear, frontal camera (the box runs down over palm and wrist, so its centre
+  # is often below the jaw line): it covers >= hand_zone_cover of the ear zone, OR its top
+  # edge is between the eye line and the jaw line and it overlaps the zone horizontally. A box
+  # centred above the eye line (hand on the head) never counts.
+  hand_zone_cover: 0.30
+  wrist_ear_max: 1.3     # pose wrist within this many fw of the ear landmark (frontal: ~1 fw below) ...
+  wrist_min_side: 0.6    # ... out at that ear's side (>= 0.6 of face centre -> ear), not under the chin ...
+  elbow_max_below_shoulder: 1.0   # ... with the elbow raised (elbow y <= shoulder y + 1.0 fw)
+  elbow_unseen_ok: true  # elbows are often out of a webcam's frame
+  kpt_conf: 0.3
+  classifier_phone: 0.6
+
+phone_in_hand:
+  # Phone centre must be below chin_y + this many face widths ... (negative = slightly above)
+  below_chin: -0.10
+  # ... and within this distance of a hand box (box-to-box gap, in fw). Ignored when hands are off.
+  hand_max_gap: 0.30
+  require_hand: true
+  # A phone in these zones is in a holder: ignored. Normalised rectified-ROI coords [x, y, w, h].
+  holder_zones: []
+  # WARNING escalates to ALERT once the head/gaze has been down for this long.
+  alert_after_down_s: 2.0
+
+drinking:
+  # Mouth region: centred on the lips (13, 14, 61, 291), half sizes in fw.
+  mouth_half_width: 0.40
+  mouth_half_height: 0.35
+  min_overlap: 0.15
+  # Head tilted back (pitch above baseline) multiplies confidence by this.
+  pitch_up_deg: 8.0
+  pitch_up_bonus: 1.25
+  # Mouth-crop classifier (when loaded): smoothed P(drink) at or above this is drinking
+  # evidence on its own (the detector rarely sees a cup at the mouth).
+  classifier_drink: 0.6
+
+eating:
+  # Food box within this distance of the mouth centre (fw) counts as a bite ...
+  food_mouth_max_dist: 0.80
+  # ... and stays relevant for this long.
+  food_memory_s: 5.0
+  # Mouth-crop classifier (when loaded): smoothed P(food) at or above this counts as food at
+  # the mouth (still needs chewing to be eating).
+  classifier_food: 0.6
+  chewing:
+    window_s: 3.0
+    min_span_s: 2.0
+    resample_hz: 15.0
+    band_hz: [0.8, 2.5]
+    # Share of 0.3-7 Hz power that must fall inside band_hz.
+    min_band_fraction: 0.45
+    # Std of the detrended jaw signal. Blendshape jawOpen is 0..1; the geometric fallback is
+    # chin-to-nose distance in fw.
+    min_amplitude_blendshape: 0.02
+    min_amplitude_geometric: 0.008
+    # Lips count as closed when inner-lip gap / mouth width is below this ...
+    lips_closed_ratio: 0.10
+    # ... and must be closed in at least this share of the window. This is what rejects talking
+    # and singing: their jaw moves with the lips apart.
+    min_lips_closed_fraction: 0.6
+
+smoothing:
+  window_s: 1.75
+  # Activate when >= on_ratio of the frames in the window are positive; clear at <= off_ratio.
+  on_ratio: 0.70
+  off_ratio: 0.30
+  # The window must hold samples for at least this share of its length before it can activate
+  # (prevents a 2-frame "window" at start-up or after a gap).
+  min_coverage: 0.6
+  # Face lost or occluded: face-based behaviours freeze for up to this long, then clear.
+  face_lost_hold_s: 5.0
+  # Face lost: reuse the last face box this long for ear / mouth zone geometry, so a phone
+  # or cup hiding the face still counts from detector evidence alone.
+  face_geometry_hold_s: 5.0
+
+# Recommended level per behaviour. Fusion owns the actual cabin alert (repo invariant);
+# these are what this module reports.
+levels:
+  phone_right_ear: alert
+  phone_left_ear: alert
+  phone_in_hand: warning   # -> alert after alert_after_down_s of head/gaze down
+  drinking: warning
+  eating: warning

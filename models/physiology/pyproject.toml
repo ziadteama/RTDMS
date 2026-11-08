@@ -18,6 +18,9 @@ dependencies = [
 
 [project.optional-dependencies]
 train = ["scikit-learn>=1.5,<2"]
+# Garmin watch receiver on the Pi (BLE peripheral / GATT server via BlueZ). bless 0.3 needs
+# bleak >= 1.1, which conflicts with the bleak pin above, so stay on 0.2.x.
+garmin = ["bless>=0.2.6,<0.3"]
 dev = [
   "mypy>=1.13,<2",
   "pytest>=8.3,<9",
@@ -29,6 +32,7 @@ dev = [
 [project.scripts]
 dms-physiology-simulate = "dms_physiology.simulate:main"
 dms-physiology-service = "dms_physiology.service:main"
+dms-physiology-garmin = "dms_physiology.garmin_receiver:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dms_physiology"]
@@ -52,7 +56,7 @@ warn_unreachable = true
 files = ["src"]
 
 [[tool.mypy.overrides]]
-module = ["scipy", "scipy.*"]
+module = ["scipy", "scipy.*", "bless", "bless.*"]
 ignore_missing_imports = true
 
 [tool.coverage.run]

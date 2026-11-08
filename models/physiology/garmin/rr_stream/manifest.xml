@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!--
+  RR Stream: streams heart rate + beat-to-beat (RR) intervals from the Forerunner 265 to the RTDMS
+  Pi over Bluetooth LE (docs/packet_format.md). The watch is the BLE central; the Pi advertises.
+  Permissions: Sensor (heart rate, heart beat intervals) and BluetoothLowEnergy.
+-->
+<iq:manifest version="3" xmlns:iq="http://www.garmin.com/xml/connectiq">
+    <iq:application id="3170c20d-af3e-44ef-aec4-5f1ee997941a" type="watch-app" name="@Strings.AppName"
+            entry="RrStreamApp" launcherIcon="@Drawables.LauncherIcon" minApiLevel="3.2.0">
+        <iq:products>
+            <iq:product id="fr265"/>
+            <iq:product id="fr265s"/>
+        </iq:products>
+        <iq:permissions>
+            <iq:uses-permission id="Sensor"/>
+            <iq:uses-permission id="BluetoothLowEnergy"/>
+        </iq:permissions>
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+        <iq:barrels/>
+    </iq:application>
+</iq:manifest>

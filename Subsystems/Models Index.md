@@ -18,10 +18,10 @@ consume them. Code lives in `models/`; see `models/README.md` for on-disk conven
 
 | Model | Note | Code | Detects | Status |
 |---|---|---|---|---|
-| Physiology | [[Physiology Subsystem]] | `models/physiology/` | Fatigue/stress from HR + PRV | **Replay pipeline implemented** |
-| Face (drowsiness + gaze) | [[Face Subsystem]] | `models/face/` | Eye closure, PERCLOS, blink, gaze, head pose | **Core + demo runner** |
+| Physiology | [[Physiology Subsystem]] | `models/physiology/` | Fatigue/stress from HR + PRV | **Replay pipeline implemented**; Garmin FR265 RR stream to the Pi + live HRV |
+| Face (drowsiness + gaze) | [[Face Subsystem]] | `models/face/` | Eye closure, PERCLOS, blink, gaze, head pose | **Core + demo runner**; live on Pi via LiteRT at 30 fps |
 | Phone / eating | [[Phone Subsystem]] | `models/phone/` | Phone + eating distraction scores | **ONNX wired** (Safe-Drive-TN); superseded for the IR camera by Distraction |
-| Distraction (IR camera) | [[Distraction Subsystem]] | `models/distraction/` | Phone, phone in hand (texting), drinking, eating | **Release models shipped** (YOLO26n on IR + face mesh + pose rules) |
+| Distraction (IR camera) | [[Distraction Subsystem]] | `models/distraction/` | Phone call, texting, drinking, eating | **v2 live on Pi** for call + texting (action classifier + ear / lap phone checks, INT8 NCNN); drinking via the det_v2d detector (off on the Pi stream) |
 | Decision fusion | *(stub)* | `fusion/` | Combines models → alert pattern | **Stub `decide()`** |
 | Alert subsystem | *(pending)* | *(pending)* | Buzzer + vibration patterns | Planned (Phase 4) |
 | Wearable firmware | *(pending)* | *(pending)* | ESP32-C3 + MAX30102, BLE only | Planned (Phase 1) |
