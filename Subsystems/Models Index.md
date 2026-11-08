@@ -19,7 +19,7 @@ consume them. Code lives in `models/`; see `models/README.md` for on-disk conven
 | Model | Note | Code | Detects | Status |
 |---|---|---|---|---|
 | Physiology | [[Physiology Subsystem]] | `models/physiology/` | Fatigue/stress from HR + PRV | **Replay pipeline implemented** |
-| Face (drowsiness + gaze) | [[Face Subsystem]] | `models/face/` | Eye closure, PERCLOS, blink, gaze, head pose | **Core + demo runner** |
+| Face (drowsiness + gaze) | [[Face Subsystem]] | `models/face/` | Eye closure, PERCLOS, blink, gaze, head pose | **Core + demo runner**; live on Pi via LiteRT at 30 fps (branch `face/pi-litert-stream`, 2026-10-10) |
 | Phone / eating | [[Phone Subsystem]] | `models/phone/` | Phone + eating distraction scores | **ONNX wired** (Safe-Drive-TN) |
 | Decision fusion | *(stub)* | `fusion/` | Combines models → alert pattern | **Stub `decide()`** |
 | Alert subsystem | *(pending)* | *(pending)* | Buzzer + vibration patterns | Planned (Phase 4) |
