@@ -7,6 +7,7 @@ Food and its human-labelling files are never training inputs or modified.
 # ruff: noqa: E402
 import csv
 import hashlib
+import importlib
 import itertools
 import json
 import os
@@ -27,10 +28,11 @@ os.environ.setdefault("OMP_NUM_THREADS", "4")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("OPENCV_FFMPEG_THREADS", "1")
 
+torch = importlib.import_module("torch")  # Load CUDA DLLs before OpenCV; keep this order explicit.
+
 import cv2
 import held_wrist as W
 import numpy as np
-import torch
 import yaml
 from build_held import RUN_NAME, read_source, square_cover
 from held_alerts import DrinkingRule
