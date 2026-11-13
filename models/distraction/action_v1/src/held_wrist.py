@@ -349,7 +349,7 @@ def make_wrist_sheets(paths):
         for r in data["records"]:
             groups[r["target"]].append(r)
         for label, records in groups.items():
-            for r in rng.sample(records, min(2, len(records))):
+            for r in rng.sample(records, min(16, len(records))):
                 samples[(job["dataset"], label)].append((job, r))
     for ds in sorted({k[0] for k in samples}):
         selected = []
