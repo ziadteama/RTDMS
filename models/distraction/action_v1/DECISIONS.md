@@ -104,14 +104,30 @@ D26. **A wrist is below a held bottle, not at the mouth (2026-11-14 review).** O
     <=1 second old, then a pose-head regression fitted only on SynDD TRAIN. Both c and the
     inter-eye/eye-to-ear height scales g use face-height-normalized least squares; internal
     held-out TRAIN drivers choose the height scale and provide fit-error evidence.
-    The h x K grid (K in {1, 1.25, 1.5}) is selected only on SynDD-val + 3MDAD/EBDD TRAIN:
-    maximize the mean of drinking/eating pass rates (each class pooled over those sets),
-    subject to normal <=2% on SynDD-val and <=5% separately on 3MDAD/EBDD train. Test/DAD rows
-    are descriptive only. If no candidate meets all constraints, select none, do not relax
-    them, and label the lowest-violation sheet parameters as illustration only. EBDD train
-    normal was 548/7140 at the original K=1 and must be checked again. New crop geometry is
+    The first grid review used the orchestrator's proposed normal-rate limits (<=2% on
+    SynDD-val, <=5% on 3MDAD/EBDD train). The orchestrator subsequently corrected that
+    criterion: normal proximity supplies valid empty_hand hard negatives and determines
+    runtime classifier cost, not label noise. Those limits were wrong for constructing
+    labels; the historical grid remains evidence, but D27 replaces parameter selection.
+    Test/DAD rows remain descriptive only. EBDD train normal was 548/7140 at original K=1.
+    New crop geometry is
     midpoint of mouth/hand, side=max(2 face heights, 1.3*mouth-hand distance). Larger 512px
     review tiles show wrist, projected hand, source-coloured mouth, K circle and crop square,
     including DAD mesh-lost drinking frames. All full COCO keypoints are already cached;
     no inference, crop build or training is authorized in this correction job. Original audit
     files remain intact; corrected outputs go under ignored `_held_data/geometry_v2/`.
+
+D27. **Build a loose corpus and retain gate distances (2026-11-14).** Use h=.35, K=1.25,
+    with D26's mesh -> held <=1s -> pose-mouth fallback and covering square. Do not choose a
+    single tight runtime gate now. Only train drivers and SynDD-val produce crops; no test
+    crops or training. Save both h=0 and h=.35 distances, face source, original action label,
+    driver/split/clip/time and wrist/elbow confidences. Tight is selectable as dist_h0<=1
+    within the same saved loose corpus; report the count of h=0 tight frames outside the
+    loose gate rather than silently adding them. Greedy chronological thinning enforces
+    >=.3 seconds between retained crops per clip; report before/after counts. The square
+    keeps its centre and covers mouth and hand, with replicate padding outside the frame,
+    128px gray AREA resize and D9 contrast stretch. Record padding in the manifest.
+    Write loose/tight balance and original-label negative breakdowns, and separate train/val,
+    class and tight/loose-only random sheets (seed 27; at most 48 samples; 192px crop tiles).
+    Positive crops with no visible object remain the weak-label risk requiring review.
+    Phase B may compare subsets on SynDD-val; no classifier is trained in this build.

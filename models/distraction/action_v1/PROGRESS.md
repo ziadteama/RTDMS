@@ -162,3 +162,16 @@
   execution failure. Pi frames: open (to be done by orchestrator). Phase B not started.
 - Staging/commit attempts fail: parent checkout worktree index.lock permission denied. No
   commit or push; the requested Co-Authored-By trailer was included in the failed commit command.
+
+## 2026-11-14: loose crop build after geometry review (D26/D27)
+
+- Detached audit and cache-only geometry jobs completed. Orchestrator reviewed the larger
+  sheets and found the mouth fallback useful on bottle-occluded DAD faces.
+- Corrected the orchestrator's original normal-pass selection criterion: passing normal
+  frames are useful empty_hand negatives and runtime cost, not label noise. D27 replaces
+  selecting one gate with a loose h=.35/K=1.25 corpus and manifest-selectable h=0/K=1 subset.
+- Builder now reads corrected cached mouths, preserves both distances and keypoint confidence,
+  enforces >=.3s per clip, writes before/after loose/tight balance and negative-label tables,
+  and creates 192px tight/loose-only sample sheets. Detached JOB build will also verify the
+  saved manifest, every image, thinning, splits and unchanged source hashes. No test crops,
+  classifier training or runtime code changes. Actual build totals await the job output.
