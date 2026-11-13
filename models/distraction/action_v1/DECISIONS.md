@@ -131,3 +131,27 @@ D27. **Build a loose corpus and retain gate distances (2026-11-14).** Use h=.35,
     class and tight/loose-only random sheets (seed 27; at most 48 samples; 192px crop tiles).
     Positive crops with no visible object remain the weak-label risk requiring review.
     Phase B may compare subsets on SynDD-val; no classifier is trained in this build.
+
+D28. **Phase B is drinking only (2026-11-14, user approved).** Sheet review found roughly
+    46/48 tight cup samples usable and appropriate empty_hand hard negatives, but only about
+    7/48 food samples visibly contained food. Food is excluded from BOTH classifier classes,
+    not reassigned to empty_hand. The team's label_food.html and food_labels.csv are protected
+    and never modified. Train tight and loose binary nano classifiers; cap each train
+    driver/class at 100 crops, cap each dataset to at most the other datasets combined when
+    possible, then balance the two train classes. Keep SynDD-val uncapped for evaluation.
+D29. **Freeze drinking selection before opening test results.** Compare INT8 crop AUC and
+    gated alert-level D12 objective on SynDD-val only. Pose is updated every third sampled
+    frame and its arm/head points held between updates; classifier runs only near the mouth.
+    Tight gate h=0/K=1 and loose h=.35/K=1.25 use D26 mouth fallback. Both training subsets
+    use stored h=.35 crop pixels; tight runtime crops use h=0, an explicit geometry difference
+    measured on val. Tune P, pitch-up X and averaging window on val; never test. Empty-hand
+    top probability cannot alert. A sustained mean-cup condition needs .5s unless pitch-up
+    qualifies relative to the driver's prior non-near running pitch baseline.
+D30. **Phase B artifacts stay local; no Phase C wiring.** Train recipe follows train_cls.py,
+    export FP32 and KL INT8, and name the chosen local export held_cup_n128. Test predictions
+    use transient in-memory crops and the evaluate_v2 clip universes (276 SynDD, 225 3MDAD,
+    39 DAD), including reaching, smoking and fatigue. Legacy mouth models map P(drink) to
+    cup and run with the same chosen rule. Their original mouth-crop training domain differs
+    from the held-hand crop. PC pose/crop timing uses four threads; Pi timing is explicitly
+    an estimate at x2.1. Initial LAN key-auth probe timed out; benchmark stage retries.
+    No hybrid.py, stream.py, Pi start script, call/texting or eating implementation changes.
