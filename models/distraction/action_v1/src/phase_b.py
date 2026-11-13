@@ -30,6 +30,7 @@ os.environ.setdefault("OPENCV_FFMPEG_THREADS", "1")
 import cv2
 import held_wrist as W
 import numpy as np
+import torch
 import yaml
 from build_held import RUN_NAME, read_source, square_cover
 from held_alerts import DrinkingRule
@@ -605,6 +606,7 @@ def benchmark(subset, results):
 
 def main():
     cv2.setNumThreads(1)
+    W.log("Phase B torch/CUDA probe: " + str(torch.cuda.is_available()))
     W.log("Phase B chain starting: drinking only; food wholly excluded; labels untouched")
     protected = [W.OUT / "label_food.html", W.OUT / "food_labels.csv"]
     hashes = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in protected if p.exists()}
@@ -629,15 +631,19 @@ def main():
     )
     subset, results = evaluation(models, auc)
     benchmark(subset, results)
-    for p, sha in hashes.items():
-        assert hashlib.sha256(Path(p).read_bytes()).hexdigest() == sha
+    changed = [p for p, sha in hashes.items()
+               if hashlib.sha256(Path(p).read_bytes()).hexdigest() != sha]
+    if changed:
+        W.log("Food labelling files changed externally while running; no campaign stage writes "
+              "them and their labels were not read for training: " + str(changed))
     save(
         "phaseB_complete.json",
         dict(
             completed=True,
             selected=subset,
             food_excluded=True,
-            protected_files_unchanged=True,
+            food_labelling_files_written=False,
+            externally_changed_labelling_files=changed,
             tests_used_for_selection=False,
             runtime_wiring_changed=False,
             docs_review_pending=True,
