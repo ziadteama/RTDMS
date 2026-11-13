@@ -2,7 +2,14 @@
 
 Lightweight, quality-gated PPG processing for a Raspberry Pi 5 Driver Monitoring System.
 
-The wearable sends raw MAX30102 samples through BLE. This service derives heart rate, pulse-rate variability (PRV), signal quality, and an optional fatigue probability for multimodal DMS fusion.
+Two live paths feed the same fusion contract (`fatigue_probability` + quality/state):
+
+- **Garmin FR265** — watch RR ms → `RrHrv` → optional `models/fatigue_wesad_v1.json`
+  (`python -m dms_physiology.garmin_receiver --model models/fatigue_wesad_v1.json`).
+  Training / role: `docs/WESAD.md` and vault `[[Physiology Fusion Approach]]`.
+- **MAX30102 / ESP** — raw PPG over BLE → peaks → PRV → same JSON logistic loader.
+
+Bad / invalid windows suppress fatigue output (`null`); fusion owns alerts.
 
 ## Runtime design
 

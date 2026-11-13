@@ -40,6 +40,8 @@ from .garmin_rr import (
     SequenceTracker,
     decode,
 )
+from .model import LogisticModel
+from .wesad_garmin import enrich_hrv_dict
 
 LOG = logging.getLogger("garmin_receiver")
 CSV_FIELDS = ["rx_wall", "rx_monotonic", "arrival", "session", "seq", "watch_ms", "hr_bpm",
@@ -241,8 +243,11 @@ async def _main(args: argparse.Namespace) -> None:
     log = RrCsvLog(path)
     rx = GarminRrReceiver(log)
     hrv = RrHrv()
+    model = None if args.model is None else LogisticModel.from_json_file(Path(args.model))
     live = LiveState(rx.tracker)
     print(f"[garmin] logging to {path}", flush=True)
+    if model is not None:
+        print(f"[garmin] fatigue model {model.version}", flush=True)
     if args.http:
         serve(live, args.http)
         print(f"[garmin] live page on http://<this machine>:{args.http}/", flush=True)
@@ -265,12 +270,17 @@ async def _main(args: argparse.Namespace) -> None:
         while True:
             await asyncio.sleep(UPDATE_S)
             snap = hrv.compute(time.monotonic(), time.time())
-            live.on_hrv(snap)
-            d = snap.to_dict()
-            print(f"[hrv] {d['state']:8} HR {d['mean_hr_bpm']} RMSSD {d['rmssd_ms']} "
-                  f"SDNN {d['sdnn_ms']} pNN50 {d['pnn50']} | quality {d['quality']} "
-                  f"beats {d['valid_beats']} coverage {d['coverage']} loss {d['packet_loss']}",
-                  flush=True)
+            d = enrich_hrv_dict(snap, model)
+            # Live page /status consume the enriched dict (includes gated fatigue_probability).
+            live.on_hrv_dict(d)
+            fatigue = d.get("fatigue_probability")
+            print(
+                f"[hrv] {d['state']:8} HR {d['mean_hr_bpm']} RMSSD {d['rmssd_ms']} "
+                f"SDNN {d['sdnn_ms']} pNN50 {d['pnn50']} | quality {d['quality']} "
+                f"beats {d['valid_beats']} coverage {d['coverage']} loss {d['packet_loss']} "
+                f"fatigue {fatigue}",
+                flush=True,
+            )
 
     async def stale() -> None:
         warned = False
@@ -304,6 +314,11 @@ def main() -> None:
     p.add_argument("--http", type=int, default=8081,
                    help="port of the live page + /status JSON (0 = off)")
     p.add_argument("--quiet", action="store_true", help="no line per packet (HRV lines only)")
+    p.add_argument(
+        "--model",
+        type=Path,
+        help="optional LogisticModel JSON (fatigue_probability when HRV is valid/degraded)",
+    )
     logging.basicConfig(level=logging.INFO, format="[garmin] %(message)s")
     with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(_main(p.parse_args()))
