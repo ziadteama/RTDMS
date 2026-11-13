@@ -32,6 +32,11 @@ def parse_args() -> argparse.Namespace:
             "cvnn",
         ],
     )
+    parser.add_argument(
+        "--version",
+        default="unreleased",
+        help="artifact version string written into the JSON",
+    )
     return parser.parse_args()
 
 
@@ -95,7 +100,7 @@ def main() -> None:
     classifier = pipeline.named_steps["classifier"]
     artifact: dict[str, Any] = {
         "schema_version": 1,
-        "version": "unreleased",
+        "version": args.version,
         "feature_names": args.features,
         "means": [float(value) for value in scaler.mean_],
         "scales": [float(value) for value in scaler.scale_],

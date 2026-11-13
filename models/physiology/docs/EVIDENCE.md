@@ -178,9 +178,16 @@ Only the "physiology alone" row of `VALIDATION.md:116-122` is addressed. Still o
 - **Ledger 5.6-5.8 PARTIAL** — `BoundedOutputSink` is installed only by the CLI wrapper; a raw sink
   passed directly to `PhysiologyService` can still raise into acquisition.
 - **PRV vs ECG agreement**, PPG-DaLiA, BUT PPG.
-- **Fatigue-model LOSO validation** — no trained artifact exists; only an untrained
-  `dummy-untrained-DO-NOT-DEPLOY` fixture that returns a constant 0.5 to exercise the code path.
-  **No fatigue number in this document carries predictive meaning.**
+- **Fatigue-model LOSO validation (partial)** — `models/fatigue_wesad_v1.json` exists for the
+  **Garmin `RrHrv` path** (`version`: `wesad-baseline-vs-stress-v1-experimental`). Features are
+  exactly `FeatureSnapshot.model_features()` from `RrHrv` (not the MAX30102 PPG peak service).
+  Labels are binary baseline vs stress (amusement dropped). Retrained 2026-11-08 on **real WESAD
+  Empatica E4 `IBI.csv` + `S*_quest.csv`** (15 subjects, 421 windows; HF mirror
+  `Rabbit-bot/prism_daatset`, not chest-synced `.pkl` labels). LOSO: AUROC **0.545**, AP
+  **0.503**, balanced accuracy@0.5 **0.506** — weak separation; treat as experimental bring-up,
+  not a deploy accuracy claim. Caveats: stress ≠ drowsiness; E4 IBI ≠ Garmin optical RR domain;
+  quest times are not RespiBAN-synced pickle labels; fusion must treat scores as experimental.
+  Rebuild path: `docs/WESAD.md`.
 - **MAX30102 sensor-domain transfer** and the wrist-motion 80%-usable-windows risk.
 - **The fault-injection matrix and the 30-min soak are still Docker-only** — logic-level results,
   not expected to differ on target, but not yet re-run there.
