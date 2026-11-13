@@ -42,7 +42,8 @@ def main():
         elif args.job == "geometry":
             command += [str(here / "held_geometry.py")]
         else:
-            command += [str(here / "build_held.py"), "--k", "1.0", "--side", "2.0"]
+            command += [str(here / "build_held.py"), "--h", "0.35", "--k", "1.25",
+                        "--min-gap", "0.3"]
         log(f"Starting detached JOB {args.job}; supervisor PID {os.getpid()}; "
             "resume existing caches; no training")
         child = subprocess.Popen(command, cwd=str(here.parents[3]))
@@ -63,6 +64,10 @@ def main():
         elif args.job == "geometry":
             if not (out / "geometry_v2/geometry_complete.json").is_file():
                 raise RuntimeError("missing geometry completion manifest")
+        elif args.job == "build":
+            log("Build child finished; starting saved-artifact and split verification")
+            subprocess.run([sys.executable, "-B", "-u", str(here / "verify_held.py")],
+                           cwd=str(here.parents[3]), check=True)
         success = True
         status.update(state="done", exit_code=0)
     except BaseException as exc:

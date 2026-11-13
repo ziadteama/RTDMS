@@ -1,4 +1,5 @@
-"""Validate actual Phase A artifacts, split isolation, images and source fingerprints."""
+"""Verify loose Phase A crops, manifest gates, thinning, splits and source preservation."""
+
 # ruff: noqa: E402
 import csv
 import hashlib
@@ -8,74 +9,114 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-
 import cv2
-from held_wrist import DATA, OUT, log, target
+from build_held import MIN_GAP, RUN_NAME, candidate
+from held_wrist import DATA, OUT, log
 
 
 def main():
-    log("Starting Phase A artifact verification: splits, all crop images, sheets, source hashes")
-    run = OUT / "crops_k1_side2"
-    complete = json.loads((OUT / "audit_complete.json").read_text())
-    assert set(complete["datasets"]) == {"syndd", "3mdad", "ebdd", "dad"}
+    log("Starting saved loose-corpus verification: all images, both gates, .3s spacing, splits")
+    run = OUT / RUN_NAME
+    saved = json.loads((run / "build.json").read_text(encoding="utf8"))
     expected = Counter()
-    excluded = 0
-    for p in complete["geometry"]:
-        data = json.loads((OUT / p).read_text())
-        job = data["job"]
-        for r in data["records"]:
-            assert r["target"] == target(r["label"], r["cls"])
-            if job["split"] == "test":
-                excluded += 1
-            elif r["distance"] is not None and r["distance"] <= 1:
-                expected[(r["target"], job["dataset"], job["split"])] += 1
+    before = 0
+    for p in sorted((OUT / "geometry_v2/base").glob("*.json")):
+        d = json.loads(p.read_text(encoding="utf8"))
+        j = d["job"]
+        if j["split"] == "test":
+            continue
+        last_t = -float("inf")
+        for r in sorted(d["records"], key=lambda r: r["t"]):
+            found = candidate(r)
+            if found is None:
+                continue
+            before += 1
+            if r["t"] - last_t < MIN_GAP - 1e-6:
+                continue
+            last_t = r["t"]
+            expected[(j["dataset"], j["clip"], r["t"], r["target"])] += 1
+    with open(run / "manifest.csv", encoding="utf8") as f:
+        rows = list(csv.DictReader(f))
     assignments = {}
-    for ds in complete["datasets"]:
+    for ds in ("syndd", "3mdad", "ebdd", "dad"):
         with open(DATA / f"action_v1/data/v2/{ds}.csv", encoding="utf8") as f:
             for r in csv.DictReader(f):
                 key = (ds, r["driver"])
                 assert assignments.get(key, r["split"]) == r["split"]
                 assignments[key] = r["split"]
-    with open(run / "manifest.csv", encoding="utf8") as f:
-        rows = list(csv.DictReader(f))
-    counts, drivers, seen = Counter(), defaultdict(set), set()
+    actual, balance, seen, drivers, times = (
+        Counter(),
+        Counter(),
+        set(),
+        defaultdict(set),
+        defaultdict(list),
+    )
     for i, r in enumerate(rows, 1):
         assert r["split"] in ("train", "val")
-        assert r["split"] == assignments[(r["dataset"], r["driver"])]
+        assert assignments[(r["dataset"], r["driver"])] == r["split"]
         assert r["split"] != "val" or r["dataset"] == "syndd"
-        assert float(r["distance"]) <= 1
-        p = OUT / r["path"]
-        assert p.resolve().is_relative_to(OUT.resolve())
+        assert r["face_source"] in ("mesh", "held", "pose-fallback")
+        assert float(r["dist_h035"]) <= 1.25
+        assert int(r["tight"]) == int(float(r["dist_h0"]) <= 1)
+        assert float(r["wrist_conf"]) >= 0.3
+        if int(r["elbow_usable"]):
+            assert float(r["elbow_conf"]) >= 0.3
+        path = OUT / r["path"]
+        assert path.resolve().is_relative_to(run.resolve())
         assert r["path"] not in seen
         seen.add(r["path"])
-        image = cv2.imread(str(p), cv2.IMREAD_UNCHANGED)
-        assert image is not None and image.shape == (128, 128), str(p)
-        counts[(r["target"], r["dataset"], r["split"])] += 1
+        image = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+        assert image is not None and image.shape == (128, 128)
+        actual[(r["dataset"], r["clip"], float(r["t"]), r["target"])] += 1
+        balance[(r["target"], r["dataset"], r["split"], "loose")] += 1
+        balance[(r["target"], r["dataset"], r["split"], "tight")] += int(r["tight"])
+        times[(r["dataset"], r["clip"])].append(float(r["t"]))
         drivers[r["split"]].add((r["dataset"], r["driver"]))
         if i % 5000 == 0:
-            log(f"Artifact verification: {i}/{len(rows)} crop images checked")
-    assert counts == expected, (counts, expected)
+            log(f"Loose-corpus verification: {i}/{len(rows)} images checked")
+    assert actual == expected
+    assert before == saved["before_thinning"] and len(rows) == saved["after_thinning"]
+    for ts in times.values():
+        ts = sorted(ts)
+        assert all(b - a >= 0.3 - 1e-6 for a, b in zip(ts, ts[1:], strict=False))
     assert not drivers["train"].intersection(drivers["val"])
-    assert len(list(run.glob("train/*/*.jpg"))) + len(list(run.glob("val/*/*.jpg"))) == len(rows)
     assert not (run / "test").exists()
-    for split in ("train", "val"):
-        for label in ("cup_bottle", "food", "empty_hand"):
-            paths = json.loads((run / f"sheet_{split}_{label}.json").read_text())
-            assert len(paths) >= 48 and len(set(paths)) == len(paths)
-            for p in paths:
-                assert p in seen and f"/{split}/{label}/" in p.replace("\\", "/")
-            assert cv2.imread(str(run / f"sheet_{split}_{label}.jpg")) is not None
-    for ds in complete["datasets"]:
-        assert cv2.imread(str(OUT / "sheets" / f"wrist_{ds}.jpg")) is not None
-    fingerprints = json.loads((OUT / "source_fingerprints.json").read_text())
+    assert len(list(run.glob("train/*/*.jpg"))) + len(list(run.glob("val/*/*.jpg"))) == len(rows)
+    with open(run / "balance.csv", encoding="utf8") as f:
+        for r in csv.DictReader(f):
+            for subset in ("loose", "tight"):
+                assert int(r[subset]) == balance[(r["target"], r["dataset"], r["split"], subset)]
+    for key, status in saved["sheets"].items():
+        split, label, subset = key.split("/")
+        stem = f"sheet_{split}_{label}_{subset}"
+        selected = json.loads((run / f"{stem}.json").read_text(encoding="utf8"))
+        assert len(selected) == min(48, status["available"])
+        assert len({r["path"] for r in selected}) == len(selected)
+        assert all(
+            r["path"] in seen
+            and r["split"] == split
+            and r["target"] == label
+            and r["subset"] == subset
+            for r in selected
+        )
+        assert cv2.imread(str(run / f"{stem}.jpg")) is not None
+    fingerprints = json.loads((OUT / "source_fingerprints.json").read_text(encoding="utf8"))
     for p, sha in fingerprints.items():
         assert hashlib.sha256(Path(p).read_bytes()).hexdigest() == sha, p
-    result = dict(passed=True, crops_checked=len(rows), test_records_excluded=excluded,
-                  drivers={k: len(v) for k, v in drivers.items()},
-                  unchanged_source_files=len(fingerprints), class_sheets=6, wrist_sheets=4)
-    (run / "verification.json").write_text(json.dumps(result, indent=2))
-    saved = json.loads((run / "verification.json").read_text())
-    log("Read verification.json: " + json.dumps(saved))
+    result = dict(
+        passed=True,
+        crops_checked=len(rows),
+        before_thinning=before,
+        minimum_gap_s=0.3,
+        unchanged_source_files=len(fingerprints),
+        class_sheets=12,
+        drivers={k: len(v) for k, v in drivers.items()},
+        test_crops=0,
+    )
+    (run / "verification.json").write_text(json.dumps(result, indent=2), encoding="utf8")
+    log(
+        "Read verification.json: " + json.dumps(json.loads((run / "verification.json").read_text()))
+    )
 
 
 if __name__ == "__main__":
