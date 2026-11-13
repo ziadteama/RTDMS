@@ -94,3 +94,24 @@ D25. **Held-object weak labels retain original driver splits and explicit negati
     all test records; only SynDD-val tunes. Nothing was trained. These scripts are statically
     checked only; the build and human contact-sheet check remain open. Git commits were also
     blocked by the read-only parent worktree index, and no permission workaround was attempted.
+
+D26. **A wrist is below a held bottle, not at the mouth (2026-11-14 review).** On the DAD
+    real-IR sheet the bottle reaches the mouth while the wrist/forearm can sit 1.5-2 face
+    heights lower; the original K=1 wrist gate passes only 34/664 drinking frames. Face mesh
+    is also lost behind the bottle. Therefore the crop build is on hold. A cache-only geometry
+    job tests hand = wrist + h*(wrist-elbow), h in {0, .35, .5}, with elbow confidence >=.3
+    and wrist fallback when the elbow is missing. Mouth priority is current mesh, last mesh
+    <=1 second old, then a pose-head regression fitted only on SynDD TRAIN. Both c and the
+    inter-eye/eye-to-ear height scales g use face-height-normalized least squares; internal
+    held-out TRAIN drivers choose the height scale and provide fit-error evidence.
+    The h x K grid (K in {1, 1.25, 1.5}) is selected only on SynDD-val + 3MDAD/EBDD TRAIN:
+    maximize the mean of drinking/eating pass rates (each class pooled over those sets),
+    subject to normal <=2% on SynDD-val and <=5% separately on 3MDAD/EBDD train. Test/DAD rows
+    are descriptive only. If no candidate meets all constraints, select none, do not relax
+    them, and label the lowest-violation sheet parameters as illustration only. EBDD train
+    normal was 548/7140 at the original K=1 and must be checked again. New crop geometry is
+    midpoint of mouth/hand, side=max(2 face heights, 1.3*mouth-hand distance). Larger 512px
+    review tiles show wrist, projected hand, source-coloured mouth, K circle and crop square,
+    including DAD mesh-lost drinking frames. All full COCO keypoints are already cached;
+    no inference, crop build or training is authorized in this correction job. Original audit
+    files remain intact; corrected outputs go under ignored `_held_data/geometry_v2/`.
