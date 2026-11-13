@@ -17,7 +17,7 @@ sys.dont_write_bytecode = True
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("job", choices=("audit", "build"))
+    parser.add_argument("job", choices=("audit", "geometry", "build"))
     parser.add_argument("--workers", type=int, default=10)
     args = parser.parse_args()
     here = Path(__file__).resolve().parent
@@ -39,6 +39,8 @@ def main():
         command = [sys.executable, "-B", "-u"]
         if args.job == "audit":
             command += [str(here / "held_wrist.py"), "--workers", str(args.workers)]
+        elif args.job == "geometry":
+            command += [str(here / "held_geometry.py")]
         else:
             command += [str(here / "build_held.py"), "--k", "1.0", "--side", "2.0"]
         log(f"Starting detached JOB {args.job}; supervisor PID {os.getpid()}; "
@@ -58,6 +60,9 @@ def main():
                     raise RuntimeError(f"missing {ds} wrist sheet")
             if not (out / "syndd_val_ncnn_agreement.json").is_file():
                 raise RuntimeError("missing NCNN/PyTorch agreement results")
+        elif args.job == "geometry":
+            if not (out / "geometry_v2/geometry_complete.json").is_file():
+                raise RuntimeError("missing geometry completion manifest")
         success = True
         status.update(state="done", exit_code=0)
     except BaseException as exc:
