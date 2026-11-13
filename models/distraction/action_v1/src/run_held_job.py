@@ -3,6 +3,7 @@
 The child scripts append detailed progress to LIVE.log. This supervisor appends exactly one
 terminal JOB marker on success or a caught failure, and persists process/status metadata.
 """
+
 import argparse
 import json
 import os
@@ -17,7 +18,7 @@ sys.dont_write_bytecode = True
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("job", choices=("audit", "geometry", "build"))
+    parser.add_argument("job", choices=("audit", "geometry", "build", "phaseB"))
     parser.add_argument("--workers", type=int, default=10)
     args = parser.parse_args()
     here = Path(__file__).resolve().parent
@@ -31,8 +32,12 @@ def main():
         print(line, flush=True)
 
     status_path = out / f"{args.job}_job.json"
-    status = dict(job=args.job, supervisor_pid=os.getpid(), state="starting",
-                  started=time.strftime("%Y-%m-%d %H:%M:%S"))
+    status = dict(
+        job=args.job,
+        supervisor_pid=os.getpid(),
+        state="starting",
+        started=time.strftime("%Y-%m-%d %H:%M:%S"),
+    )
     success, reason = False, "supervisor did not complete"
     try:
         status_path.write_text(json.dumps(status, indent=2), encoding="utf8")
@@ -41,11 +46,20 @@ def main():
             command += [str(here / "held_wrist.py"), "--workers", str(args.workers)]
         elif args.job == "geometry":
             command += [str(here / "held_geometry.py")]
+        elif args.job == "phaseB":
+            command += [str(here / "phase_b.py")]
         else:
-            command += [str(here / "build_held.py"), "--h", "0.35", "--k", "1.25",
-                        "--min-gap", "0.3"]
-        log(f"Starting detached JOB {args.job}; supervisor PID {os.getpid()}; "
-            "resume existing caches; no training")
+            command += [
+                str(here / "build_held.py"),
+                "--h",
+                "0.35",
+                "--k",
+                "1.25",
+                "--min-gap",
+                "0.3",
+            ]
+        scope = "drinking-only training authorized" if args.job == "phaseB" else "no training"
+        log(f"Starting detached JOB {args.job}; supervisor PID {os.getpid()}; {scope}")
         child = subprocess.Popen(command, cwd=str(here.parents[3]))
         status.update(state="running", child_pid=child.pid, command=command)
         status_path.write_text(json.dumps(status, indent=2), encoding="utf8")
@@ -66,8 +80,14 @@ def main():
                 raise RuntimeError("missing geometry completion manifest")
         elif args.job == "build":
             log("Build child finished; starting saved-artifact and split verification")
-            subprocess.run([sys.executable, "-B", "-u", str(here / "verify_held.py")],
-                           cwd=str(here.parents[3]), check=True)
+            subprocess.run(
+                [sys.executable, "-B", "-u", str(here / "verify_held.py")],
+                cwd=str(here.parents[3]),
+                check=True,
+            )
+        elif args.job == "phaseB":
+            if not (out / "phaseB/phaseB_complete.json").is_file():
+                raise RuntimeError("missing Phase B completion manifest")
         success = True
         status.update(state="done", exit_code=0)
     except BaseException as exc:
