@@ -23,6 +23,7 @@ sys.dont_write_bytecode = True
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent / "_held_data/phaseB"
 ROOT.mkdir(parents=True, exist_ok=True)
+os.chdir(ROOT)  # Keep auxiliary Ultralytics downloads inside the ignored artifact tree.
 os.environ["YOLO_CONFIG_DIR"] = str(ROOT / "ultralytics_config")
 os.environ.setdefault("OMP_NUM_THREADS", "4")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
@@ -119,9 +120,11 @@ def prepare(subset):
 def train(subset, folder):
     import train_cls
     from train_cls import AugTrainer
-    from ultralytics import YOLO
+    from ultralytics import YOLO, settings
 
     train_cls.RUNS = ROOT / "runs"
+    settings.update({"weights_dir": str(ROOT / "weights"),
+                     "datasets_dir": str(ROOT / "data"), "runs_dir": str(ROOT / "runs")})
     weight = ROOT / "runs" / subset / "weights/best.pt"
     if weight.exists() and (ROOT / subset / "training_done.json").exists():
         W.log(f"Resume phaseB: completed weights exist for {subset}")
