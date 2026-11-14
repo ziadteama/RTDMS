@@ -208,3 +208,20 @@ D34. **Cadence is part of drinking-rule timing (2026-11-14).** The orchestrator 
     evidence, running new test inference only if a different val-selected model needs it.
     Live Pi drinking remains OFF; historical Phase B loose10/18 and9.7 FA/h is worse
     than release15/18 and0 FA/h. Do not erase or reinterpret those historical numbers.
+
+D35. **Overnight measurement contract (2026-11-14).** Follow OVERNIGHT_PLAN H1-H8.
+    Nano yolo26n-cls128 is the product; s is a control and cannot choose the product
+    rule. ONE FA metric: false drinking onsets / hours of ALL non-drinking clips,
+    with original-action breakdown where source data permits. Historical normal-only
+    rates stay labelled historical, never silently converted or compared as identical.
+    Compare ea3d6ad/c77e01c on nano SynDD-val only; lock the better D12 objective
+    before reporting tests; tie keeps current c77e01c. Git implementations are loaded
+    for measurement only, not retained as alternate runtime paths. overnight_measure.py
+    is the authoritative overnight scorer; rescore_drinking.py is historical only.
+    Freeze five of the35 original 3MDAD TRAIN drivers via numeric driver sort and
+    random.Random(28).sample(...,5); persist exact names in split_freeze.json. Remove
+    them from ALL subsequent training, including control/distillation/hard negatives.
+    Existing models trained on those drivers are ineligible for clean MDAD-val keep
+    decisions. Train clean baselines before the optimization loop; original15 test
+    drivers remain untouched. No DAD-only keep decision. No Pi/SSH contact tonight.
+    No human food-label results consumed. Data never deleted; one commit per iteration.
