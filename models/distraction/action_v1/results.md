@@ -53,3 +53,68 @@ fair comparison stays **12/18 vs 15/18**. Re-scoring both sides untrimmed needs 
 detector's per-event times, which the saved JSON doesn't have. Fixing the window definition is a
 decision for you.
 
+
+---
+
+## IR evaluation (2026-11-14 evening) — supersedes the tables above for decisions
+
+**IR split (frozen, `ir_split.json`, driver-disjoint):**
+- train: SynDD train drivers (49);
+- **IR validation:** SynDD-val (10 drivers, rear view);
+- **IR test:** SynDD-test (10 drivers, rear view) + DAD Tester1/10/11 (front IR).
+
+Two caveats:
+- SynDD is a monochrome daylight camera (measured colour 0.1), not active IR. DAD is true IR.
+- **Event counts are below the 30 + 30 goal:** IR test drinking = 18 + 2 = **20**, eating =
+  19 + 0 = **19** (DAD has no eating). The extra IR data is not on disk; see
+  `dataset_inventory.md`.
+
+**Scoring:**
+- **Untrimmed windows** for every model and the old detector. SynDD windows = the annotation;
+  the earlier tables used the annotation minus 0.5 s per side.
+- One false-alarm rate: false alerts per hour over all non-target clips.
+- Rule parameters of each of our models re-picked on IR validation only.
+
+### Drinking — IR validation
+
+| Model | Caught | FA/h | False alarms by clip type |
+|---|---|---|---|
+| Best small (iteration 6 + phone veto), p=.5 x=15 w=.3 | 14/15 | 1.09 | — |
+| Clean small, no veto | 12/15 | 6.52 | — |
+| s control, no veto | 13/15 | 2.17 | — |
+| Old box detector (release rules, fixed) | 13/15 | 9.78 | — |
+
+### Drinking — IR test (report only)
+
+| Model | SynDD-test | DAD (IR) | False alarms by clip type |
+|---|---|---|---|
+| Best small (iteration 6 + phone veto) | 15/18, 3.21/h | 1/2, 0.79/h | SynDD: phone at right ear 3; DAD: normal driving 1 |
+| Clean small, no veto | 14/18, 9.62/h | 2/2, 1.58/h | SynDD: phone R 5, talking 2, yawning 2; DAD: normal 2 |
+| s control, no veto | 15/18, 2.14/h | 1/2, 0/h | SynDD: talking 1, phone L 1 |
+| Old box detector | 16/18, 0/h | 2/2, 8.67/h | DAD: normal driving 11 |
+
+**Eating, IR test:** the old box detector catches **0/19** on SynDD-test (0/19 on val). No
+eating model of ours existed before step 3.
+
+**The 2 DAD drinking clips:** the cup **is** detected, at moderate confidence. That's not a
+case of the cup not being seen.
+
+| Clip | Hand at mouth | Max cup score | Frames > 0.5 | Frames > 0.9 | Best small |
+|---|---|---|---|---|---|
+| Tester10 | 78 of 338 frames | 0.976 | 29 | 6 | caught |
+| Tester1 | 245 of 338 frames | 0.959 | 41 | 1 | **missed**: high-scoring frames are scattered, never sustained enough for the rule |
+
+### Why the old detector's 3MDAD numbers changed between runs (25/30 at 28.5/h → 22/30 at 5.2/h)
+
+They are two different systems measured two different ways. Both come from the same file
+(`D:\rtdms-data\action_v1\runs\eval_v2_det2.json`, 3MDAD-test):
+- **25/30 at 28.5/h:** the **v2 hybrid** (action classifier + release detector for drinking,
+  detector on every 2nd frame). Drinking recall was 25/30. Its false-alarm rate counted **every
+  alert type** (call + texting + drinking) on **normal + hand-on-face clips only** (16 alerts in
+  0.562 h).
+- **22/30 at 5.2/h:** the **release box detector alone**. Drinking recall was 22/30. Its
+  false-alarm rate counts **only drinking alerts** over **all non-drinking clips** (the unified
+  metric from 2026-11-14). The same row's old-style number is 14.2/h (all release alerts on
+  normal + hand-on-face).
+
+So neither the detector nor the data changed; the system row and the false-alarm definition did.
