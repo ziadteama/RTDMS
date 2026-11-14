@@ -21,7 +21,8 @@ fresh thread. I (Claude) did everything after that myself.
 | Model | SynDD-val caught | SynDD-val FA/h | 3MDAD-val caught | 3MDAD-val FA/h |
 |---|---|---|---|---|
 | Baseline: clean nano, no veto (iteration 1) | 10/15 | 1.18 (singing 1) | 9/10 | 7.77 (texting 5, reaching 1) |
-| **Best overnight: distilled nano + phone veto** | **10/15** | **0.00** | **9/10** | **0.00** |
+| Distilled nano + phone veto (iteration 4) | 10/15 | 0.00 | 9/10 | 0.00 |
+| **Best overnight: iteration 6 (distillation + dataset × class sampling) + phone veto** | **11/15** | **0.00** | **9/10** | **0.00** |
 | s control, clean, no veto | 13/15 | 2.35 | 9/10 | 16.84 |
 | Old box detector (eval_v2_det2 replay) | 13/15 | 10.59 (eating 5, phone 2, reaching 1, yawning 1) | n/a (no replay on these drivers) | n/a |
 
@@ -31,7 +32,8 @@ fresh thread. I (Claude) did everything after that myself.
 |---|---|---|---|
 | Baseline: clean nano, no veto | 13/18, 4.63/h (talking 2, yawning 1, phone at ear 1) | 29/30, 8.47/h (texting R 11, phone L 4, phone R 2, smoking 1, singing 1, GPS 1, texting L 1) | 1/2, 0.79/h |
 | Clean nano + phone veto (iteration 2) | 13/18, 3.47/h (talking 2, yawning 1) | 29/30, 3.63/h | 1/2, 0.79/h |
-| **Best overnight: distilled nano + phone veto** | **12/18, 0.00/h** | **29/30, 2.42/h** (smoking 3, singing 1, texting R 1, phone L 1) | **0/2, 0.00/h** |
+| Distilled nano + phone veto (iteration 4) | 12/18, 0.00/h | 29/30, 2.42/h (smoking 3, singing 1, texting R 1, phone L 1) | 0/2, 0.00/h |
+| **Best overnight: iteration 6 + phone veto** | **12/18, 0.00/h** | **29/30, 2.42/h** (smoking 2, singing 1, texting R 1, texting L 1, phone L 1) | **0/2, 0.00/h** |
 | s control, clean, no veto | 14/18, 2.32/h | 30/30, 13.31/h | 1/2, 0.00/h |
 | Old box detector (eval_v2_det2) | 15/18, 0.00/h | 22/30, 5.24/h | 2/2, 8.67/h |
 | Live Pi today (`--no-detect`) | drinking OFF | OFF | OFF |
@@ -46,9 +48,9 @@ fresh thread. I (Claude) did everything after that myself.
 the first half-second of a sip therefore score as misses. Re-scoring with the untrimmed
 annotation (`_held_data/overnight/boundary.json`):
 
-| Distilled nano + phone veto | Trimmed (official) | Untrimmed |
+| Best (iteration 6) + phone veto | Trimmed (official) | Untrimmed |
 |---|---|---|
-| SynDD-val | 10/15, 0/h | 11/15, 0/h |
+| SynDD-val | 11/15, 0/h | 11/15, 0/h |
 | SynDD-test | 12/18, 0/h | 16/18, 0/h |
 
 The old detector was also scored on trimmed windows (evaluate_v2 "minus 0.5 s edges"), so the
@@ -72,10 +74,13 @@ an alternative.
 | 3 | Yawn veto, lip gap / face width > thr (S2.2) | no change at any threshold (no yawning FAs in val) | REVERTED |
 | 4 | Distil s into nano (S1.4) | FA 1.18/1.30 → 0/0, recall same | **KEPT** |
 | 5 | Dataset × class sampling, plain CE | SynDD 10 → 13/15, but 3MDAD FA 0 → 9.07/h | REVERTED |
-| 6 | Distillation + dataset × class sampling | ITER6_VAL | ITER6_DECISION |
+| 6 | Distillation + dataset × class sampling | SynDD-val 10 → 11/15, FA 0 → 0 | **KEPT** (final model) |
+| 7 | + stronger scale / occlusion augmentation | no change (11/15, 9/10, 0/h) | REVERTED |
+| 8 | + cup class weight ×2 | no change (11/15, 9/10, 0/h) | REVERTED |
+| stop | Loop stopped at 08:25 (2 reverts in a row) | Validation FA already 0 on both sets, so only recall gains can pass the keep rule. The remaining misses are small or hidden cups and very short sips. A 9th run would have ended at ~08:50, too close to the 09:30 report. | — |
 | S2.3 | Phone + cigarette hard negatives | not run | **SKIPPED**: cigarette crops (3MDAD smoking) are already negatives. The phone clips of training drivers have no hand/face geometry; building it needs a new pose + face-mesh pass. The phone veto (kept) already removes most phone false alarms. |
 
-Details per row in `overnight_log.md`.
+Details per row in `overnight_log.md`. Commits on overnight/held-object: d4935be, 251d78d (Codex); 9f03380, f00096d, 4cbe0ab, 0d1abbb, 0adaf49, 6ad4d45, e7d0552, 1150da3 and the final report commit.
 
 ## M4. Remaining failure cases (validation, best model; frames in report_assets/)
 
@@ -83,12 +88,22 @@ Details per row in `overnight_log.md`.
 |---|---|---|
 | SynDD 61962 (two short sips) | Small paper cup almost hidden in the hand; cup score 0.07–0.11 | `overnight_fail_04.jpg`, `overnight_fail_05.jpg` |
 | SynDD 47457 | Cup score never above threshold (the old detector missed it too) | `overnight_fail_03.jpg` |
-| SynDD 84935 | Cup seen at 0.99, the alert fires at 428.2 s, but the trimmed window starts at 428.5 s (the boundary finding above) | `overnight_fail_06.jpg` |
 | SynDD 16700 | 1.1 s sip, only 3 frames above threshold, so the rule needs more | `overnight_fail_02.jpg` |
 | 3MDAD S10 AC14 (left-hand drink) | Hand at mouth on only 16/95 frames; cup score ≤ 0.25 | `overnight_fail_01.jpg` |
 
-Remaining test false alarms (distilled + veto) are on 3MDAD only: smoking 3, singing 1, one
-texting and one phone call that the veto didn't catch.
+The SynDD 84935 sip that iteration 4 missed is caught by iteration 6.
+
+**S1.2: clips the old detector catches and the new model misses (SynDD-val):**
+- 16700_5_008 and the two 61962 clips (61962_5_012, 61962_7_012), all short (about 1–2 s).
+- What they have in common: a **small cup almost hidden by the hand**. A box detector still
+  finds it, but our 128 px hand-mouth crop scores it low (≤ 0.94, often ≤ 0.2). In the
+  1-second sips, too few frames pass the threshold for the rule to fire.
+- 47457 is missed by both.
+- Cause split over all SynDD-val misses tonight: cup score below threshold in most cases; one
+  rule-timing case (16700); one window-boundary case (84935, fixed by iteration 6).
+
+Remaining test false alarms (iteration 6 + veto) are on 3MDAD only: smoking 2, singing 1,
+texting 2 and one phone call that the veto didn't catch.
 
 ## M5. Eating
 
@@ -130,7 +145,7 @@ texting and one phone call that the veto didn't catch.
 on as a live alert.**
 
 - **Why test it now:**
-  - The best small model has very few false alarms: 0/h on SynDD and DAD, 2.4/h on 3MDAD,
+  - The best small model (iteration 6: `_held_data/overnight/distill_rw/weights/best.pt`, FP32 NCNN `best_ncnn_model`; params in `pi_held/held_params.json`) has very few false alarms: 0/h on SynDD and DAD, 2.4/h on 3MDAD,
     against the old detector's 5.2 and 8.7/h.
   - 3MDAD recall is high: 29/30.
   - The open question is our real IR camera at the mirror, and only Pi recordings can answer it.

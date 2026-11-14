@@ -1,6 +1,6 @@
 {
- "model": "distilled nano (overnight iteration 4), FP32 NCNN _held_data/overnight/distill/weights/best_ncnn_model",
- "params": {"p": 0.9, "x": 5, "window": 0.3},
+ "model": "overnight iteration 6 nano (distillation + dataset x class sampling), FP32 NCNN _held_data/overnight/distill_rw/weights/best_ncnn_model",
+ "params": {"p": 0.9, "x": 5, "window": 0.5},
  "gate": {"h": 0.35, "K": 1.25},
  "phone_veto": true,
  "yawn_veto": null,

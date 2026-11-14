@@ -45,22 +45,24 @@ Source data, phone/ear/lap/action weights, runtime scripts and Pi start config r
 
 ## Overnight result (2026-11-14, 04:00–10:00) — current state
 
-Model version: **distilled nano** (`_held_data/overnight/distill/weights/best.pt`, FP32 NCNN
-`best_ncnn_model`), clean-trained without the 5 frozen 3MDAD-val drivers, distilled from the s
-control. Dataset version: held_object_v2 (manifest sha256 `93f34932…`). Rule c77e01c, p=0.9,
-x=5, window=0.3, gate h=0.35/K=1.25, **phone call/texting veto at fusion**. Runtime code for the
-Pi: `src/held_runtime.py` (0 mismatches vs the evaluated geometry on 1,072 cached frames).
+Model version: **overnight iteration 6 nano** (`_held_data/overnight/distill_rw/weights/best.pt`,
+FP32 NCNN `best_ncnn_model`): clean-trained without the 5 frozen 3MDAD-val drivers, distilled
+from the s control with dataset x class sampling. Dataset version: held_object_v2 (manifest
+sha256 `93f34932…`). Rule c77e01c, p=0.9, x=5, window=0.5, gate h=0.35/K=1.25, **phone
+call/texting veto at fusion** (`pi_held/held_params.json`). Pi runtime: `src/held_runtime.py`
+(0 mismatches vs the evaluated geometry on 1,072 cached frames; smoke-tested on a real frame).
 
 | | SynDD | 3MDAD | DAD (2 drinks) |
 |---|---|---|---|
-| Validation | 10/15, 0 FA/h | 9/10, 0 FA/h | — |
+| Validation | 11/15, 0 FA/h | 9/10, 0 FA/h | — |
 | Test (report only) | 12/18, 0 FA/h (16/18 with untrimmed windows) | 29/30, 2.42 FA/h | 0/2, 0 FA/h |
 | Old box detector, test | 15/18, 0 FA/h | 22/30, 5.24 FA/h | 2/2, 8.67 FA/h |
 
-Target (≥ 85 % recall, ≤ 5 FA/h everywhere) not reached: SynDD recall is the gap. Kept:
-phone veto, distillation. Reverted: yawn veto, dataset × class sampling. Skipped: phone/cigarette
-hard negatives (no hand geometry for training-driver phone clips). Eating: still unsupported
-(experimental rule SynDD-test 0/19); 1,161 crops queued in `label_food_v2.html`.
+Target (≥ 85 % recall, ≤ 5 FA/h everywhere) not reached: SynDD recall is the gap. Kept: phone
+veto (it2), distillation (it4), dataset x class sampling in distillation (it6). Reverted: yawn veto
+(it3), plain dataset sampling (it5), stronger augmentation (it7), cup class weight (it8).
+Skipped: phone/cigarette hard negatives. Eating still unsupported (experimental rule SynDD-test
+0/19); 1,161 crops queued in `label_food_v2.html`.
 
 **Pi wrist check: NOT DONE** — Pi unreachable, no contact allowed overnight. Run
 `pi_held/run_pi_eval.sh` (writes `wrist_check.jpg`) once the Pi is up; record the result here.

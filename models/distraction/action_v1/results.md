@@ -2,11 +2,11 @@
 
 2026-11-14 (overnight run, branch overnight/held-object). Dataset version: held_object_v2
 (manifest sha256 93f34932...; split freeze in `_held_data/overnight/step0/split_freeze.json`).
-Product model: distilled nano (`_held_data/overnight/distill/weights/best.pt`, FP32 NCNN
-`best_ncnn_model`; INT8 not built, see below). Rule: c77e01c, params p=0.9, x=5, window=0.3,
-loose gate h=0.35 / K=1.25, phone call/texting veto at fusion.
+Product model: overnight iteration 6 nano (`_held_data/overnight/distill_rw/weights/best.pt`,
+FP32 NCNN `best_ncnn_model`; INT8 not built). Rule c77e01c, p=0.9, x=5, window=0.5, loose gate
+h=0.35 / K=1.25, phone call/texting veto at fusion (`pi_held/held_params.json`).
 FA/h = false drinking alerts per hour over ALL non-drinking clips. Choices on validation only;
-test is report-only. Full narrative, failure cases and needs-a-human list: `morning_report.md`.
+test is report-only. Narrative, failure cases and needs-a-human list: `morning_report.md`.
 Earlier versions of this file (normal-only FA/h, pre-fix 3MDAD 0/30) are superseded.
 
 ## Drinking results (validation and test separate)
@@ -16,7 +16,8 @@ Earlier versions of this file (normal-only FA/h, pre-fix 3MDAD 0/30) are superse
 | Model | SynDD-val caught | SynDD-val FA/h | 3MDAD-val caught | 3MDAD-val FA/h |
 |---|---|---|---|---|
 | Baseline: clean nano, no veto (iteration 1) | 10/15 | 1.18 (singing 1) | 9/10 | 7.77 (texting 5, reaching 1) |
-| **Best overnight: distilled nano + phone veto** | **10/15** | **0.00** | **9/10** | **0.00** |
+| Distilled nano + phone veto (iteration 4) | 10/15 | 0.00 | 9/10 | 0.00 |
+| **Best overnight: iteration 6 (distillation + dataset × class sampling) + phone veto** | **11/15** | **0.00** | **9/10** | **0.00** |
 | s control, clean, no veto | 13/15 | 2.35 | 9/10 | 16.84 |
 | Old box detector (eval_v2_det2 replay) | 13/15 | 10.59 (eating 5, phone 2, reaching 1, yawning 1) | n/a (no replay on these drivers) | n/a |
 
@@ -26,7 +27,8 @@ Earlier versions of this file (normal-only FA/h, pre-fix 3MDAD 0/30) are superse
 |---|---|---|---|
 | Baseline: clean nano, no veto | 13/18, 4.63/h (talking 2, yawning 1, phone at ear 1) | 29/30, 8.47/h (texting R 11, phone L 4, phone R 2, smoking 1, singing 1, GPS 1, texting L 1) | 1/2, 0.79/h |
 | Clean nano + phone veto (iteration 2) | 13/18, 3.47/h (talking 2, yawning 1) | 29/30, 3.63/h | 1/2, 0.79/h |
-| **Best overnight: distilled nano + phone veto** | **12/18, 0.00/h** | **29/30, 2.42/h** (smoking 3, singing 1, texting R 1, phone L 1) | **0/2, 0.00/h** |
+| Distilled nano + phone veto (iteration 4) | 12/18, 0.00/h | 29/30, 2.42/h (smoking 3, singing 1, texting R 1, phone L 1) | 0/2, 0.00/h |
+| **Best overnight: iteration 6 + phone veto** | **12/18, 0.00/h** | **29/30, 2.42/h** (smoking 2, singing 1, texting R 1, texting L 1, phone L 1) | **0/2, 0.00/h** |
 | s control, clean, no veto | 14/18, 2.32/h | 30/30, 13.31/h | 1/2, 0.00/h |
 | Old box detector (eval_v2_det2) | 15/18, 0.00/h | 22/30, 5.24/h | 2/2, 8.67/h |
 | Live Pi today (`--no-detect`) | drinking OFF | OFF | OFF |
@@ -41,9 +43,9 @@ Earlier versions of this file (normal-only FA/h, pre-fix 3MDAD 0/30) are superse
 the first half-second of a sip therefore score as misses. Re-scoring with the untrimmed
 annotation (`_held_data/overnight/boundary.json`):
 
-| Distilled nano + phone veto | Trimmed (official) | Untrimmed |
+| Best (iteration 6) + phone veto | Trimmed (official) | Untrimmed |
 |---|---|---|
-| SynDD-val | 10/15, 0/h | 11/15, 0/h |
+| SynDD-val | 11/15, 0/h | 11/15, 0/h |
 | SynDD-test | 12/18, 0/h | 16/18, 0/h |
 
 The old detector was also scored on trimmed windows (evaluate_v2 "minus 0.5 s edges"), so the
