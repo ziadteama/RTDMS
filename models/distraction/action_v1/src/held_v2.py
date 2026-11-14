@@ -81,7 +81,7 @@ def wait_old():
     while True:
         status = json.loads((OUT / "phaseB_job.json").read_text())
         if status["state"] == "done":
-            if "JOB phaseB DONE" not in (OUT / "LIVE.log").read_text(encoding="utf8"):
+            if "JOB phaseB DONE" not in (OUT / "LIVE.log").read_text(encoding="utf8", errors="replace"):
                 raise RuntimeError("Phase B status done without required success marker")
             return
         if status["state"] == "failed":

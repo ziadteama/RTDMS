@@ -36,7 +36,7 @@ def run(stage, job):
                 if "failed" in states.values():
                     raise RuntimeError(f"Prerequisite failed: {states}")
                 if all(s == "done" for s in states.values()):
-                    live = (OUT / "LIVE.log").read_text(encoding="utf8")
+                    live = (OUT / "LIVE.log").read_text(encoding="utf8", errors="replace")
                     if all(f"JOB {j} DONE" in live for j in states):
                         break
                 log(f"v2train waiting for successful prerequisites: {states}; no GPU training")
