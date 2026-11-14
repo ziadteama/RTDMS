@@ -21,7 +21,16 @@ OUT = HERE.parent / "_held_data"
 dest = OUT / "pi_bundle"
 model, params = Path(sys.argv[1]), json.loads(Path(sys.argv[2]).read_text())
 dest.mkdir(parents=True, exist_ok=True)
-shutil.copytree(model, dest / "models/held_cup_nano_ncnn_model", dirs_exist_ok=True)
+(dest / "models").mkdir(parents=True, exist_ok=True)
+if model.suffix == ".onnx":  # ncnn blocked on the dev PC: convert on the Pi (build_int8_on_pi.sh)
+    shutil.copy(model, dest / "models/held_cup_nano.onnx")
+    (dest / "models/metadata.yaml").write_text(
+        "names:\n  0: cup_bottle\n  1: empty_hand\nimgsz:\n- 128\n- 128\n", encoding="utf8")
+    for extra in ("eat_backbone_ir3.onnx", "eat_head.onnx"):
+        if (OUT / "ir" / extra).exists():
+            shutil.copy(OUT / "ir" / extra, dest / "models" / extra)
+else:
+    shutil.copytree(model, dest / "models/held_cup_nano_ncnn_model", dirs_exist_ok=True)
 (dest / "held_params.json").write_text(json.dumps(params, indent=1))
 shutil.copy(OUT / "geometry_v2/mouth_fit.json", dest / "mouth_fit.json")
 crops = sorted((OUT / "overnight/clean/data/clean_binary/train").rglob("*.jpg"))

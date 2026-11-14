@@ -2,7 +2,9 @@
 # Build the INT8 held cup model ON THE PI (the ncnn2table tool is blocked by Windows Application
 # Control on the dev PC). WRITTEN OFFLINE 2026-11-14, NOT YET RUN.
 #
-#   bash build_int8_on_pi.sh <fp32 ncnn model dir> <calibration crops dir (jpg, recursive)>
+#   bash build_int8_on_pi.sh <fp32 ncnn model dir | model.onnx> <calibration crops dir (jpg, recursive)>
+# Given an .onnx (exported on the dev PC, where ncnn is blocked by Windows Application Control
+# since 2026-11-14), it is first converted to FP32 NCNN with onnx2ncnn (metadata.yaml next to it).
 #
 # Same steps as action_v1/src/bench.py int8(): ncnnoptimize -> ncnn2table (KL, 600 crops,
 # /255 RGB input like Ultralytics) -> ncnn2int8. Builds the ncnn tools once (pinned tag).

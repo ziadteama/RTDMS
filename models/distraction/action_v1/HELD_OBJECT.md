@@ -68,3 +68,27 @@ Skipped: phone/cigarette hard negatives. Eating still unsupported (experimental 
 `pi_held/run_pi_eval.sh` (writes `wrist_check.jpg`) once the Pi is up; record the result here.
 Details: [morning_report.md](morning_report.md), [results.md](results.md),
 [overnight_log.md](overnight_log.md).
+
+## IR run (2026-11-14 evening → 11-15) — current state, supersedes the overnight section
+
+**Product drinking model:** IR-4 nano (`_held_data/ir/camsim_light/weights/best.pt` /
+`best.onnx`).
+- Recipe: clean nano + distillation from s, dataset × class sampling, 1,500 phone hard negatives,
+  light camera simulation.
+- Rule p=0.5, x=10, window=0.3, gate h=0.35 / K=1.25, phone veto.
+
+**Eating:** GRU head on IR-3 backbone features (`eat_backbone_ir3.onnx` + `eat_head.onnx`),
+gated on ≥ 2 hand-at-mouth samples, phone veto, no eating during drinking.
+
+**Dataset version:** IR split `ir_split.json` (SynDD + DAD front IR), untrimmed windows.
+
+| IR | Drinking | Eating |
+|---|---|---|
+| Validation (SynDD-val) | 14/15, 0.00 FA/h | 13/19, 16.05 FA/h |
+| Test (SynDD-test + DAD), report only | 16/18 @1.07/h + DAD 2/2 @1.58/h = **18/20** | 13/19 @10.15/h |
+| Old box detector, test | 16/18 @0/h + DAD 2/2 @8.67/h | 0/19 |
+
+**Pi wrist check: NOT DONE.** The Pi was unreachable on all 5 hourly SSH tries (16:56–23:56).
+`ncnn` is blocked by Windows Application Control on the dev PC, so models were evaluated from
+PyTorch / ONNX (parity checked). Full report: [ir_report.md](ir_report.md); dataset inventory:
+[dataset_inventory.md](dataset_inventory.md); change log: [ir_log.md](ir_log.md).

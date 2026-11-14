@@ -13,12 +13,13 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REC="${1:?recorded clips dir with labels.csv}"
 PY="${RTDMS_PYTHON:-$HOME/rtdms/.venv/bin/python}"
+ONNX="$HERE/models/held_cup_nano.onnx"
 FP32="$HERE/models/held_cup_nano_ncnn_model"
 INT8="$HERE/models/held_cup_nano_int8kl_ncnn_model"
 CALIB="$HERE/calib"
 
 if [ ! -d "$INT8" ]; then
-  bash "$HERE/build_int8_on_pi.sh" "$FP32" "$CALIB"
+  bash "$HERE/build_int8_on_pi.sh" "$ONNX" "$CALIB"   # also writes the FP32 NCNN dir
 fi
 for M in "$INT8" "$FP32"; do
   echo "== $(basename "$M")"

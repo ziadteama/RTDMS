@@ -118,3 +118,13 @@ They are two different systems measured two different ways. Both come from the s
   normal + hand-on-face).
 
 So neither the detector nor the data changed; the system row and the false-alarm definition did.
+
+### Final IR results (after steps 2–3; details in `ir_report.md`)
+
+| IR test (report only) | SynDD drinking | DAD drinking | SynDD eating |
+|---|---|---|---|
+| Product (IR-4 drinking + eating head) | 16/18, 1.07/h | 2/2, 1.58/h | 13/19, 10.15/h |
+| s control | 15/18, 2.14/h | 1/2, 0.00/h | — |
+| Old box detector | 16/18, 0.00/h | 2/2, 8.67/h | 0/19 |
+
+IR validation: product drinking 14/15 @0.00/h, eating 13/19 @16.05/h.
