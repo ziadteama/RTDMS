@@ -1,4 +1,4 @@
-"""Detached drinking-only campaign: train two subsets, export, tune, evaluate, benchmark.
+"""Detached drinking-only campaign: train three subsets, export, tune, evaluate, benchmark.
 
 All generated artifacts remain below _held_data/phaseB. Test pixels are transient arrays.
 Food and its human-labelling files are never training inputs or modified.
@@ -40,7 +40,7 @@ from held_alerts import DrinkingRule
 from held_geometry import hand_geometry, pose_mouth
 
 CLASSES = ["cup_bottle", "empty_hand"]
-SUBSETS = {"tight": (0.0, 1.0), "loose": (0.35, 1.25)}
+SUBSETS = {"tight": (0.0, 1.0), "loose": (0.35, 1.25), "tight_drv": (0.0, 1.0)}
 TOOLS = Path("C:/Users/youss/rtdms-tools/ncnn")
 
 
@@ -86,13 +86,19 @@ def prepare(subset):
                 groups[(r["dataset"], r["driver"])].append(r)
         capped = defaultdict(list)
         for (ds, _), group in sorted(groups.items()):
-            capped[ds] += rng.sample(group, min(100, len(group)))
+            capped[ds] += rng.sample(group, min(60 if subset == "tight_drv" else 100, len(group)))
         for ds, group in capped.items():
             other = sum(len(v) for key, v in capped.items() if key != ds)
-            chosen += rng.sample(group, min(len(group), other or len(group)))
+            chosen += (
+                group
+                if subset == "tight_drv"
+                else rng.sample(group, min(len(group), other or len(group)))
+            )
     # Equal class totals after driver<=100 and dataset<=50%-when-possible caps.
     n = min(sum(r["target"] == c for r in chosen) for c in CLASSES)
     train = [r for cls in CLASSES for r in rng.sample([r for r in chosen if r["target"] == cls], n)]
+    if subset == "tight_drv":
+        train = chosen  # No dataset equalisation or negative downsampling.
     selected = train + [r for r in rows if r["split"] == "val"]
     folder = ROOT / "data" / subset
     for r in selected:
@@ -106,8 +112,13 @@ def prepare(subset):
         dict(
             before=dict(Counter(f"{r['split']}/{r['dataset']}/{r['target']}" for r in rows)),
             after=dict(Counter(f"{r['split']}/{r['dataset']}/{r['target']}" for r in selected)),
-            max_per_driver_class=100,
-            dataset_cap="no dataset exceeds other datasets combined",
+            max_per_driver_class=60 if subset == "tight_drv" else 100,
+            dataset_cap="none"
+            if subset == "tight_drv"
+            else "no dataset exceeds other datasets combined",
+            balancing="inverse-class-frequency weighted sampling"
+            if subset == "tight_drv"
+            else "downsampling",
             class_balanced_train=True,
             food_excluded=True,
             selected=selected,
@@ -117,14 +128,47 @@ def prepare(subset):
     return folder, selected
 
 
+from train_cls import AugTrainer
+
+
+class BalancedDriverTrainer(AugTrainer):
+    """Keep capped negative diversity; sample equal class mass with replacement."""
+
+    def get_dataloader(self, dataset_path, batch_size=16, rank=0, mode="train"):
+        if mode != "train":
+            return super().get_dataloader(dataset_path, batch_size, rank, mode)
+        from ultralytics.data.build import InfiniteDataLoader, seed_worker
+
+        ds = self.build_dataset(dataset_path, mode)
+        counts = Counter(sample[1] for sample in ds.samples)
+        weights = [1.0 / counts[sample[1]] for sample in ds.samples]
+        sampler = torch.utils.data.WeightedRandomSampler(
+            weights, len(weights), replacement=True, generator=torch.Generator().manual_seed(28)
+        )
+        return InfiniteDataLoader(
+            ds,
+            batch_size=batch_size,
+            sampler=sampler,
+            num_workers=self.args.workers,
+            pin_memory=False,
+            collate_fn=getattr(ds, "collate_fn", None),
+            worker_init_fn=seed_worker,
+        )
+
+
 def train(subset, folder):
     import train_cls
     from train_cls import AugTrainer
     from ultralytics import YOLO, settings
 
     train_cls.RUNS = ROOT / "runs"
-    settings.update({"weights_dir": str(ROOT / "weights"),
-                     "datasets_dir": str(ROOT / "data"), "runs_dir": str(ROOT / "runs")})
+    settings.update(
+        {
+            "weights_dir": str(ROOT / "weights"),
+            "datasets_dir": str(ROOT / "data"),
+            "runs_dir": str(ROOT / "runs"),
+        }
+    )
     weight = ROOT / "runs" / subset / "weights/best.pt"
     if weight.exists() and (ROOT / subset / "training_done.json").exists():
         W.log(f"Resume phaseB: completed weights exist for {subset}")
@@ -145,7 +189,7 @@ def train(subset, folder):
     W.log(f"Starting {subset} two-way yolo26n-cls 128 training, up to 40 epochs, patience 8")
     model.train(
         data=str(folder),
-        trainer=AugTrainer,
+        trainer=BalancedDriverTrainer if subset == "tight_drv" else AugTrainer,
         imgsz=128,
         epochs=40,
         batch=128,
@@ -177,6 +221,16 @@ def train(subset, folder):
 
 class Classifier:
     def __init__(self, folder, cup="cup_bottle", threads=4):
+        folder = Path(folder)
+        self.pt = folder.suffix == ".pt"
+        if self.pt:
+            from ultralytics import YOLO
+
+            torch.set_num_threads(threads)
+            self.model = YOLO(str(folder)).model.cpu().float().eval()
+            self.index = next(int(i) for i, name in self.model.names.items() if name == cup)
+            self.size = 128
+            return
         import ncnn
 
         self.nc = ncnn
@@ -194,27 +248,47 @@ class Classifier:
     def __call__(self, gray):
         x = cv2.resize(gray, (self.size, self.size), interpolation=cv2.INTER_AREA)
         x = np.ascontiguousarray(np.repeat((x.astype(np.float32) / 255)[None], 3, axis=0))
+        if self.pt:
+            with torch.inference_mode():
+                out = self.model(torch.from_numpy(x[None]))
+            out = out[0] if isinstance(out, tuple) else out
+            return float(out[0, self.index])
         ex = self.net.create_extractor()
         ex.input(self.input, self.nc.Mat(x))
         return float(np.array(ex.extract(self.output)[1]).reshape(-1)[self.index])
 
 
 def export(subset, weight, folder, rows):
-    import bench
     from ultralytics import YOLO
 
     fp = weight.parent / "best_ncnn_model"
-    if not fp.exists():
-        W.log(f"Exporting {subset} FP32 NCNN")
-        fp = Path(YOLO(str(weight)).export(format="ncnn", imgsz=128, half=False))
-    quant = weight.parent / "best_int8kl_ncnn_model"
-    if not quant.exists():
-        W.log(f"Calibrating {subset} INT8 KL on train crops only")
-        quant = Path(bench.int8(fp, 128, folder / "train", "kl", 600))
+    try:
+        if not all(
+            (fp / name).is_file()
+            for name in ("model.ncnn.param", "model.ncnn.bin", "metadata.yaml")
+        ):
+            W.log(f"Exporting {subset} FP32 NCNN")
+            fp = Path(YOLO(str(weight)).export(format="ncnn", imgsz=128, half=False))
+        Classifier(fp)  # Validate completed export before using it.
+        backend = "fp32"
+    except Exception as exc:
+        W.log(f"FP32 NCNN export unavailable for {subset}: {exc}; using PyTorch checkpoint")
+        fp, backend = weight, "pytorch"
+    # ncnn2table is known blocked: do not invoke it again or alter executables/policy.
+    W.log("INT8: open (ncnn2table blocked by Application Control)")
+    save(
+        f"{subset}/export_status.json",
+        dict(
+            int8="open (ncnn2table blocked by Application Control)",
+            backend=backend,
+            model=str(fp),
+            executable_or_policy_changes=False,
+        ),
+    )
     result = {}
     val = [r for r in rows if r["split"] == "val"]
     y = [int(r["target"] == "cup_bottle") for r in val]
-    for name, path in (("fp32", fp), ("int8", quant)):
+    for name, path in ((backend, fp),):
         net = Classifier(path)
         probs = [net(cv2.imread(str(W.OUT / r["path"]), 0)) for r in val]
         result[name] = dict(
@@ -229,7 +303,7 @@ def export(subset, weight, folder, rows):
         f"Read {subset} crop validation: "
         + str({k: {q: v for q, v in s.items() if q != "probabilities"} for k, s in saved.items()})
     )
-    return quant, saved
+    return fp, saved
 
 
 def windows(split):
@@ -305,7 +379,9 @@ def predict_job(job, models, settings):
     """Continuous cached timeline; pose updated every third sampled frame, held in between."""
     dest = ROOT / "predictions" / f"{job['dataset']}_{job['clip']}.json"
     if dest.exists():
-        return json.loads(dest.read_text(encoding="utf8"))
+        cached = json.loads(dest.read_text(encoding="utf8"))
+        if cached.get("campaign_version") == "optional_int8_driver60":
+            return cached
     ds = job["dataset"]
     kind, cache = W.load_cache(dict(job))
     pitch_cache = {}
@@ -390,7 +466,7 @@ def predict_job(job, models, settings):
             W.log(f"Predict {ds} {job['clip']}: {i} sampled frames; pose every third")
     for cap in caps.values():
         cap.release()
-    data = dict(job=job, frames=frames)
+    data = dict(job=job, frames=frames, campaign_version="optional_int8_driver60")
     save(str(dest.relative_to(ROOT)), data)
     return data
 
@@ -444,7 +520,7 @@ def score(scenes, setting, model, params):
     )
 
 
-def evaluation(models, auc):
+def evaluation(models, auc, primary):
     W.log(
         "Starting gated SynDD-val predictions and threshold tuning; tests not opened for selection"
     )
@@ -455,7 +531,7 @@ def evaluation(models, auc):
             (0.5, 0.6, 0.7, 0.8, 0.9, 0.95), (5, 10, 15), (0.3, 0.5, 1.0, 1.5)
         ):
             params = dict(p=p, x=x, window=window)
-            metric = score(scenes, subset, subset + "/int8", params)
+            metric = score(scenes, subset, primary[subset], params)
             candidates.append(dict(subset=subset, params=params, metrics=metric))
     bests = {
         s: max([c for c in candidates if c["subset"] == s], key=lambda c: c["metrics"]["objective"])
@@ -488,9 +564,14 @@ def evaluation(models, auc):
     subset, params = chosen["subset"], chosen["params"]
     exported = ROOT / "held_cup_n128"
     exported.mkdir(exist_ok=True)
-    for p in Path(models[subset + "/int8"][0]).iterdir():
-        if p.is_file():
-            shutil.copy2(p, exported / p.name)
+    source = Path(models[primary[subset]][0])
+    if source.is_dir():
+        for p in source.iterdir():
+            if p.is_file():
+                shutil.copy2(p, exported / p.name)
+    else:
+        shutil.copy2(source, exported / "held_cup_n128.pt")
+    save("chosen_backend.json", dict(model=primary[subset], path=str(source)))
     results = {}
     for ds in ("syndd", "3mdad", "dad"):
         jobs = windows("test") if ds == "syndd" else other_jobs(ds)
@@ -513,7 +594,7 @@ def evaluation(models, auc):
         )
     baseline = json.loads((W.DATA / "action_v1/runs/eval_v2_det2.json").read_text())
     save("release_comparison.json", dict(new=results, release_v2_det2=baseline, selection=locked))
-    primary = {ds: value[subset + "/int8"] for ds, value in results.items()}
+    primary = {ds: value[primary[subset]] for ds, value in results.items()}
     targets = dict(
         syndd_recall_15_of_18=primary["syndd"]["drinking_recall"][0] >= 15,
         syndd_fa_zero=primary["syndd"]["fa_normal_hof"][0] == 0,
@@ -532,7 +613,8 @@ def benchmark(subset, results):
     pose = PoseEstimator(
         PoseConfig(weights=str(W.BASE.parent / "models/yolo26n_pose_320_ncnn_model"), num_threads=4)
     )
-    net = Classifier(ROOT / "held_cup_n128")
+    chosen = json.loads((ROOT / "chosen_backend.json").read_text())
+    net = Classifier(Path(chosen["path"]))
     files = sorted((W.DATA / "raw/3mdad/front/Day-RGB2/RGB2").glob("S3/AC1/*.jpg"))[:100]
     frames = [cv2.imread(str(p), 0) for p in files]
     pt, ct = [], []
@@ -569,6 +651,7 @@ def benchmark(subset, results):
         timeout=15,
     )
     report = dict(
+        backend=chosen["model"],
         threads=4,
         pose_ms=float(np.mean(pt)),
         crop_ms=float(np.mean(ct)),
@@ -615,14 +698,15 @@ def main():
     W.log("Phase B chain starting: drinking only; food wholly excluded; labels untouched")
     protected = [W.OUT / "label_food.html", W.OUT / "food_labels.csv"]
     hashes = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in protected if p.exists()}
-    models, auc = {}, {}
+    models, auc, primary = {}, {}, {}
     for subset in SUBSETS:
         folder, rows = prepare(subset)
         weight = train(subset, folder)
         quant, metric = export(subset, weight, folder, rows)
-        models[subset + "/int8"] = (str(quant), "cup_bottle")
-        models[subset + "/fp32"] = (metric["fp32"]["model"], "cup_bottle")
-        auc[subset] = metric["int8"]["auc"]
+        backend = next(iter(metric))
+        primary[subset] = subset + "/" + backend
+        models[primary[subset]] = (str(quant), "cup_bottle")
+        auc[subset] = metric[backend]["auc"]
     old_root = Path("C:/Users/youss/projects/RTDMS/models/distraction/models")
     old = []
     for path in sorted(old_root.glob("mouth_cls_*")):
@@ -634,13 +718,16 @@ def main():
         "old_model_mapping.json",
         dict(models=old, cup_probability="P(drink), food and none are not cup"),
     )
-    subset, results = evaluation(models, auc)
+    subset, results = evaluation(models, auc, primary)
     benchmark(subset, results)
-    changed = [p for p, sha in hashes.items()
-               if hashlib.sha256(Path(p).read_bytes()).hexdigest() != sha]
+    changed = [
+        p for p, sha in hashes.items() if hashlib.sha256(Path(p).read_bytes()).hexdigest() != sha
+    ]
     if changed:
-        W.log("Food labelling files changed externally while running; no campaign stage writes "
-              "them and their labels were not read for training: " + str(changed))
+        W.log(
+            "Food labelling files changed externally while running; no campaign stage writes "
+            "them and their labels were not read for training: " + str(changed)
+        )
     save(
         "phaseB_complete.json",
         dict(
