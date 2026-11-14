@@ -150,6 +150,30 @@ def train(root, camsim, hardneg, hard_n=0):
     return out_pt
 
 
+_POSE = None
+
+
+def torch_pose_points(gray, lm):
+    """Drop-in for held_wrist.pose_points with the PyTorch yolo26n-pose (ncnn is blocked by
+    Windows Application Control on this PC since 2026-11-14 afternoon). Same driver choice:
+    person box containing the face centre, else the best score."""
+    global _POSE
+    from ultralytics import YOLO
+
+    if _POSE is None:
+        _POSE = YOLO(str(F.HERE.parents[1] / "models/yolo26n-pose.pt"))
+    r = _POSE(cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR), imgsz=320, verbose=False, device="cpu")[0]
+    if r.keypoints is None or len(r.boxes) == 0:
+        return np.zeros((17, 3))
+    boxes, scores, kps = r.boxes.xyxy.numpy(), r.boxes.conf.numpy(), r.keypoints.data.numpy()
+    idx = list(range(len(boxes)))
+    if lm is not None:
+        fx, fy = (lm[10] + lm[152]) / 2
+        inside = [i for i in idx if boxes[i, 0] <= fx <= boxes[i, 2] and boxes[i, 1] <= fy <= boxes[i, 3]]
+        idx = inside or idx
+    return kps[max(idx, key=lambda i: scores[i])].astype(float)
+
+
 def score_ir(b, measure, scenes_val, scenes_test, model, rows):
     val = F.apply(I.widen(scenes_val), rows, True, None)
     best = None
@@ -188,6 +212,7 @@ def main():
     b.DrinkingRule = importlib.import_module("held_alerts").DrinkingRule
     measure = importlib.import_module("overnight_measure")
     b.ROOT = root
+    b.W.pose_points = torch_pose_points  # ncnn blocked on this PC
     models = {"nano/pt": (str(pt), "cup_bottle")}
     settings = {"nano": (0.35, 1.25)}
     rows = {}
