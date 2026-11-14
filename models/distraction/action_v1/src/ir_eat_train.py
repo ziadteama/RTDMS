@@ -25,10 +25,15 @@ import torch.nn as nn
 
 EAT = F.OUT / "ir/eat"
 HARD = F.OUT / "ir/hardneg"
-MODEL_PT = F.OUT / "overnight/distill_rw/weights/best.pt"
+MODEL_DIR = __import__("os").environ.get("EAT_MODEL", "hardneg1500")  # product cup model
+MODEL_PT = F.OUT / f"ir/{MODEL_DIR}/weights/best.pt"
 CLASSES = ["eating", "drinking", "phone", "other"]
 PHONE = {"phone_right_ear", "phone_left_ear", "phone_in_hand"}
 T = 7
+import os
+YAWN_W = float(os.environ.get("EAT_YAWN_W", "1"))
+HEAD_OUT = os.environ.get("EAT_HEAD_OUT", "eat_head")
+MIN_NEAR = 2  # the head only runs on windows with >= 2 hand-at-mouth samples
 DEV = "cuda"
 
 
@@ -94,6 +99,9 @@ def label_at(intervals, t):
     return None
 
 
+HARDW = []
+
+
 def windows(vids, dim):
     xs, ys = [], []
     for v in vids:
@@ -103,8 +111,11 @@ def windows(vids, dim):
             ls = labs[i - T + 1:i + 1]
             if ls[0] is None or any(lab != ls[0] for lab in ls):
                 continue
+            if x[i - T + 1:i + 1, dim + 1].sum() < MIN_NEAR:  # head runs only with hand at mouth
+                continue
             xs.append(x[i - T + 1:i + 1])
             ys.append(cls_of(ls[0]))
+            HARDW.append(YAWN_W if ls[0] in ("neg_yawning", "neg_hand_on_head") else 1.0)
     return np.array(xs, np.float32), np.array(ys, np.int64)
 
 
@@ -154,6 +165,7 @@ def eat_probs(head, v, dim):
     w = np.stack([x[i - T + 1:i + 1] for i in range(T - 1, len(x))])
     with torch.no_grad():
         p = torch.softmax(head(torch.from_numpy(w).to(DEV)), 1)[:, 0].cpu().numpy()
+    p[w[:, :, -1].sum(1) < MIN_NEAR] = 0.0  # not run without the hand at the mouth
     return np.concatenate([np.zeros(T - 1), p])
 
 
@@ -184,9 +196,12 @@ def main():
     F.log(f"Eat head: features dim {dim}; videos {[len(v) for v in data.values()]}; "
           f"near frames {[sum(int(x['near'].sum()) for x in v) for v in data.values()]}")
     xtr, ytr = windows(data["train"], dim)
+    sw = np.array(HARDW, np.float32)
     ph = phone_windows(fz, dim, {v["driver"] for v in data["train"]})
     xtr = np.concatenate([xtr, ph])
     ytr = np.concatenate([ytr, np.full(len(ph), 2)])
+    sw = np.concatenate([sw, np.ones(len(ph), np.float32)])
+    swt = torch.from_numpy(sw).to(DEV)
     xva, yva = windows(data["val"], dim)
     F.log(f"Eat head: train windows {dict(Counter(ytr.tolist()))} (phone from hard negatives "
           f"{len(ph)}), val windows {dict(Counter(yva.tolist()))}")
@@ -203,7 +218,8 @@ def main():
         perm = torch.randperm(len(xt), device=DEV)
         for i in range(0, len(perm), 256):
             j = perm[i:i + 256]
-            loss = nn.functional.cross_entropy(head(xt[j]), yt[j], weight=wts)
+            loss = (nn.functional.cross_entropy(head(xt[j]), yt[j], weight=wts, reduction="none")
+                    * swt[j]).sum() / (wts[yt[j]] * swt[j]).sum()
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -242,14 +258,15 @@ def main():
     ms = (time.perf_counter() - ts) / 200 * 1000
     drivers = {s: len({v["driver"] for v in d if any(c["label"] == "eating" for c in v["intervals"])})
                for s, d in data.items()}
-    res = dict(classes=CLASSES, T=T, dim=dim, best_epoch=best[1] + 1, val_window_recall=best[3],
+    res = dict(classes=CLASSES, T=T, dim=dim, best_epoch=best[1] + 1, val_window_recall=[float(v) for v in best[3]],
                rule=dict(thr=thr, m=m, refractory_s=30), val=rv, test_report_only=rt,
                head_ms_per_run_pc_cpu_4threads=round(ms, 3),
                eating_drivers_per_split=drivers, dad="no eating clips in DAD",
                source="SynDD rear view (monochrome, daylight) only — not active IR",
                minutes=round((time.time() - t0) / 60, 1))
-    torch.save(head_cpu.state_dict(), F.OUT / "ir/eat_head.pt")
-    (F.OUT / "ir/eat_results.json").write_text(json.dumps(res, indent=1))
+    torch.save(head_cpu.state_dict(), F.OUT / f"ir/{HEAD_OUT}.pt")
+    (F.OUT / f"ir/{HEAD_OUT}_results.json").write_text(json.dumps(
+        res, indent=1, default=lambda o: o.item() if hasattr(o, "item") else str(o)))
     F.log(f"Eat head: rule thr={thr} m={m}; IR val eating {rv['caught']} {rv['fa_per_h']}/h; "
           f"IR test (report only) {rt['caught']} {rt['fa_per_h']}/h {rt['false_by_type']}; head {ms:.3f} ms/run")
     F.log("JOB eat_head DONE")

@@ -72,12 +72,12 @@ class CamSim:
         return Image.fromarray(a)
 
 
-def dataset(camsim, hardneg, hard_n=0):
+def dataset(camsim, hardneg, hard_n=0, camsim_p=0.8):
     from torchvision import datasets, transforms
 
     aug = [transforms.Grayscale(1)]
     if camsim:
-        aug.append(CamSim())
+        aug.append(CamSim(p=camsim_p))
     aug += [transforms.Grayscale(3),
             transforms.RandomResizedCrop(128, scale=(0.75, 1.0), ratio=(0.9, 1.1)),
             transforms.RandomHorizontalFlip(),
@@ -105,7 +105,7 @@ def logits(model, x):
     return out
 
 
-def train(root, camsim, hardneg, hard_n=0):
+def train(root, camsim, hardneg, hard_n=0, camsim_p=0.8):
     from torch.utils.data import DataLoader, WeightedRandomSampler
     from ultralytics import YOLO
 
@@ -120,7 +120,7 @@ def train(root, camsim, hardneg, hard_n=0):
     student = YOLO(str(student_pt)).model.float().to(dev)
     for p in student.parameters():
         p.requires_grad_(True)
-    ds, weights, counts = dataset(camsim, hardneg, hard_n)
+    ds, weights, counts = dataset(camsim, hardneg, hard_n, camsim_p)
     F.log(f"IR train {root.name}: groups {counts}")
     dl = DataLoader(ds, batch_size=64, num_workers=0,  # AppControl blocks DLLs in child processes
                     sampler=WeightedRandomSampler(weights, len(weights), replacement=True))
@@ -197,6 +197,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("name")
     ap.add_argument("--camsim", action="store_true")
+    ap.add_argument("--camsim-p", type=float, default=0.8)
     ap.add_argument("--hardneg", action="store_true")
     ap.add_argument("--hard-n", type=int, default=0, help="subsample the hard negatives")
     ap.add_argument("--base", default=str(F.OUT / "overnight/distill_rw"))
@@ -205,7 +206,7 @@ def main():
     os.chdir(F.HERE)
     root = F.OUT / "ir" / a.name
     root.mkdir(parents=True, exist_ok=True)
-    pt = train(root, a.camsim, a.hardneg, a.hard_n)
+    pt = train(root, a.camsim, a.hardneg, a.hard_n, a.camsim_p)
     # Evaluated from the PyTorch weights: ncnn is blocked by Windows Application Control on this
     # PC since 2026-11-14 afternoon (not bypassed). NCNN/INT8 export moves to the Pi.
     b = importlib.import_module("phase_b")
