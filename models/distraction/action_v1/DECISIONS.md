@@ -136,10 +136,10 @@ D28. **Phase B is drinking only (2026-11-14, user approved).** Sheet review foun
     46/48 tight cup samples usable and appropriate empty_hand hard negatives, but only about
     7/48 food samples visibly contained food. Food is excluded from BOTH classifier classes,
     not reassigned to empty_hand. The team's label_food.html and food_labels.csv are protected
-    and never modified. Train tight and loose binary nano classifiers; cap each train
+    and never modified. Train tight and loose binary nano classifiers initially; cap each train
     driver/class at 100 crops, cap each dataset to at most the other datasets combined when
     possible, then balance the two train classes. Keep SynDD-val uncapped for evaluation.
-D29. **Freeze drinking selection before opening test results.** Compare INT8 crop AUC and
+D29. **Freeze drinking selection before opening test results.** Compare available-backend crop AUC and
     gated alert-level D12 objective on SynDD-val only. Pose is updated every third sampled
     frame and its arm/head points held between updates; classifier runs only near the mouth.
     Tight gate h=0/K=1 and loose h=.35/K=1.25 use D26 mouth fallback. Both training subsets
@@ -155,3 +155,18 @@ D30. **Phase B artifacts stay local; no Phase C wiring.** Train recipe follows t
     from the held-hand crop. PC pose/crop timing uses four threads; Pi timing is explicitly
     an estimate at x2.1. Initial LAN key-auth probe timed out; benchmark stage retries.
     No hybrid.py, stream.py, Pi start script, call/texting or eating implementation changes.
+
+D31. **Application Control is a hard export boundary (2026-11-14).** ncnn2table.exe
+    failed with WinError 4551. INT8 remains open, not a prerequisite for evaluation.
+    Do not retry the known-blocked tool, alter policy, or copy/rename/replace executables.
+    Reuse the trained tight checkpoint and completed FP32 NCNN export. Export subsequent
+    variants to FP32 NCNN; if unavailable, use the same checkpoint on CPU with direct
+    128px gray-to-three-channel /255 tensors (no additional contrast stretch). Record the
+    backend explicitly in metrics and latency. B3 is partial; Pi is open after LAN timeout.
+D32. **Compare a driver-only cap without discarding negative diversity (2026-11-14).**
+    Add tight_drv alongside the original tight/loose variants. Retain at most 60 crops
+    per train driver/class, with no dataset equalisation or class downsampling. Use
+    inverse-class-frequency weighted sampling with replacement, one retained-set-length
+    epoch, seed 28. The cap applies to distinct retained crops; sampling may repeat them.
+    Validation is uncapped and unweighted. Choose among all three variants using only
+    SynDD-val alert objective and crop AUC; no test-set threshold or variant selection.
