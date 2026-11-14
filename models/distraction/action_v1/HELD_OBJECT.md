@@ -42,3 +42,27 @@ All current FA/h = false drinking onsets / ALL non-drinking hours. [results.md](
 Frozen MDAD-val drivers10,11,15,19,50 (seed28), removed from all subsequent nano/control training. Existing models are contaminated on that new holdout; clean retrain in progress:18076 train crops,3375 crop-val. Event validation uses all15 mapped actions per heldout driver. Choice uses validation only; test scored after keep. [OVERNIGHT_PLAN.md](OVERNIGHT_PLAN.md), [overnight_log.md](overnight_log.md), and [morning_report.md](morning_report.md) track the run.
 
 Source data, phone/ear/lap/action weights, runtime scripts and Pi start config remain unchanged. No data deleted or pushed.
+
+## Overnight result (2026-11-14, 04:00–10:00) — current state
+
+Model version: **distilled nano** (`_held_data/overnight/distill/weights/best.pt`, FP32 NCNN
+`best_ncnn_model`), clean-trained without the 5 frozen 3MDAD-val drivers, distilled from the s
+control. Dataset version: held_object_v2 (manifest sha256 `93f34932…`). Rule c77e01c, p=0.9,
+x=5, window=0.3, gate h=0.35/K=1.25, **phone call/texting veto at fusion**. Runtime code for the
+Pi: `src/held_runtime.py` (0 mismatches vs the evaluated geometry on 1,072 cached frames).
+
+| | SynDD | 3MDAD | DAD (2 drinks) |
+|---|---|---|---|
+| Validation | 10/15, 0 FA/h | 9/10, 0 FA/h | — |
+| Test (report only) | 12/18, 0 FA/h (16/18 with untrimmed windows) | 29/30, 2.42 FA/h | 0/2, 0 FA/h |
+| Old box detector, test | 15/18, 0 FA/h | 22/30, 5.24 FA/h | 2/2, 8.67 FA/h |
+
+Target (≥ 85 % recall, ≤ 5 FA/h everywhere) not reached: SynDD recall is the gap. Kept:
+phone veto, distillation. Reverted: yawn veto, dataset × class sampling. Skipped: phone/cigarette
+hard negatives (no hand geometry for training-driver phone clips). Eating: still unsupported
+(experimental rule SynDD-test 0/19); 1,161 crops queued in `label_food_v2.html`.
+
+**Pi wrist check: NOT DONE** — Pi unreachable, no contact allowed overnight. Run
+`pi_held/run_pi_eval.sh` (writes `wrist_check.jpg`) once the Pi is up; record the result here.
+Details: [morning_report.md](morning_report.md), [results.md](results.md),
+[overnight_log.md](overnight_log.md).

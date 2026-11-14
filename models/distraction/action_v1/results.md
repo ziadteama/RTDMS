@@ -1,58 +1,53 @@
-# Overnight measurement baseline
+# Held-object drinking — results
 
-2026-11-14. Product: yolo26n-cls 128; yolo26s-cls is control only.
-FA/h everywhere below = false drinking onsets / ALL non-drinking hours. Historical normal-only FA/h in earlier documents is a different metric, not comparable.
+2026-11-14 (overnight run, branch overnight/held-object). Dataset version: held_object_v2
+(manifest sha256 93f34932...; split freeze in `_held_data/overnight/step0/split_freeze.json`).
+Product model: distilled nano (`_held_data/overnight/distill/weights/best.pt`, FP32 NCNN
+`best_ncnn_model`; INT8 not built, see below). Rule: c77e01c, params p=0.9, x=5, window=0.3,
+loose gate h=0.35 / K=1.25, phone call/texting veto at fusion.
+FA/h = false drinking alerts per hour over ALL non-drinking clips. Choices on validation only;
+test is report-only. Full narrative, failure cases and needs-a-human list: `morning_report.md`.
+Earlier versions of this file (normal-only FA/h, pre-fix 3MDAD 0/30) are superseded.
 
-Validation-only rule choice: `c77e01c`. No test used to choose.
+## Drinking results (validation and test separate)
 
-## Validation
+### Validation (used for the decisions)
 
-| Model | Set | Caught/total | All-negative FA/h |
+| Model | SynDD-val caught | SynDD-val FA/h | 3MDAD-val caught | 3MDAD-val FA/h |
+|---|---|---|---|---|
+| Baseline: clean nano, no veto (iteration 1) | 10/15 | 1.18 (singing 1) | 9/10 | 7.77 (texting 5, reaching 1) |
+| **Best overnight: distilled nano + phone veto** | **10/15** | **0.00** | **9/10** | **0.00** |
+| s control, clean, no veto | 13/15 | 2.35 | 9/10 | 16.84 |
+| Old box detector (eval_v2_det2 replay) | 13/15 | 10.59 (eating 5, phone 2, reaching 1, yawning 1) | n/a (no replay on these drivers) | n/a |
+
+### Test (report only, never used to choose)
+
+| Model | SynDD-test | 3MDAD-test | DAD (real IR) |
 |---|---|---|---|
-| v2_n | SynDD-val | [11, 15] | 0.0 |
-| v2_s | SynDD-val | [11, 15] | 0.0 |
-| all historical models | new 3MDAD-val | NOT ELIGIBLE: trained on these drivers | pending clean retrain |
+| Baseline: clean nano, no veto | 13/18, 4.63/h (talking 2, yawning 1, phone at ear 1) | 29/30, 8.47/h (texting R 11, phone L 4, phone R 2, smoking 1, singing 1, GPS 1, texting L 1) | 1/2, 0.79/h |
+| Clean nano + phone veto (iteration 2) | 13/18, 3.47/h (talking 2, yawning 1) | 29/30, 3.63/h | 1/2, 0.79/h |
+| **Best overnight: distilled nano + phone veto** | **12/18, 0.00/h** | **29/30, 2.42/h** (smoking 3, singing 1, texting R 1, phone L 1) | **0/2, 0.00/h** |
+| s control, clean, no veto | 14/18, 2.32/h | 30/30, 13.31/h | 1/2, 0.00/h |
+| Old box detector (eval_v2_det2) | 15/18, 0.00/h | 22/30, 5.24/h | 2/2, 8.67/h |
+| Live Pi today (`--no-detect`) | drinking OFF | OFF | OFF |
 
-## Test (report only)
+**Target (≥ 85 % recall and ≤ 5 FA/h on every dataset, nano): NOT reached.**
+- **3MDAD:** meets the target (97 %, 2.4/h).
+- **SynDD:** 67 % recall, below target; false alarms meet it.
+- **DAD:** 0/2. That is only two clips, but it's still a miss on real IR.
 
-| Model | Set | Caught/total | All-negative FA/h |
-|---|---|---|---|
-| v2_n | syndd | [11, 18] | 4.63171437761338 |
-| v2_n | 3mdad | [29, 30] | 11.693112252869605 |
-| v2_n | dad | [2, 2] | 0.0 |
-| v2_s | syndd | [12, 18] | 0.0 |
-| v2_s | 3mdad | [30, 30] | 20.16053836701656 |
-| v2_s | dad | [1, 2] | 3.9408366571371407 |
-| old detector | syndd | [15, 18] | 0.0 |
-| old detector | 3mdad | [22, 30] | 5.241739975424306 |
-| old detector | dad | [2, 2] | 8.66984064570171 |
-| live Pi --no-detect | all | 0 alerts (OFF) | 0 |
+**Measurement finding (does not change any decision):** SynDD event windows are the annotation
+**trimmed by 0.5 s at each end** (`phase_b.windows`, a crop-label choice). Alerts that start in
+the first half-second of a sip therefore score as misses. Re-scoring with the untrimmed
+annotation (`_held_data/overnight/boundary.json`):
 
-Frozen 3MDAD holdout and complete split verification: `_held_data/overnight/step0/split_freeze.json`.
-Historical bug: old rule 3MDAD 0/30. Historical Phase B loose10/18,9.7 normal-only FA/h was worse than release15/18,0; retained as historical evidence, not the unified metric.
-No Pi contact. No label_food results consumed. Detector subtype breakdown cannot be reconstructed from aggregated JSON alone.
+| Distilled nano + phone veto | Trimmed (official) | Untrimmed |
+|---|---|---|
+| SynDD-val | 10/15, 0/h | 11/15, 0/h |
+| SynDD-test | 12/18, 0/h | 16/18, 0/h |
 
-## Method and outstanding Step0 evidence
+The old detector was also scored on trimmed windows (evaluate_v2 "minus 0.5 s edges"), so the
+fair comparison stays **12/18 vs 15/18**. Re-scoring both sides untrimmed needs the old
+detector's per-event times, which the saved JSON doesn't have. Fixing the window definition is a
+decision for you.
 
-The rule comparison tied on nano SynDD-val at11/15 and0 false drinking onsets/h;
-keep c77e01c, already the sole runtime rule. s remains a control, regardless of test
-scores. Historical test results are descriptive, never keep/revert evidence.
-
-The eval_v2_det2.json artifact contains test results only. Its SynDD-val row is
-BLOCKED pending replay of the exact cached detector/face streams; no test number
-is substituted for validation. Original-action subtype breakdown is unavailable
-from its aggregated false_alerts, so its breakdown remains true-class-level.
-
-Clean training now excludes MDAD-val drivers10,11,15,19,50 (seed28). Training
-18076 crops, combined crop-validation3375; all remaining hard negatives retained
-with weighted sampling. Both clean model fits use the same split. Thresholds
-will use SynDD-val plus the five driver-held-out MDAD-val scenes; tests follow
-only after that validation selection is saved. Existing models' MDAD holdout
-performance is contaminated and cannot decide improvements.
-
-Live Pi drinking OFF (--no-detect). No Pi or SSH contact tonight.
-The earlier old-rule3MDAD0/30 is preserved in the archived historical report;
-original PhaseB loose SynDD10/18,9.7 normal+hand-on-face FA/h was worse than
-release15/18,0. That9.7 is a historical denominator, not the current metric.
-
-Artifact paths: _held_data/overnight/step0/{rule_selection,test_baseline,detector_baseline,split_freeze}.json.
