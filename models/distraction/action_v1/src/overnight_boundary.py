@@ -41,6 +41,11 @@ def main():
         "distilled nano + phone veto": (F.OUT / "overnight/distill", "nano/fp32",
                                         dict(p=0.9, x=5, window=0.3), True),
     }
+    for it, root in (("iteration 6", "distill_rw"), ("iteration 7", "distill_aug")):
+        res_file = F.OUT / f"overnight/{root}/results.json"
+        if res_file.exists() and json.loads(res_file.read_text())["kept"]:
+            configs[f"{it} nano + phone veto"] = (F.OUT / f"overnight/{root}", "nano/fp32",
+                                                  json.loads(res_file.read_text())["params"], True)
     rows = {}
     rows.update(F.phone_rows("syndd", "val"))
     rows.update(F.phone_rows("3mdad", "train", frozen))
