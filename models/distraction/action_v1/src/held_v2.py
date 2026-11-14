@@ -652,6 +652,8 @@ def train():
         return result
 
     B.predict_job = recording_predict
+    B.DrinkingRule = importlib.reload(importlib.import_module("held_alerts")).DrinkingRule
+    log("v2 evaluation loaded current D34 cadence-aware DrinkingRule before val selection")
     selected, results = B.evaluation(models, auc, primary)
     B.Classifier = original_classifier
     B.benchmark(selected, results)

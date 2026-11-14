@@ -11,6 +11,7 @@ class DrinkingRule:
         self.baseline = deque(maxlen=300)
         self.start = None
         self.confirmed_since = None
+        self.confirmed_samples = 0
         self.on = False
         self.off_t = -1e9
         self.last_t = None
@@ -20,10 +21,12 @@ class DrinkingRule:
         if self.last_t is not None and t - self.last_t > 1:
             self.history.clear()
             self.start = None
+            self.confirmed_since = None
+            self.confirmed_samples = 0
         if self.last_t is not None and 0 < t - self.last_t <= 1:
             self.gaps.append(t - self.last_t)
         self.last_t = t
-        # D31: the window must span >= 2.5 frame intervals, or a slow stream (3MDAD, 3 fps)
+        # D34: the window must span >= 2.5 frame intervals, or a slow stream (3MDAD, 3 fps)
         # never holds two samples and can never confirm.
         window = max(self.window, 2.5 * median(self.gaps)) if self.gaps else self.window
         if pitch is not None and not near:
@@ -50,9 +53,21 @@ class DrinkingRule:
         confirmed = eligible and covered and mean > self.p
         if not confirmed:
             self.confirmed_since = None
+            self.confirmed_samples = 0
         elif self.confirmed_since is None:
             self.confirmed_since = t
-        sip = self.confirmed_since is not None and t - self.confirmed_since >= 0.5 - 1e-6
+            self.confirmed_samples = 1
+        else:
+            self.confirmed_samples += 1
+        # Nearest-frame quantisation of a .5s sip, with at least two confirmed samples.
+        # 3 fps: threshold 1/3s; 10 fps: .45s (observed span .5s); 20 fps: .475s (.5s).
+        interval = median(self.gaps) if self.gaps else 0
+        sip_span = max(interval, 0.5 - interval / 2)
+        sip = (
+            self.confirmed_samples >= 2
+            and self.confirmed_since is not None
+            and t - self.confirmed_since >= sip_span - 1e-6
+        )
         active = confirmed and (pitch_up or sip)
         onset = active and not self.on and t - self.off_t >= 3
         if self.on and not active:

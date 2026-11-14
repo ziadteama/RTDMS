@@ -189,3 +189,22 @@ D33. **Versioned v2 evidence, original labels retained (2026-11-14).** User supe
     package installs, policy/executable changes, runtime edits, or data deletions.
     Pi and labelled Pi IR evaluation are blocked. Human food CSV is absent at launch.
     Three-class training remains gated on >=300 human food crops from >=3 drivers.
+
+D34. **Cadence is part of drinking-rule timing (2026-11-14).** The orchestrator found
+    that a .3s SynDD-val window drops the previous sample at 3fps, preventing coverage
+    and producing historical 3MDAD-test 0/30 despite high cup scores. This is an algorithm
+    defect, not classifier evidence. The correction is decided from frame-spacing
+    reasoning, not optimized on test scores. Effective window=max(configured window,
+    2.5*stream median interval), median over the last15 positive gaps<=1s. Coverage is
+    >=2 eligible samples OR >=.8*effective-window span. Sip requires >=2 consecutive
+    confirmed samples and span>=max(dt,.5-.5*dt) seconds: nearest-frame quantisation,
+    at 3fps two confirmations 1/3s apart; at 10/20fps observed confirmed span .5s.
+    Empty/low-cup or >1s gap resets confirmation. Tests cover 3/10/20fps, one onset
+    for sustained cup, none for empty, brief blips, exact onset timing and interruption.
+    Re-select Phase B loose thresholds and v2 model/thresholds on SynDD-val only, then
+    score tests once with locked choices. Keep old-rule metrics and outputs intact;
+    corrected artifacts in _held_data/rule_d34. v2 reloads the rule before evaluation.
+    Existing v2train finished before this review; detached rulefix rechecks its cached
+    evidence, running new test inference only if a different val-selected model needs it.
+    Live Pi drinking remains OFF; historical Phase B loose10/18 and9.7 FA/h is worse
+    than release15/18 and0 FA/h. Do not erase or reinterpret those historical numbers.
