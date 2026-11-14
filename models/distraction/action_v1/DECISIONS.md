@@ -225,3 +225,20 @@ D35. **Overnight measurement contract (2026-11-14).** Follow OVERNIGHT_PLAN H1-H
     decisions. Train clean baselines before the optimization loop; original15 test
     drivers remain untouched. No DAD-only keep decision. No Pi/SSH contact tonight.
     No human food-label results consumed. Data never deleted; one commit per iteration.
+
+D36. **Step0 rule tie and clean validation baseline (2026-11-14).** Measurement
+    compared ea3d6ad/c77e01c on nano SynDD-val; both11/15,0 all-negative FA/h,
+    D12 objective.733333. Keep current c77e01c; there is one runtime rule.
+    Freeze MDAD-val drivers s10,s11,s15,s19,s50 (numeric sort, seed28), leaving
+    30 train drivers. Clean nano/control fits from local base checkpoints move
+    those crops to validation; retain18076 training crops and3375 crop-val,
+    weighted sampling, no per-dataset equalisation. All15 mapped actions of each
+    heldout driver enter event validation, including phone/reaching/smoking.
+    Both MDAD-val and SynDD-val choose thresholds: equal-dataset mean recall
+    minus.02 times pooled ALL-negative FA/h. Control never selects product model.
+    Lock selection before reporting tests once. Existing models cannot supply
+    clean MDAD-val evidence. DAD2 available drinking folders are already test;
+    freeze unchanged, no DAD train drivers, no DAD-only choice.
+    Keep old metric outputs archived; root results.md switches to ALL-negative
+    denominator consistently. Detector JSON test baseline has no val row: replay
+    pending, never substitute test data. No Pi/SSH or human-food-result reads.

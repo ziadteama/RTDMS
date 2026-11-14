@@ -175,3 +175,7 @@
   and creates 192px tight/loose-only sample sheets. Detached JOB build will also verify the
   saved manifest, every image, thinning, splits and unchanged source hashes. No test crops,
   classifier training or runtime code changes. Actual build totals await the job output.
+
+## 2026-11-14 overnight iteration1
+
+Step0 measurement chose c77e01c on nano-val tie11/15,0 all-negative FA/h. Driver split verified; freezeMDAD10/11/15/19/50, train30. Clean nano/control training launched excluding heldout; all remaining hard negatives retained. Unified results baseline published; morning snapshot initialized; offline deadline guard scheduled. No Pi/SSH or human-label-results reads.
