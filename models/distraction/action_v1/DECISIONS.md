@@ -170,3 +170,22 @@ D32. **Compare a driver-only cap without discarding negative diversity (2026-11-
     epoch, seed 28. The cap applies to distinct retained crops; sampling may repeat them.
     Validation is uncapped and unweighted. Choose among all three variants using only
     SynDD-val alert objective and crop AUC; no test-set threshold or variant selection.
+
+D33. **Versioned v2 evidence, original labels retained (2026-11-14).** User supersedes the
+    remaining Phase B plan. Preserve completed phaseB outputs as the old-label baseline.
+    Use local cached CLIP ViT-L/14 only; exact two requested prompts. Candidate spherical
+    k-means k=2,3,4,6,8 partitions and contact sheets support visual review. Numerical
+    cosine-silhouette selection is provisional, explicitly not claimed as visual inspection.
+    Pseudo-label confidence requires softmax>=.6, absolute cosine margin>=.015 and agreeing
+    cluster median margin of at least .015. Cluster evidence is correlated with zero-shot
+    evidence, not independent verification. All uncertain sheets retained; no auto-resolution.
+    Five driver-disjoint OOF fits use at most15 epochs; NumPy confident-joint diagnostic
+    uses mean class self-confidence thresholds and ranks by self-confidence. Suspects are
+    never automatically relabelled. Binary training retains ALL original binary crops,
+    including 3MDAD negatives, balanced sampling without driver/dataset caps; ALL original
+    food stays excluded, including CLIP-empty. Local nano and small controls, SynDD-val-only
+    rule/model selection, original tests isolated. Additional augmentation: low-light gain
+    [.25,.75] p=.35 and scale [.65,1.25] p=.4 on top of documented CropAug. No downloads,
+    package installs, policy/executable changes, runtime edits, or data deletions.
+    Pi and labelled Pi IR evaluation are blocked. Human food CSV is absent at launch.
+    Three-class training remains gated on >=300 human food crops from >=3 drivers.
