@@ -23,7 +23,10 @@
 - So I moved phone detection to an **action classifier**, which looks at the driver's whole
   upper body. This is what runs on the Pi now.
 - **The Pi currently gives no drinking or eating alerts.** Section 8 explains why.
-- My best drinking model is newer and **not set up on the Pi yet**. Eating does not work.
+- My newest drinking model (IR-4) meets the target on the infrared test: 18 of 20 drinks, under
+  2 false alarms per hour [IRR]. My eating model is experimental: 13 of 19, about 10 false alarms
+  per hour. It does not meet the target [IRR].
+- Both are in GitHub as code, but **neither is set up on the Pi yet**.
 
 ---
 
@@ -293,29 +296,48 @@ The cup and food boxes came from a teacher model that rarely saw food. So I aske
 question: **is the hand at the mouth holding something?** [S 11-08]
 
 - I cut crops around the hand when it is near the mouth: 22,612 crops, with no test drivers
-  [S 11-13].
+  [HELD].
 - The cup / bottle crops looked clean. The food crops did not: food was visible in only about
-  7 of 48 [S 11-13].
+  7 of 48 [HELD].
 - So I trained a two-class model first: **cup / bottle vs empty hand**.
-- I built a frozen infrared test set. It has 20 drinking and 19 eating events, short of the 30 +
-  30 I wanted, because no more IR data with labels was available [S 11-14].
+- I built a frozen infrared split, by driver: SynDD 49 training drivers, 10 validation drivers,
+  and a test set of 10 SynDD drivers plus the 3 DAD drivers [IRR]. The test set has 20 drinking and 19 eating events, short of the 30 +
+  30 I wanted, because no more IR data with labels was available [IRR].
 
-The best version, **IR-3**, was trained with 1,500 phone-in-hand crops as negative examples. I
-chose it on the validation drivers only [S 11-14]:
+I then improved it on the infrared split, keeping a change only if it helped on the validation
+drivers [IRL]:
+- **IR-3:** 1,500 phone-in-hand crops added as negative examples. Validation: 13 of 15 drinks,
+  0 false alarms per hour. Kept.
+- **IR-4:** IR-3 plus light camera simulation. Validation: 14 of 15, 0 false alarms per hour.
+  **Kept. This is my product drinking model** [IRL], [HELD].
+- Two other changes made things worse, so I reverted them: strong camera simulation (more false
+  alarms) and all 5,310 phone crops (recall fell from 14 to 12) [IRL].
 
-| Infrared test set | IR-3: drinks caught | IR-3: false alarms / h | Old box detector |
+Results on the infrared test set (report only; nothing was chosen on it) [IRR]:
+
+| Infrared test set | IR-4: drinks caught | IR-4: false alarms / h | Old box detector |
 |---|---|---|---|
-| SynDD | 16 / 18 | 1.07 | 16 / 18 |
-| DAD (real IR) | 2 / 2 | 1.58 | 2 / 2, at 8.7 false alarms / h |
-| **Total** | **18 / 20 (90 %)** | | |
+| SynDD (10 drivers) | 16 / 18 | 1.07 | 16 / 18, 0.00 / h |
+| DAD (real IR, 3 drivers) | 2 / 2 | 1.58 | 2 / 2, 8.67 / h |
+| **Total** | **18 / 20 (90 %)** | ≤ 1.6 | |
 
-Source: [S 11-14].
+This **meets my target** of at least 85 % caught and at most 5 false alarms per hour [IRR].
+The weak points: two drinks were missed because the hand-at-mouth check never fired, and a large
+hand close to the IR lens was read as a cup [IRR].
 
-**Eating still does not work.** A hand-to-mouth + chewing rule caught 0 of 19 eating clips
-[S 11-14]. No eating model was trained, because there are no hand-checked food labels.
+**Eating, experimental.** I trained a small temporal model (a GRU) on the IR-3 model's features.
+It looks at about 2 s of hand-at-mouth frames [IRL]:
+- Validation: 13 of 19 eating events, 16.05 false alarms per hour [IRR].
+- Infrared test: **13 of 19 (68 %), 10.15 false alarms per hour** [IRR].
+- This **does not meet the target**. The main error is yawning: a hand at a wide-open mouth looks
+  like eating (5 of the false alarms) [IRR].
+- All infrared eating data is SynDD daylight video. No true-IR driver in my data has eating
+  clips [IRR].
 
-The code for this stage is on a branch called `overnight/held-object`. I could not find it on
-GitHub on 16 November, so these numbers come from the session record.
+The earlier hand-to-mouth + chewing rule caught 0 of 19 [S 11-14]. I dropped it.
+
+All of this work was merged into the main branch on 16 November (pull request #10, commit
+`d153ae7`) [git].
 
 ---
 
@@ -355,6 +377,7 @@ All splits are **by driver**: nobody in the test set appears in training.
 | EBDD | 11 drivers (action model; the detector kept 2 of them for validation) | — | 2 (akkas, jewel) | [DEC D5], [LOG] |
 | DAD | — | — | 3 drivers (test only) | [AV1] |
 | Open Images, Roboflow | their own published splits | | | [DET2] |
+| Infrared split (drinking, eating) | SynDD 49 drivers | SynDD 10 | SynDD 10 + DAD 3 | [IRR], `action_v1/ir_split.json` |
 
 Thresholds are chosen on validation drivers only. Test drivers are scored once [OVR].
 
@@ -431,8 +454,10 @@ level.
 | Action v1, larger "s" model | SynDD val | top-1 0.664 | — | — | — | about 3× slower [PROG] | Rejected |
 | Action v1 + smoking class | SynDD val | top-1 0.657 | — | — | — | smoking false alarms 7 → 7 [DEC] | Rejected |
 | **v2 hybrid (action + ear + lap checks)** | SynDD / 3MDAD / DAD test | — | — | — | — | calls 37/39, 30/30, 5/5; false alarms 0, 19.6, 3.6 per h; lap check AUC 0.84 [AV2] | **Runs on the Pi** (calls, texting) |
-| **IR-3 drinking model** | infrared test set | — | — | 18/20 drinks (90 %) | — | false alarms 1.07/h (SynDD), 1.58/h (DAD) [S 11-14] | **Best drinking model; not on the Pi** |
-| Eating rule (hand to mouth + chewing) | SynDD test | — | — | 0/19 | — | [S 11-14] | Does not work |
+| IR-3 drinking model | infrared val / test | — | — | val 13/15; test 18/20 | — | 0 false alarms/h on val [IRL] | Kept, then improved into IR-4 |
+| **IR-4 drinking model** (product) | infrared test set | — | — | 18/20 drinks (90 %) | — | false alarms 1.07/h (SynDD), 1.58/h (DAD); meets target [IRR] | **Best drinking model; not on the Pi** |
+| Eating temporal head (experimental) | infrared test set | — | — | 13/19 (68 %) | — | 10.15 false alarms/h; misses target [IRR] | **Experimental; not on the Pi** |
+| Eating rule (hand to mouth + chewing) | SynDD test | — | — | 0/19 | — | [S 11-14] | Dropped |
 
 ---
 
@@ -444,7 +469,8 @@ level.
   action classifier (section 2.12).
 - **Results change a lot between driver groups.** One 10-driver test can be off by 10–20 points
   [OVR].
-- **Eating is not visible from the mirror** in the data I have.
+- **Eating is hard to see from the mirror.** Object boxes never worked for it. A temporal model
+  of the hand at the mouth gets 13 of 19, but yawning still fools it [IRR].
 
 ---
 
@@ -473,28 +499,39 @@ level.
   [S 11-08].
 
 **The Pi gives no drinking and no eating alerts right now.** Why:
-- In v2, drinking and eating come only from the det_v2d box detector [DEC D17]. The Pi starts
-  with the detector switched off (`--no-detect`).
-- Turning it back on costs speed. On every frame it was estimated at 15.1 frames per second in
-  the worst case [DEC D22]. On every 2nd frame it costs about 22 ms per frame, so about 20 frames
-  per second, and its false phone alerts come back: about 79 per hour on real IR video
-  [S 10-26].
-- My best drinking model, IR-3 (18 of 20 drinks), is **not set up on the Pi yet**. I could not
-  export it for the Pi, because my PC blocked the export tool and the Pi was not reachable
-  [S 11-14].
-- Eating has no working model at all.
+- In the v2 stream, drinking and eating come only from the det_v2d box detector [DEC D17]. The Pi
+  starts with the detector switched off (`--no-detect`) [`pi/start_stream.sh`].
+- Turning the old detector back on costs speed and false alarms. On every frame it was estimated at
+  15.1 frames per second in the worst case [DEC D22]. On every 2nd frame it costs about 22 ms per
+  frame, so about 20 frames per second, and its false phone alerts come back: about 79 per hour on
+  real IR video [S 10-26].
+- The new drinking model (IR-4) and the eating model are **in GitHub as code** (pull request #10),
+  but **the Pi has not been updated**. It was not reachable on any of the five tries [IRR], and it
+  has no internet connection [OWN].
+- **Even after the Pi is updated, drinking and eating alerts stay off** until the stream itself is
+  changed to use the new models. Today the start script still runs `--hybrid --no-detect`
+  [`pi/start_stream.sh`]. The new models only run in a separate test script
+  (`action_v1/pi_held/pi_held_eval.py`), and the eating model is not wired into it yet [IRR].
+- **The model weights are not on GitHub.** They sit in the git-ignored `_held_data/` folder on my
+  PC [`action_v1/.gitignore`], [IRR]. They must be copied to the Pi by hand, then converted to INT8
+  on the Pi [IRR].
+- The Pi speed of the new models is not measured. On my PC the drinking model costs about 1.13 ms
+  per hand-at-mouth frame [IRR].
 
 **Best models so far:**
-- Calls and texting: v2 hybrid (section 2.13).
-- Drinking: IR-3 (section 2.15), not on the Pi.
-- Release box detector: det_v2d, in GitHub, used for testing [MOD].
-- Eating: none.
+- Calls and texting: v2 hybrid (section 2.13). Runs on the Pi.
+- Drinking: IR-4 (section 2.15). 18 of 20 on the infrared test; meets the target. Not on the Pi.
+- Eating: experimental temporal model, 13 of 19 at 10.15 false alarms per hour; does not meet the
+  target. Not on the Pi.
+- Release box detector: det_v2d, in GitHub, used for comparison [MOD].
 
 **Still to do:**
-1. Put IR-3 on the Pi for drinking, and measure the speed with everything running together.
+1. Copy the IR-4 weights to the Pi, build INT8 there, change the stream to use it, and measure the
+   speed with everything running together. Run drinking in shadow mode first [IRR].
 2. Record my own drivers with the Pi camera, day and night (Task 7). I have no own recordings yet.
 3. Calibrate the fisheye lens.
-4. Get eating data where the food is visible, or leave eating out of the alerts.
+4. Get true-IR eating data (DMD, Drive&Act annotations or 100-Driver), or leave eating out of the
+   alerts [IRR].
 5. Hand-check the 495 test frames.
 
 ---
@@ -508,7 +545,11 @@ level.
 | [OWN] | My own answers, 16 November 2026 |
 | [S mm-dd] | Claude Code session record of that date (2026) |
 | [LOG] | Data-build logs on the data drive, printed in the session of 18 October 2026 (`det_v2_syndd.log`, `det_v2_ebdd.log`, `build_openimages.log`, `build_det_v2b.log`) |
-| [INV] | Dataset inventory of the data drive, session of 14 November 2026 |
+| [INV] | `models/distraction/action_v1/dataset_inventory.md` (14 November 2026) |
+| [IRR] | `models/distraction/action_v1/ir_report.md` |
+| [IRL] | `models/distraction/action_v1/ir_log.md` |
+| [HELD] | `models/distraction/action_v1/HELD_OBJECT.md` |
+| [git] | git history of `ziadteama/RTDMS` |
 | [PHN] | `models/phone/docs/EVIDENCE.md` |
 | [PIT] | `Subsystems/Raspberry Pi 5 Target.md` |
 | [FEV] | `models/face/docs/EVIDENCE.md` |
@@ -530,8 +571,5 @@ The full date-by-date history is in `timeline.md`. The comparison with version 2
 
 ## Questions for me
 
-1. The `overnight/held-object` branch is not on GitHub. Where is it? Until it is found, IR-3's
-   numbers rest on the session record only.
-2. Why did I choose YOLO26n over YOLOv8n on 10 October? Not recorded.
-3. Did the eating head trained on 14–15 November finish? Its result is not recorded.
-4. Was the hand check of the 495 test frames ever done?
+1. Why did I choose YOLO26n over YOLOv8n on 10 October? Not recorded.
+2. Was the hand check of the 495 test frames ever done?

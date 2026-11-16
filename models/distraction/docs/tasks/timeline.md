@@ -465,30 +465,34 @@ This stage is the reason we moved from the box detector to the action classifier
     export was blocked on the PC and the Pi was unreachable (session 2026-11-14 16:17).
   - Eating has no working model at all (stage 12).
 
-## Stage 12. 2026-11-08 → 11-15: held-object drinking model (current best drinking model, not on the Pi)
+## Stage 12. 2026-11-08 → 11-16: held-object drinking and eating models (merged to main, not on the Pi)
 
 - **Why:** "labels was bad can we do something related to holding an object + near face" (user,
   session 2026-11-08 20:56). The box labels came from a teacher model that "rarely saw food".
 - **Branch:** `phone/held-object`, later `overnight/held-object` (last commits named: `9430ae5`,
   `e8b4761`, `bde27ab`, `47b0774`, `b246d11`). "Nothing was pushed" (session 2026-11-14 06:27).
-  - You said on 2026-11-16 that you pushed it. A fetch of `ziadteama/RTDMS` on 2026-11-16
-    found no such branch and none of these commits. The other repos this account can reach
-    have nothing either. So the numbers below are from the transcript only.
-  - Your decision: count IR-3 as the **current best drinking model**. It is **not set up on the
-    Pi yet**.
+  - **Merged into main on 2026-11-16** as
+    [ziadteama/RTDMS#10](https://github.com/ziadteama/RTDMS/pull/10) (merge commit `d153ae7`;
+    last branch commit `9bca553`, 2026-11-15). The reports are now in the repo:
+    `action_v1/ir_report.md`, `ir_log.md`, `HELD_OBJECT.md`, `results.md`,
+    `dataset_inventory.md`, `ir_split.json`.
+  - **The weights are not in git:** `action_v1/.gitignore` ignores `_held_data/`, where they live.
+  - Your decision: count the product drinking model as the **current best drinking model**. It
+    is **not set up on the Pi**.
 - **Data** (session 2026-11-13 23:07):
   - 22,612 hand-at-mouth crops, 95 training drivers + 10 SynDD validation drivers, no test
     drivers.
   - Cup/bottle 2,459 tight / 4,614 wider (1,960 tight ones from 3MDAD): "clean".
   - Empty hand 8,406 / 12,837: "clean".
   - Food 597 / 1,161: "not clean" (food visible in about 7 of 48).
-- **Dataset inventory of D:** (2026-11-14, `dataset_inventory.md` on the unpushed branch):
+- **Dataset inventory of D:** (2026-11-14, `action_v1/dataset_inventory.md`):
   - On disk but unused: SynDD dashboard/side views, SynDD A2 (no labels), Drive&Act NIR videos
     (annotations missing), AUC v1/v2, DAD top_IR, MRL Eye, UTA-RLDD Fold3 part 2.
   - Missing: DAD parts 2…N, Drive&Act annotations, DMD, 3MDAD night IR / side view, 100-Driver,
     State Farm.
-- **IR test set (frozen, driver-disjoint):** 20 drinking and 19 eating events, below the 30 + 30
-  target, because "the extra IR data isn't on the D: drive" (session 2026-11-14 16:17).
+- **IR split (frozen, driver-disjoint, `ir_split.json`):** train SynDD 49 drivers; val SynDD 10;
+  test SynDD 10 + DAD 3. The test has 20 drinking and 19 eating events, below the 30 + 30 goal,
+  "because the remaining IR data isn't on disk" (`ir_report.md` §1).
 - **Drinking results** (validation decides; test is report-only):
 
   | Model | SynDD | 3MDAD | DAD (real IR) | Source |
@@ -497,19 +501,33 @@ This stage is the reason we moved from the box detector to the action classifier
   | v2 cleaned labels, larger "s" model | 12/18, 0 /h | 28/30, 7.1 /h | 1/2, 1.8 /h | session 2026-11-14 01:57 |
   | Best small model + phone veto (trimmed windows) | 12/18, 0 /h | 29/30, 2.4 /h | 0/2, 0 /h | session 2026-11-14 06:27 |
   | Old box detector (same windows) | 15/18, 0 /h | 22/30, 5.2 /h | 2/2, 8.7 /h | session 2026-11-14 06:27 |
-  | **IR-3 (+1,500 phone-in-hand hard negatives), untrimmed IR test** | **16/18, 1.07 /h** | — | **2/2, 1.58 /h** | session 2026-11-14 21:24 |
-  | Old box detector, untrimmed IR test | 16/18 | — | 2/2, 8.7 /h | session 2026-11-14 21:24 |
+  | IR-3 (+1,500 phone hard negatives), untrimmed IR test | 16/18, 1.07 /h | — | 2/2, 1.58 /h | `ir_log.md` |
+  | **IR-4 = IR-3 + light camera simulation (product), untrimmed IR test** | **16/18, 1.07 /h** | — | **2/2, 1.58 /h** | `ir_report.md` §2 |
+  | Old box detector, untrimmed IR test | 16/18, 0.00 /h | — | 2/2, 8.67 /h | `ir_report.md` §2 |
 
-  - IR-3 was **kept** (validation 13/15 at 0 /h vs previous best 14/15 at 1.09 /h, session
-    2026-11-14 21:14).
-  - Reverted: camera simulation, all phone hard negatives (recall 14 → 12 of 15), yawn block,
-    stronger augmentation, extra cup weight (sessions 2026-11-14 06:27, 17:31).
-- **Eating:** no model. There are no hand-checked food labels yet; the hand-to-mouth + chewing
-  rule caught 0/19 on SynDD test (session 2026-11-14 06:27). An eating temporal head was being
-  trained on IR-3 features at the last message; its result is NOT FOUND (session ends 2026-11-15
-  01:06).
-- **Blocked:** the Pi did not answer SSH. Windows Application Control blocked `ncnn` on the PC,
-  so there is no INT8/NCNN export of the drinking model (session 2026-11-14 16:17).
+  - IR validation, keep-or-revert (`ir_log.md`): IR-1 strong camera simulation reverted (FA 1.09
+    → 3.26 /h); IR-2 all 5,310 phone negatives reverted (recall 14 → 12 of 15); IR-3 kept (13/15,
+    0 /h); **IR-4 kept as the product** (14/15, 0 /h).
+  - IR test total for IR-4: **18/20 = 90 % at ≤ 1.6 FA/h, "Meets the target"** (≥ 85 %, ≤ 5 /h)
+    (`ir_report.md` §2). IR-3 had the same test score (`ir_log.md`).
+  - Earlier reverts (trimmed windows): yawn block, plain dataset sampling, stronger augmentation,
+    cup weight (`HELD_OBJECT.md`).
+- **Eating (experimental):**
+  - The hand-to-mouth + chewing rule caught 0/19 (session 2026-11-14 06:27).
+  - The temporal head finished: Linear + GRU over 7 samples (≈ 2.1 s) on the IR-3 backbone,
+    gated on hand-at-mouth, with phone veto and no eating during drinking (`ir_log.md` E-1, E-2,
+    E-4).
+  - IR val 13/19 at 16.05 /h. **IR test 13/19 (68 %) at 10.15 /h. "Does not meet" the target.**
+    Main error: yawning (5 false alarms) (`ir_report.md` §2, §4).
+  - Reverted: yawn veto (E-3), yawn weighting (E-5), IR-4 backbone (E-6, recall 13 → 8).
+- **Pi:** SSH timed out at 16:56, 18:17, 19:17, 22:56 and 23:56; no INT8 build, FPS, wrist
+  check or shadow mode (`ir_report.md` §5).
+  - A Pi bundle (drinking ONNX, eating backbone + head ONNX, params, calibration crops) was
+    prepared, with `pi_held/build_int8_on_pi.sh` to build INT8 on the Pi.
+  - The eating head is "not wired into `pi_held_eval.py`" (`ir_report.md` §5).
+  - The Pi has no internet (your note, 2026-11-16).
+- **Stream unchanged:** `pi/start_stream.sh` on main still runs `--hybrid --no-detect`. So even
+  after a Pi update, drinking and eating alerts stay off until the stream uses the new models.
 
 ---
 
@@ -532,7 +550,9 @@ This stage is the reason we moved from the box detector to the action classifier
 | 10-26 | act_s224 | same | ~3× slower, not better | Rejected |
 | 10-26 | act_n224_smk (smoking class) | + 3MDAD smoking | smoking FAs 7 → 7 | Rejected |
 | 10-26 | **v2 hybrid** (act_n224 + phone_ear + phone_lap, INT8) | as above | DAD FA 3.6 vs 79.2 /h | **Runs on the Pi now** |
-| 11-14 | **IR-3 held-object drinking model** | hand-at-mouth crops | IR test 18/20 drinking | Best drinking result; **not pushed, not on the Pi** |
+| 11-14 | IR-3 held-object drinking model | hand-at-mouth crops + 1,500 phone negatives | IR val 13/15, 0 /h; IR test 18/20 (`ir_log.md`) | Kept, improved into IR-4 |
+| 11-15 | **IR-4 held-object drinking model (product)** | + light camera simulation | IR test 18/20, ≤ 1.6 FA/h; meets target (`ir_report.md`) | **Best drinking model; on main as code, weights not in git, not on the Pi** |
+| 11-15 | Eating temporal head (experimental) | SynDD IR split, IR-3 features | IR test 13/19, 10.15 FA/h; misses target (`ir_report.md`) | Experimental; not on the Pi |
 
 ## Datasets: every dataset used, considered or dropped
 
@@ -585,15 +605,13 @@ Resolved on 2026-11-16:
 - **Reset:** only one, before 2026-10-16.
 - **CEW / MRL Eye:** done outside Claude Code; files lost; old-report numbers, not counted.
 - **Camera:** IR NoIR 160° installed after 2026-10-10 (date not recorded).
-- **Held-object:** IR-3 counts as the current best drinking model, not on the Pi.
+- **Held-object:** merged as PR #10 on 2026-11-16; the product drinking model (IR-4) is the
+  current best drinking model, not on the Pi; the eating head finished (13/19, experimental).
 - **Eating frames:** 3 (log, training set only).
 - **SynDD A2:** both values kept with a note.
 - **SynDD modality:** as the pixel check found it.
 
 Still open:
-1. **Held-object branch:** not found on GitHub (see stage 12). Which repo or remote did you
-   push it to?
-2. **Why YOLO26n** replaced the YOLOv8n plan on 2026-10-10: NOT FOUND.
-3. **Eating temporal head (2026-11-14/15):** did it finish, and with what numbers?
-4. **Iris landmarks:** 478 with iris or 468 without (sessions 08-28 disagree)?
-5. **Hand check of the 495 test frames:** was it ever done?
+1. **Why YOLO26n** replaced the YOLOv8n plan on 2026-10-10: NOT FOUND.
+2. **Iris landmarks:** 478 with iris or 468 without (sessions 08-28 disagree)?
+3. **Hand check of the 495 test frames:** was it ever done?

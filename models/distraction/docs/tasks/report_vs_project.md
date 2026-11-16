@@ -18,8 +18,9 @@ Source short names:
 - `LOGS 10-18` = data-build log output printed in session 2026-10-18 20:14 (`build_openimages.log`,
   `build_det_v2b.log`, `det_v2_syndd.log`, `det_v2_ebdd.log` on D:). The D: drive is not on this
   machine, so these logs are the closest thing to a direct count I could check
-- `INVENTORY` = `dataset_inventory.md` written in session 2026-11-14 on the local branch
-  `overnight/held-object` (**never pushed**, so it is not in the repo; I read it from the transcript)
+- `INVENTORY` = `models/distraction/action_v1/dataset_inventory.md` (written 2026-11-14, merged to main in
+  [ziadteama/RTDMS#10](https://github.com/ziadteama/RTDMS/pull/10) on 2026-11-16)
+- `IRR` = `action_v1/ir_report.md`; `IRL` = `action_v1/ir_log.md`; `HELD` = `action_v1/HELD_OBJECT.md` (all from PR #10)
 
 ## 1. Datasets used
 
@@ -31,7 +32,7 @@ Source short names:
 | DAD role | Test only; 3 drivers, 66 min normal driving | Test only for every model. 3 drivers (Tester1, 10, 11), part 1 of the archive only | OVERNIGHT §9, AV1/class_map.json, INVENTORY | STILL CORRECT |
 | EBDD role | Training + test, 2 drivers kept for test | Same for det_v2d. In the action classifier its 2 validation drivers (aktar, asif) moved into training; test drivers akkas and jewel | DETV2, AV1/DECISIONS D5 | STILL CORRECT (with one change for the action model) |
 | Face datasets | CEW (2,423 photos) for thresholds and test; MRL Eye (84,898 IR images, 37 people) to train an eye-state CNN | Done outside Claude Code; the original files were lost in the PC reset (your answer). No code or results in the repo. MRL Eye is still on D:, listed as not used | your answer 2026-11-16, INVENTORY | CANNOT VERIFY: from old report, not verified; not counted in results |
-| Held-object (drinking) data | — | 2026-11-13/14: hand-at-mouth crops, 22,612 crops from 95 training drivers plus the 10 SynDD validation drivers (no test drivers). Cup/bottle 2,459 tight / 4,614 wider (1,960 of the tight ones from 3MDAD); empty hand 8,406 / 12,837; food 597 / 1,161 | session 2026-11-13 | MISSING FROM REPORT |
+| Held-object (drinking / eating) data | — | Hand-at-mouth crops: 22,612 from training drivers and SynDD validation drivers, no test drivers (cup / bottle 2,459 tight, mostly 3MDAD; empty hand; food 1,161 "not clean"). Infrared split `ir_split.json`: train SynDD 49, val SynDD 10, test SynDD 10 + DAD 3 (20 drinking, 19 eating events) | HELD, IRR §1 | MISSING FROM REPORT |
 
 ## 2. Datasets dropped or not used
 
@@ -107,10 +108,10 @@ Source short names:
 | Version 1 phone model | Ready image classifier trained on State Farm | `models/phone`: YOLOv8n-cls (Hugging Face Safe-Drive-TN), 10 → 3 classes, ONNX (2026-09-25). Kept, not deleted | `models/phone/docs/EVIDENCE.md` | STILL CORRECT |
 | Release detector | YOLO26n (2.5 M weights), 512 px, gray | det_v2d: YOLO26n, 2.5 M params, 5.9 GFLOPs, 512 px | MODELS | STILL CORRECT |
 | Model running on the Pi now | YOLO26n detector + rules | **v2 hybrid**: yolo26n-cls action model (224 px, INT8) + ear phone check + lap phone check (128 px, INT8). Box detector **off** (`--no-detect`), so there are **no drinking / eating alerts on the Pi**. Texting rule off (`--no-texting`) | `pi/start_stream.sh`, MODELS v2 section, `Subsystems/Distraction Subsystem.md` | OUTDATED |
-| Why the Pi gives no drinking / eating alerts | — | In v2, drinking and eating come only from det_v2d boxes (D17), and the Pi starts with `--no-detect`. Recorded trade-offs: detector every frame ≈ 66 ms → 15.1 FPS worst case (D22, estimate); detector every 2nd frame ≈ +22 ms → ~20 FPS and its false phone alerts return (~79 /h on the IR test) (session 2026-10-26 08:35). The newer drinking model (IR-3) was never exported for the Pi. Eating has no working model | `action_v1/DECISIONS.md` D17, D22; `pi/start_stream.sh`; sessions 2026-10-26, 2026-11-14 | MISSING FROM REPORT (must be stated in the new report) |
+| Why the Pi gives no drinking / eating alerts | — | In v2, drinking and eating come only from det_v2d boxes (D17), and the Pi starts with `--no-detect`. Recorded trade-offs: detector every frame ≈ 66 ms → 15.1 FPS worst case (D22, estimate); detector every 2nd frame ≈ +22 ms → ~20 FPS and its false phone alerts return (~79 /h on the IR test) (session 2026-10-26 08:35). The new drinking (IR-4) and eating models are on main as code only: the Pi was unreachable (IRR §5) and has no internet (your note); the stream still uses `--no-detect`, so the alerts stay off until it is changed; weights not on GitHub | `action_v1/DECISIONS.md` D17, D22; `pi/start_stream.sh`; sessions 2026-10-26, 2026-11-14 | MISSING FROM REPORT (must be stated in the new report) |
 | Why we moved from det_v2d to the action classifier | — | 2026-10-25 live Pi test: near-ear calls missed. det_v2d phone score median 0.18 at the near ear vs 0.63 at the far ear; the alert rule fired 11 % vs 89 % of the time. An ear-zone rule raised SynDD right-ear calls 80 % → 90 % at 3.4 false alarms /h. The action brief followed 12 minutes after a suggestion to train on 3MDAD (35 / 15 drivers) | session 2026-10-25 23:40–23:48, 2026-10-26 00:04–00:16 | MISSING FROM REPORT |
-| Drinking model | Detector cup box at the mouth | Current best drinking model: "IR-3", a cup/bottle-vs-empty-hand crop model trained with 1,500 phone hard negatives (2026-11-14). **Not set up on the Pi.** Its branch was not found on GitHub on 2026-11-16, so its numbers come from the transcript | session 2026-11-14, your answer 2026-11-16 | MISSING FROM REPORT |
-| Eating | Weak | Unsupported everywhere (0 % on SynDD for det_v2d, 0/19 for the eating rule; no eating model trained because there are no hand-checked food labels) | MODELS, OVERNIGHT §8, session 2026-11-14 | STILL CORRECT |
+| Drinking model | Detector cup box at the mouth | Product drinking model **IR-4**: cup/bottle-vs-empty-hand crop model (yolo26n-cls 128) with 1,500 phone hard negatives and light camera simulation. Code on main (PR #10); weights in the git-ignored `_held_data/`, not on GitHub. **Not set up on the Pi** | IRR, IRL, HELD, `action_v1/.gitignore` | MISSING FROM REPORT |
+| Eating | Weak | Box detector: 0 % (MODELS). Experimental temporal head (GRU on IR-3 features): IR test **13/19 (68 %) at 10.15 FA/h, "Does not meet"** the target; main error yawning. Not on the Pi | MODELS, IRR §2, IRL | OUTDATED |
 | Rejected models / ideas | 8 ideas, none better | det_v2c, ideas A–G, additions 1–3; plus later: yolo26s-cls (D15), smoking class (D21) | OVERNIGHT, AV1/DECISIONS | MISSING FROM REPORT (later rejections) |
 
 ## 8. Metrics
@@ -121,7 +122,7 @@ Source short names:
 | Step 4 det_v2b | Phone at ear 72–92 % of frames | 71.5 % / 91.6 % | DETV2 | STILL CORRECT |
 | Step 5 det_v2d | 80–100 % calls, 0–5 false alarms /h | Test: 80 % / 100 %, 0 /h; validation 5.2 /h | OVERNIGHT §2, MODELS | STILL CORRECT |
 | Current best phone numbers | det_v2d only | v2 vs det_v2d (same clips): SynDD calls 37/39 vs 34/39, texting 18/41 vs 14/41, FA 0 vs 0; DAD FA 3.6 vs 79.2 /h | MODELS, AV1/REPORT_v2 | MISSING FROM REPORT |
-| Current best drinking numbers | det_v2d 90 % | IR test (2026-11-14, untrimmed windows): IR-3 18/20 (SynDD 16/18 at 1.07 /h, DAD 2/2 at 1.58 /h) vs old detector 16/18 + 2/2 at 8.7 /h | session 2026-11-14 | MISSING FROM REPORT |
+| Current best drinking numbers | det_v2d 90 % | IR test (untrimmed): IR-4 **18/20 = 90 % at ≤ 1.6 FA/h** (SynDD 16/18 at 1.07 /h, DAD 2/2 at 1.58 /h), "Meets the target". Old detector 16/18 at 0 /h + 2/2 at 8.67 /h | IRR §2 | MISSING FROM REPORT |
 
 ## 9. Hardware and camera
 
@@ -134,8 +135,6 @@ Source short names:
 
 ## Questions for me (from this comparison)
 
-All earlier questions were answered on 2026-11-16. Still open:
+All earlier questions are answered (held-object merged as PR #10 on 2026-11-16). Still open:
 
-1. **Held-object branch:** not on `ziadteama/RTDMS` or any repo this account can reach. Where was
-   it pushed?
-2. **Hand check of the 495 test frames:** was it ever done?
+1. **Hand check of the 495 test frames:** was it ever done?
