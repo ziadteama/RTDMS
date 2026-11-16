@@ -2,7 +2,7 @@
 
 **Project:** Real-Time Driver Monitoring System (RTDMS)
 **Scope:** face monitoring, phone / drink / food (distraction) detection, and heart rate / HRV
-**Prepared by:** Youssef Medhat
+**Prepared by:** Youssef Medhat, Omar Deyaa (face and distraction models), Ziad Teama (heart rate / HRV)
 **Date:** November 2026
 **Programme:** B.Sc. Graduation Project, Computer Engineering, AASTMT
 
