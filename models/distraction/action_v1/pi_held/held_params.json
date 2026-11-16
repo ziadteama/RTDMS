@@ -1,0 +1,26 @@
+{
+ "model": "IR-4 nano (camsim_light), ONNX _held_data/ir/camsim_light/weights/best.onnx",
+ "params": {
+  "p": 0.5,
+  "x": 10,
+  "window": 0.3
+ },
+ "gate": {
+  "h": 0.35,
+  "K": 1.25
+ },
+ "phone_veto": true,
+ "yawn_veto": null,
+ "chosen_on": "IR validation = untrimmed SynDD-val, 2026-11-14/15",
+ "eating": {
+  "backbone": "IR-3 nano features (eat_backbone_ir3.onnx: outputs features, cup)",
+  "head": "eat_head.onnx (window [1, 7, 1282] -> logits eating/drinking/phone/other)",
+  "gate": ">= 2 hand-at-mouth samples in the window",
+  "thr": 0.98,
+  "m": 5,
+  "refractory_s": 30,
+  "phone_veto": true,
+  "suppress_while_drinking": true,
+  "status": "exported, NOT integrated into pi_held_eval.py yet"
+ }
+}
