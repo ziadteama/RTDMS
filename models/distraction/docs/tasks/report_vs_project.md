@@ -30,7 +30,7 @@ Source short names:
 | 3MDAD role | "Test only" | Still test only **for det_v2d**. Before that, 3MDAD front view trained the ear/mouth crop classifiers (2026-10-11). From 2026-10-26 it is also **training data** for the action classifier (35 drivers, seed 0) | DATA (Sources table), MORNING, AV1/DECISIONS D6, `action_v1/splits/3mdad.json` | OUTDATED |
 | DAD role | Test only; 3 drivers, 66 min normal driving | Test only for every model. 3 drivers (Tester1, 10, 11), part 1 of the archive only | OVERNIGHT §9, AV1/class_map.json, INVENTORY | STILL CORRECT |
 | EBDD role | Training + test, 2 drivers kept for test | Same for det_v2d. In the action classifier its 2 validation drivers (aktar, asif) moved into training; test drivers akkas and jewel | DETV2, AV1/DECISIONS D5 | STILL CORRECT (with one change for the action model) |
-| Face datasets | CEW (2,423 photos) for thresholds and test; MRL Eye (84,898 IR images, 37 people) to train an eye-state CNN | No CEW or MRL code, results or splits in the repo. The face model has no trained component. MRL Eye is on the D: drive but listed as "no (face model area)" = not used. MRL appears only as a *suggestion* in the face notes ("would serve them better") | `models/face/` (grep), `models/face/docs/UPSTREAM_README.md`, session 2026-08-28, INVENTORY | CANNOT VERIFY |
+| Face datasets | CEW (2,423 photos) for thresholds and test; MRL Eye (84,898 IR images, 37 people) to train an eye-state CNN | Done outside Claude Code; the original files were lost in the PC reset (your answer). No code or results in the repo. MRL Eye is still on D:, listed as not used | your answer 2026-11-16, INVENTORY | CANNOT VERIFY: from old report, not verified; not counted in results |
 | Held-object (drinking) data | — | 2026-11-13/14: hand-at-mouth crops, 22,612 crops from 95 training drivers plus the 10 SynDD validation drivers (no test drivers). Cup/bottle 2,459 tight / 4,614 wider (1,960 of the tight ones from 3MDAD); empty hand 8,406 / 12,837; food 597 / 1,161 | session 2026-11-13 | MISSING FROM REPORT |
 
 ## 2. Datasets dropped or not used
@@ -61,7 +61,7 @@ Source short names:
 | Open Images size | 16,996 photos | **Recomputed: 14,674 + 1,143 + 1,179 = 16,996** (download log) | LOGS 10-18 (`build_openimages.log`) | STILL CORRECT |
 | DMS_Project / ADMS_FINAL_3 sizes | 10,198 / 2,698 images | Sums of the per-split numbers typed in the chart script (7,244 + 2,121 + 833; 2,149 + 549 + 0). No log line with these totals was seen. Raw export folder counts printed on 2026-10-18: DMS_Project train 17,126 / valid 4,893 / test 2,447; ADMS train 6,484 / valid 1,621 (the listing does not show whether it counted images or all files) | session 2026-10-18 20:14–20:16 | CANNOT VERIFY: **from old report, not verified** |
 | EBDD frames | 13 drivers, 2,093 frames | **Recomputed: 1,514 + 210 + 369 = 2,093** | LOGS 10-18 (`det_v2_ebdd.log`) | STILL CORRECT |
-| Eating frames in SynDD | 3 frames | Labelling log: **eating 3** in train, none in val or test. OVERNIGHT §2: food found "in only 3 frames out of 2,000". OVERNIGHT §8: "only 5 eating frames" | LOGS 10-18, OVERNIGHT §2 and §8 | CANNOT VERIFY (conflicting: 3 in the log and §2, 5 in §8) |
+| Eating frames in SynDD | 3 frames | **3, in the training set only** (labelling log; none in val or test). OVERNIGHT §8 says 5; the log value is used | LOGS 10-18 | STILL CORRECT |
 | Action classifier data | — | 7 classes (normal, call, texting, drinking, eating, hand_on_face, other). Frames: SynDD 52,125, 3MDAD 60,655, EBDD 5,972, DAD 11,349, syndd_fish 6,188. Balanced train set 62,085 crops | AV1/PROGRESS.md, AV1/REPORT.md, `class_map.json` | MISSING FROM REPORT |
 | 3MDAD size | 50 drivers, 16 actions, 650 clips | 50 drivers; 13 actions × 50 = 650 clips in the unseen test; ~3 fps frames, 640×480 | OVERNIGHT §9, INVENTORY | STILL CORRECT |
 
@@ -80,7 +80,7 @@ Source short names:
 |---|---|---|---|---|
 | SynDD | By driver 49 / 10 / 10 | Same, fixed in `configs/syndd_split.json` | `syndd_split.json`, SYNDD_RT | STILL CORRECT |
 | Open Images / Roboflow | Their own published splits | Same. DMS_Project split is image-level, so its scores are inflated | DETV2 | STILL CORRECT |
-| CEW 30 % tuning / 70 % test; MRL split by person | As stated | Nothing in the repo | — | CANNOT VERIFY |
+| CEW 30 % tuning / 70 % test; MRL split by person | As stated | Files lost in the reset | your answer 2026-11-16 | CANNOT VERIFY: from old report, not verified |
 | 3MDAD | Test only | 35 / 15 drivers for the action classifier (seed 0) | AV1/DECISIONS D6 | OUTDATED |
 | 5-fold CV | Not mentioned | 59 train+val drivers in 5 groups of 11–12; test drivers untouched | OVERNIGHT §8 addition 6 | MISSING FROM REPORT |
 | IR-only split (2026-11-14) | — | Frozen driver-disjoint IR split. IR test has 20 drinking and 19 eating events (target was 30 + 30) | session 2026-11-14 | MISSING FROM REPORT |
@@ -109,7 +109,7 @@ Source short names:
 | Model running on the Pi now | YOLO26n detector + rules | **v2 hybrid**: yolo26n-cls action model (224 px, INT8) + ear phone check + lap phone check (128 px, INT8). Box detector **off** (`--no-detect`), so there are **no drinking / eating alerts on the Pi**. Texting rule off (`--no-texting`) | `pi/start_stream.sh`, MODELS v2 section, `Subsystems/Distraction Subsystem.md` | OUTDATED |
 | Why the Pi gives no drinking / eating alerts | — | In v2, drinking and eating come only from det_v2d boxes (D17), and the Pi starts with `--no-detect`. Recorded trade-offs: detector every frame ≈ 66 ms → 15.1 FPS worst case (D22, estimate); detector every 2nd frame ≈ +22 ms → ~20 FPS and its false phone alerts return (~79 /h on the IR test) (session 2026-10-26 08:35). The newer drinking model (IR-3) was never exported for the Pi. Eating has no working model | `action_v1/DECISIONS.md` D17, D22; `pi/start_stream.sh`; sessions 2026-10-26, 2026-11-14 | MISSING FROM REPORT (must be stated in the new report) |
 | Why we moved from det_v2d to the action classifier | — | 2026-10-25 live Pi test: near-ear calls missed. det_v2d phone score median 0.18 at the near ear vs 0.63 at the far ear; the alert rule fired 11 % vs 89 % of the time. An ear-zone rule raised SynDD right-ear calls 80 % → 90 % at 3.4 false alarms /h. The action brief followed 12 minutes after a suggestion to train on 3MDAD (35 / 15 drivers) | session 2026-10-25 23:40–23:48, 2026-10-26 00:04–00:16 | MISSING FROM REPORT |
-| Drinking model | Detector cup box at the mouth | 2026-11-14: a separate cup/bottle-vs-empty-hand crop model ("IR-3", trained with 1,500 phone hard negatives), on the unpushed `overnight/held-object` branch. Not on the Pi | session 2026-11-14 | MISSING FROM REPORT |
+| Drinking model | Detector cup box at the mouth | Current best drinking model: "IR-3", a cup/bottle-vs-empty-hand crop model trained with 1,500 phone hard negatives (2026-11-14). **Not set up on the Pi.** Its branch was not found on GitHub on 2026-11-16, so its numbers come from the transcript | session 2026-11-14, your answer 2026-11-16 | MISSING FROM REPORT |
 | Eating | Weak | Unsupported everywhere (0 % on SynDD for det_v2d, 0/19 for the eating rule; no eating model trained because there are no hand-checked food labels) | MODELS, OVERNIGHT §8, session 2026-11-14 | STILL CORRECT |
 | Rejected models / ideas | 8 ideas, none better | det_v2c, ideas A–G, additions 1–3; plus later: yolo26s-cls (D15), smoking class (D21) | OVERNIGHT, AV1/DECISIONS | MISSING FROM REPORT (later rejections) |
 
@@ -127,28 +127,15 @@ Source short names:
 
 | Topic | What the report says | What the project has now | Source | Status |
 |---|---|---|---|---|
-| Camera | Infrared, centre mirror, 1296 × 972 | Target: 160° NoIR at the centre mirror, 1296 × 972 (placement report 2026-10-11). Camera actually attached on 2026-10-10: **OV5647 clone, RGB, no IR, a stand-in "until the BOM's IR 160° module arrives"**. On the Pi now: no fisheye rectification (`rectify.enabled: false`, "until calibrate_fisheye.py has been run"), full frame (`--roi full`), image rotated 180° (camera mounted upside down). 2026-10-25: the Pi lists the sensor as `ov5647 [2592x1944 10-bit GBRG]`, captured at 1296×972 and shown as a 640×480 view; the picture was "nearly black. It needs light or the IR LEDs on". The OV5647 sensor name does not say whether it is the RGB or the NoIR module | PI_TARGET (Camera), `configs/profiles/pi.yaml`, `pi/start_stream.sh`, sessions 2026-10-11, 2026-10-25 23:20–23:30 | CANNOT VERIFY (waiting for your answer) |
+| Camera | Infrared, centre mirror, 1296 × 972 | IR NoIR 160° module on the Pi now, installed after 2026-10-10 (exact date not recorded); the OV5647 RGB camera was a temporary stand-in before that. Capture 1296 × 972, 640 × 480 view (2026-10-25). No fisheye calibration yet (`rectify.enabled: false`); image rotated 180° | your answer 2026-11-16, PI_TARGET, `configs/profiles/pi.yaml`, `pi/start_stream.sh`, session 2026-10-25 | STILL CORRECT (calibration missing from report) |
 | Speed on the Pi | "About 10 frames per second on the Raspberry Pi" | det_v2d INT8 ~45 ms per frame on the Pi ("measured earlier", AV1/PROGRESS). MODELS: "Raspberry Pi 5 numbers: still to be measured with all models running". v2 stream ~30 FPS (camera limit), ~15 ms model time, partly estimated | AV1/PROGRESS, MODELS, session 2026-11-08 | OUTDATED |
 | Hailo AI HAT | Not mentioned | ONNX ready for the Hailo compiler; compile not done | OVERNIGHT §8 addition 7, MODELS | MISSING FROM REPORT |
 | Our own recordings | None yet (Task 7) | Still none from the Pi camera. Only the developer's S01 laptop webcam clip (test only) | DATA, session 2026-11-14 ("I need ... clips recorded with the Pi camera") | STILL CORRECT |
 
 ## Questions for me (from this comparison)
 
-**Your last reply kept the template placeholders for answers 1–4.** Still open:
+All earlier questions were answered on 2026-11-16. Still open:
 
-1. **CEW and MRL Eye:** done outside Claude Code by Omar (files where?), or remove that section?
-2. **Camera on the Pi now:** RGB stand-in or IR NoIR 160°? The 2026-10-25 log shows only the
-   sensor name `ov5647`.
-3. **`overnight/held-object` branch:** still exists (which branch?) or lost? Count IR-3 as the
-   current drinking state or not?
-4. **Reset:** only the one before 2026-10-16, or a second one (date)?
-
-Answered by checking (no recount possible: the D: drive is not on this machine):
-
-- **Tables 7 and 8, Open Images, EBDD:** recomputed from the data-build logs printed on
-  2026-10-18. They match.
-- **DMS_Project / ADMS sizes and the box counts:** labelled "from old report, not verified".
-- **SynDD modality:** the pixel check result is reported, with a note that the docs called it
-  infrared.
-- **SynDD A2 (15 vs 10) and eating frames (3 vs 5):** kept both, marked conflicting.
-- **Hand check of the 495 test frames:** no later record says it was done. Still open: was it?
+1. **Held-object branch:** not on `ziadteama/RTDMS` or any repo this account can reach. Where was
+   it pushed?
+2. **Hand check of the 495 test frames:** was it ever done?

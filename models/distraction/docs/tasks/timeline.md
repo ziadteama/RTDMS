@@ -34,9 +34,9 @@ the committer's local time as git recorded it.
 | Face model texting/eating/drinking enhancement | 2026-11-08 20:56 → 11-15 01:06 | All |
 
 **PC resets.** The 2026-10-16 rebuild session starts with: "My PC was reset and my local Claude
-Code project was lost" (session 2026-10-16 02:23). So there was one reset **before 2026-10-16**,
-and the one you mention now. Everything that only lived on the PC from before those resets is
-marked "(reset period)" below. The remote transcripts above survived both.
+Code project was lost" (session 2026-10-16 02:23). You confirmed this was the **only** PC reset.
+Everything that only lived on the PC before it is marked "(reset period)" below. The remote
+transcripts above survived it.
 
 ---
 
@@ -67,11 +67,26 @@ marked "(reset period)" below. The remote transcripts above survived both.
   - One measured face: calibration SNR 69.7 (session 2026-08-28 02:47; `models/face/docs/EVIDENCE.md`).
 - **Datasets:** none used for training (pre-trained Google model). MRL Eye was named only as a
   possible future eye-state CNN for drivers whose EAR signal is poor (session 2026-08-28 02:47).
-  **CEW and an MRL-trained CNN: NOT FOUND in any source.**
+  CEW and the MRL-trained CNN are in stage 1b.
 - **Sources disagree on iris landmarks.** Session 2026-08-28 01:34 says "478 landmarks with iris
   confirmed". Session 2026-08-28 16:56 says iris landmarks were absent in 1270 of 1270 frames
   ("bundled face_landmarker.task emits 468 points"). Later Pi notes say 478 points
   (`models/face/docs/EVIDENCE.md`).
+
+## Stage 1b. Date not recorded (before 2026-10-18): CEW test and MRL Eye CNN (reset period)
+
+- **What:** you did this work outside Claude Code. The original files were lost in the PC reset
+  (your answer, 2026-11-16). No code, log or transcript exists for it.
+- **From the old report, not verified** (Task 6 v2 §2, which says this part was "unchanged since
+  version 1"):
+  - CEW: 2,423 face photos (1,192 closed, 1,231 open), colour 100 × 100. Split 30 % tuning (thresholds
+    only) / 70 % test. Faces padded with a 50 % border, then 400 × 400.
+  - MRL Eye: 84,898 infrared eye images from 37 people, used to train an eye-state CNN as a
+    comparison. Split by person (8 people never seen). 32 × 32 gray, per-image normalisation,
+    9 augmentation types.
+  - The old report gives **no accuracy numbers** for either.
+- MRL Eye is still on D: (383 MB), listed as not used (INVENTORY 2026-11-14).
+- **Not counted in the final results.**
 
 ## Stage 2. 2026-08-28: first distraction research and prototype (dms-distract)
 
@@ -450,13 +465,17 @@ This stage is the reason we moved from the box detector to the action classifier
     export was blocked on the PC and the Pi was unreachable (session 2026-11-14 16:17).
   - Eating has no working model at all (stage 12).
 
-## Stage 12. 2026-11-08 → 11-15: held-object drinking model (local branch, not pushed)
+## Stage 12. 2026-11-08 → 11-15: held-object drinking model (current best drinking model, not on the Pi)
 
 - **Why:** "labels was bad can we do something related to holding an object + near face" (user,
   session 2026-11-08 20:56). The box labels came from a teacher model that "rarely saw food".
 - **Branch:** `phone/held-object`, later `overnight/held-object` (last commits named: `9430ae5`,
   `e8b4761`, `bde27ab`, `47b0774`, `b246d11`). "Nothing was pushed" (session 2026-11-14 06:27).
-  **Not in the repo.**
+  - You said on 2026-11-16 that you pushed it. A fetch of `ziadteama/RTDMS` on 2026-11-16
+    found no such branch and none of these commits. The other repos this account can reach
+    have nothing either. So the numbers below are from the transcript only.
+  - Your decision: count IR-3 as the **current best drinking model**. It is **not set up on the
+    Pi yet**.
 - **Data** (session 2026-11-13 23:07):
   - 22,612 hand-at-mouth crops, 95 training drivers + 10 SynDD validation drivers, no test
     drivers.
@@ -520,8 +539,8 @@ This stage is the reason we moved from the box detector to the action classifier
 | Dataset | Source | Size (as recorded) | IR / RGB | Camera | Role | Kept / dropped and why |
 |---|---|---|---|---|---|---|
 | UTA-RLDD | Project 1 | Fold3 part 2 on D: (6 drivers, 7.6 GB) | RGB | phone camera, front | planned for drowsiness | Not used (INVENTORY: "not relevant") |
-| MRL Eye | Project 1 | 383 MB on D:; 84,898 images (Task 6 report only) | IR | eye crops | planned eye-state CNN | On D:, listed "not used"; CNN NOT FOUND |
-| CEW | Project 1 (reviewed) | 2,423 (Task 6 report only) | RGB | faces | Task 6 says face test | NOT FOUND in project |
+| MRL Eye | Project 1 | 383 MB on D:; 84,898 images, 37 people (from old report, not verified) | IR | eye crops | eye-state CNN (done outside Claude Code) | Files lost in the reset; not counted in results |
+| CEW | Project 1 (reviewed) | 2,423 photos (from old report, not verified) | RGB | faces | face-model thresholds + test (done outside Claude Code) | Files lost in the reset; not counted in results |
 | DG-Unicamp | Project 1 | — | — | — | planned gaze | NOT FOUND (never mentioned after Project 1) |
 | WESAD | Project 1 | 15 subjects | physiology | — | physiology fatigue model | Used by physiology (commit `fd13c61`) |
 | State Farm | Kaggle | not on D: | RGB | passenger side | v1 phone model (pre-trained weights) | Dropped: wrong view |
@@ -550,6 +569,7 @@ This stage is the reason we moved from the box detector to the action classifier
 | May 2026 | Plan: Pi 5 8 GB + AI HAT+ 26 TOPS + Pi IR camera 5MP 160° | Project 1 BOM | `CLAUDE.md` |
 | 08-28 | Laptop webcam for all tests | No Pi camera yet | sessions 08-28 |
 | 10-09 | OV5647 RGB stand-in camera on the Pi, 640×480 @ 30 fps for face | Development until the IR module arrives | PI_TARGET Camera |
+| After 10-10 (exact date not recorded) | IR NoIR 160° camera module installed on the Pi, replacing the RGB stand-in | The BOM's IR camera | your answer, 2026-11-16 |
 | 10-09 | Face runs on LiteRT, not MediaPipe | MediaPipe does not run on the Pi's Python 3.13 | session 10-09 |
 | 10-11 | Target switched to laptop colour webcam; IR parked | Live testing | LAPTOP_TESTING |
 | 10-11 | Placement target: centre mirror, 0.6–0.8 m, 20–30°, NoIR + 850 nm LEDs | Placement report | session 10-11 |
@@ -561,31 +581,19 @@ This stage is the reason we moved from the box detector to the action classifier
 
 ## Questions for me
 
-**Still open: your last reply kept the template placeholders for these four**, e.g.
-"<only the one before Oct 16 / a second one on DATE>". Please pick one option for each:
+Resolved on 2026-11-16:
+- **Reset:** only one, before 2026-10-16.
+- **CEW / MRL Eye:** done outside Claude Code; files lost; old-report numbers, not counted.
+- **Camera:** IR NoIR 160° installed after 2026-10-10 (date not recorded).
+- **Held-object:** IR-3 counts as the current best drinking model, not on the Pi.
+- **Eating frames:** 3 (log, training set only).
+- **SynDD A2:** both values kept with a note.
+- **SynDD modality:** as the pixel check found it.
 
-1. **Reset:** only the one before 2026-10-16, or also a second one (on what date)?
-2. **CEW / MRL Eye:** done outside Claude Code by Omar (files where?), or remove that section?
-3. **Camera on the Pi now:** RGB stand-in or IR NoIR 160°? The last record (2026-10-25) only
-   shows the sensor name `ov5647`, which both modules use.
-4. **`overnight/held-object` branch:** still exists (pushed as which branch?) or lost? Count IR-3
-   as the current drinking state, or not?
-
-**Other open questions:**
-
-5. **Dataset files:** the D: drive is on your PC, not on this cloud machine, so I could not
-   recount anything directly. The counts above come from log output printed in the transcripts.
-   If you want a direct recount, run the counting commands on that drive and paste the output.
-6. **SynDD A2:** the 2026-10-26 folder listing shows 15 entries; the 2026-11-14 inventory says 10
-   drivers. Kept both, marked conflicting.
-7. **SynDD eating frames:** the labelling log shows 3 (train only, none in val/test).
-   OVERNIGHT_REPORT §8 says "only 5 eating frames". Kept both; the 3 is the log count.
-8. **Still unread:** 2026-10-10 16:07 → 10-11 00:16, and 2026-10-16 18:27 → 10-18 03:44. Both
-   are covered by docs written in them. Do you want me to page through them anyway (roughly 30+
-   pages each)?
-9. **Why YOLO26n** replaced the YOLOv8n plan on 2026-10-10: NOT FOUND in what I read.
-10. **Eating temporal head (2026-11-14/15):** did it finish, and with what numbers?
-11. **Iris landmarks:** 478 with iris (session 08-28 01:34, Pi notes) or 468 without
-    (session 08-28 16:56)?
-12. **Team scope:** include Ziad Teama's State Farm phone model (stage 3) as "our" version 1,
-    and leave out physiology and Garmin?
+Still open:
+1. **Held-object branch:** not found on GitHub (see stage 12). Which repo or remote did you
+   push it to?
+2. **Why YOLO26n** replaced the YOLOv8n plan on 2026-10-10: NOT FOUND.
+3. **Eating temporal head (2026-11-14/15):** did it finish, and with what numbers?
+4. **Iris landmarks:** 478 with iris or 468 without (sessions 08-28 disagree)?
+5. **Hand check of the 495 test frames:** was it ever done?
