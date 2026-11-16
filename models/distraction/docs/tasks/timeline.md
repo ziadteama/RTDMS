@@ -28,7 +28,7 @@ the committer's local time as git recorded it.
 | Raspberry Pi 5 camera setup | 2026-10-09 20:12 → 23:03 | All |
 | RTDMS distraction module on Raspberry Pi | 2026-10-10 16:07 → 10-11 20:25 | **Partly**: 10-11 00:16 → 20:25 read; **10-10 16:07 → 10-11 00:16 not read** (too long; that day is covered by git commits and EVIDENCE.md / DATA.md written in it) |
 | RTDMS graduation project rebuild (A, B) | 2026-10-16 02:23 → 17:30 | All |
-| RTDMS graduation project rebuild (C) | 2026-10-16 18:27 → 11-07 14:24 | **Partly**: 10-25 23:26 → 11-07 14:24 read; **10-16 18:27 → 10-25 23:26 not read** (covered by git commits, OVERNIGHT_REPORT.md and DETECTOR_V2.md written in it) |
+| RTDMS graduation project rebuild (C) | 2026-10-16 18:27 → 11-07 14:24 | **Mostly**: 10-18 03:44 → 11-07 14:24 read (10-19 → 10-25 20:30 had almost no activity: one page jumps from 10-18 21:31 to 10-25 20:32). **10-16 18:27 → 10-18 03:44 not read** (the overnight experiment runs; OVERNIGHT_REPORT.md and DETECTOR_V2.md were written in that window) |
 | RTDMS graduation project rebuild (D) | 2026-11-07 14:30 → 11-09 08:34 | 11-07 15:05 → end read (mostly Garmin) |
 | RTDMS project reports by task (run on another team member's PC) | 2026-11-08 | All |
 | Face model texting/eating/drinking enhancement | 2026-11-08 20:56 → 11-15 01:06 | All |
@@ -117,8 +117,8 @@ marked "(reset period)" below. The remote transcripts above survived both.
     - Source: `models/phone/docs/EVIDENCE.md`.
   - **Known gap at the time:** "State Farm is RGB cabin; IR domain gap remains"
     (`models/phone/docs/EVIDENCE.md`).
-- **(reset period)** The first Task 6 report (version 1) was written on this model. Its date and
-  file are NOT FOUND.
+- **(reset period)** The first Task 6 report (version 1) described this model. It existed in
+  Downloads by 2026-10-18 (stage 9b); when it was written is NOT FOUND.
 
 ## Stage 4. 2026-10-09: camera on the Pi, face live on the Pi
 
@@ -228,6 +228,12 @@ marked "(reset period)" below. The remote transcripts above survived both.
     (`--mode full`), off by default").
 - **Auto-labelled boxes on driver video** (SynDD, EBDD) with the teacher, kept only when they agree
   with the action label (commit `ec58c51`; `docs/DETECTOR_V2.md`).
+  - The labelling log (`det_v2_syndd.log`, printed in session 2026-10-18 20:14) shows 1,653 SynDD
+    clips. Frames per split: train 13,385, val 2,534, test 2,399 (total 18,318).
+  - Train frames per action: phone right ear 2,207, left ear 2,217, phone in hand 2,803, drinking
+    409, **eating 3**, normal 1,158, hand on head 975, singing 1,109, talking 2,033, yawning 471.
+    No eating frames in val or test.
+  - EBDD log (`det_v2_ebdd.log`, same message): train 1,514, val 210, test 369 frames (total 2,093).
 
 ## Stage 8. 2026-10-17: detector v2 (det_v2b → det_v2d), IR again
 
@@ -298,8 +304,83 @@ marked "(reset period)" below. The remote transcripts above survived both.
 - **Release 2026-10-19** (commit `2292523`): det_v2d FP32 / INT8 / ONNX, det_v2h, YOLO26n-pose
   shipped in git (`models/distraction/models/README.md`). Pi 5 numbers "still to be measured
   with all models running" (same file).
-- **Task 6 v2 and Task 7 v2 documents** first committed in `2292523` (2026-10-19). The session
-  where they were written falls in the unread range (10-16 → 10-25), so NOT FOUND.
+## Stage 9b. 2026-10-18: Task 6 and Task 7 rewritten as version 2; release PR
+
+- **What:** the user attached `Task 6 - Dataset Preparation and Preprocessing.docx` and
+  `Task 7 - Dataset and Test-Scenario Plan.docx` from Downloads (session 2026-10-18 20:07). Both
+  were "redone as version 2: same cover, colours, tables and layout as your originals ... with
+  the real numbers", saved next to the originals (session 2026-10-18 20:23). So version 1 of
+  both existed by 2026-10-18; its content is NOT FOUND.
+- **Where the Task 6 v2 numbers came from:**
+  - The tables were rebuilt from the data-build logs on D: (session 2026-10-18 20:14), and the
+    charts used numbers typed into the chart script (session 2026-10-18 20:16).
+  - What can be recomputed from the log text in the transcript is in `report_vs_project.md`
+    section 3.
+- **Release:** the IR detector, docs and experiment scripts were packaged for GitHub (session
+  2026-10-18 21:00–21:16). Opened as
+  [ziadteama/RTDMS#3](https://github.com/ziadteama/RTDMS/pull/3): 63 commits, 141 files, all in
+  `models/distraction/` (session 2026-10-18 21:32). First commit of the Task 6/7 v2 files:
+  `2292523` (git date 2026-10-19 00:17).
+- **2026-10-19 → 10-25:** almost no activity in the transcripts. The next message is
+  2026-10-25 20:30.
+
+## Stage 9c. 2026-10-25: det_v2d live on the Pi, and the near-ear problem
+
+This stage is the reason we moved from the box detector to the action classifier.
+
+- **Setup** (session 2026-10-25 20:30–23:31):
+  - The Pi was connected by Ethernet; the release detector was bundled for the Pi (85 MB,
+    INT8 `det_v2d_ir_512_det_aciq_mixed_ncnn_model` plus the FP32 fallback).
+  - Camera: the Pi lists `ov5647 [2592x1944 10-bit GBRG]` (session 2026-10-25 23:30).
+  - Stream: "picamera2 YUV420/Y 1296x972 -> view 640x480; detector ... det_v2d ... INT8;
+    drowsiness on; texting rule off" (session 2026-10-25 23:30).
+- **Speed on the Pi:**
+  - Detector every 2nd frame and pose every 6th frame: **24.5 FPS at 58 °C**, no errors (session
+    2026-10-25 21:29).
+  - The user then asked for "both the ir and the drowsiness percelos thing only", so pose was
+    dropped (session 2026-10-25 23:21).
+  - Power: the Pi rebooted and the Ethernet link dropped several times that evening, on the
+    official 27 W supply (session 2026-10-25 21:27–23:30).
+- **The failure the user reported:** "how is this not detected it detects good on far ear but
+  near ear its bad" (user, session 2026-10-25 23:40).
+- **Measured on that recording** (det_v2d phone score per frame, session 2026-10-25 23:48):
+
+  | Segment | Frames | Median phone score | Frames ≥ 0.40 | Alert rule fires (score ≥ 0.25) |
+  |---|---|---|---|---|
+  | Far ear (16–34 s) | 180 | 0.63 | 93 % | 89 % of the time |
+  | Near ear (40–82 s) | 420 | 0.18 | 13 % | 11 % of the time |
+
+- **Fix tried: an "ear-zone" rule** (lower phone threshold near the ear, held 2 s). Scored once
+  on the SynDD test drivers (session 2026-10-25 23:48):
+
+  | Setting | Right ear | Left ear | Texting | Drinking | Phone FA/h |
+  |---|---|---|---|---|---|
+  | Baseline det_v2d | 80 % | 100 % | 36.6 % | 90 % | 0 |
+  | Ear rule, conf 0.20 | 90 % | 100 % | 36.6 % | 90 % | 3.4 |
+  | Ear rule, conf 0.25 or 0.30 | 80 % | 100 % | 36.6 % | 90 % | 1.7 |
+
+- **Explanation given at the time:** "Near-ear calls are missed because your hand hides the
+  phone: confidence is about 0.18 versus 0.63 at the far ear. An ear-zone rule lifts SynDD
+  near-ear calls from 80% to 90% at about 3 extra false alarms per hour; fine-tuning on your own
+  clips is the real fix" (session 2026-10-25 23:48).
+- **Datasets on D: listed that night** (session 2026-10-26 00:03–00:04):
+  - SynDD A1 146 GB: 69 driver folders; rear view 138 videos (86 named `Rear_view`, 52 named
+    `Rearview`); dashboard 40; right side window 40.
+  - SynDD A2 21 GB: **15** entries in the folder.
+  - DMS_Project 1.5 GB, ADMS_FINAL_3 265 MB, EBDD 2.0 GB, 3MDAD 3.9 GB, DAD 18 GB, Open Images
+    2.9 GB, COCO 1.8 GB (not used for training).
+  - The suggestion for the near-ear problem: 3MDAD is "the best unused source for near-ear
+    hand-over-phone examples ... We'd lose it as an unseen test set, though, unless we split it by
+    driver (say 35 train, 15 test)."
+- **Decision, 12 minutes later:** the action-classifier brief (session 2026-10-26 00:16). It
+  asks to:
+  - "Replace the phone/drink/eat OBJECT detector with an ACTION approach";
+  - not alert "when a hand just rests on the cheek/ear/chin with no phone";
+  - run "≥15 FPS on Raspberry Pi 5 together with face mesh";
+  - split 3MDAD 35 train / 15 test.
+
+  The brief does not state its reason in its own words. The near-ear analysis and the 3MDAD
+  suggestion right before it are the recorded context.
 
 ## Stage 10. 2026-10-26: action classifier (v1), then hybrid v2
 
@@ -351,6 +432,23 @@ marked "(reset period)" below. The remote transcripts above survived both.
   - Pi runs `pi/start_stream.sh`: `--hybrid --no-detect --no-texting --mesh --rotate 180`.
   - "About 15 ms per frame of model time on the Pi, with the stream at ~30 FPS (the camera's
     limit)"; **no drinking or eating alerts** on the Pi (session 2026-11-08 20:01).
+- **Why the Pi gives no drinking or eating alerts:**
+  - In v2, drinking and eating come **only** from the det_v2d box detector. The action model is
+    not used for them (`action_v1/DECISIONS.md` D17).
+  - The Pi stream starts with `--no-detect`, so the detector never runs (`pi/start_stream.sh`).
+  - The trade-offs recorded for leaving it off:
+    - The full hybrid with the detector on every frame is estimated at 66 ms per frame on the
+      Pi (15.1 FPS worst case), "no margin above 15 FPS" (`action_v1/DECISIONS.md` D22, an
+      estimate).
+    - Turning it back on every 2nd frame "costs about 22 ms per frame on the Pi ... the rate
+      drops to roughly 20 FPS. It also brings back its own false phone alerts, about 79 per hour
+      on the IR test set" (session 2026-10-26 08:35).
+  - No message states the decision to leave it off in so many words. The v2 report itself
+    proposed det_v2d boxes for drinking and eating, with the detector every 2nd frame
+    (`action_v1/REPORT_v2.md`).
+  - The newer drinking model (stage 12) was never exported for the Pi or installed. The INT8/NCNN
+    export was blocked on the PC and the Pi was unreachable (session 2026-11-14 16:17).
+  - Eating has no working model at all (stage 12).
 
 ## Stage 12. 2026-11-08 → 11-15: held-object drinking model (local branch, not pushed)
 
@@ -428,15 +526,15 @@ marked "(reset period)" below. The remote transcripts above survived both.
 | WESAD | Project 1 | 15 subjects | physiology | — | physiology fatigue model | Used by physiology (commit `fd13c61`) |
 | State Farm | Kaggle | not on D: | RGB | passenger side | v1 phone model (pre-trained weights) | Dropped: wrong view |
 | AUC v1/v2 | request | ~44 drivers, on D: | RGB | side | — | Not used: passenger-side view (DATA) |
-| Open Images V7 | public | train 13,623 (v1); "17k" on D: | RGB photos | none | detector training | **Used** (det_v2d) |
+| Open Images V7 | public | 16,996 downloaded = 14,674 train / 1,143 val / 1,179 test (download log, session 2026-10-18 20:14); v1 converted set: train 13,623 | RGB photos | none | detector training | **Used** (det_v2d) |
 | 3MDAD Day-RGB2 front | Kaggle | 50 drivers, 16 actions, ~3 fps | RGB → gray | low dashboard, 30–45° | crop classifiers, unseen test, action training | **Used**: test for det_v2d, train/test for the action model |
 | 3MDAD night IR / side | authors | — | IR | — | — | Missing (not on D:) |
-| EBDD | BUET | 13 drivers, 2.0 GB | RGB → gray | windshield / side | detector + action training, test | **Used** |
-| SynDD A1 rear view | AI City 2024 Track 3 | 69 drivers, 30 fps 1920×1080 | IR per docs; "monochrome" per INVENTORY | rear-view mirror | main training + test | **Used** (main dataset) |
+| EBDD | BUET | 13 drivers, 2.0 GB; 2,093 labelled frames (log) | RGB → gray | windshield / side | detector + action training, test | **Used** |
+| SynDD A1 rear view | AI City 2024 Track 3 | 69 drivers, 138 rear-view videos, 30 fps 1920×1080; 18,318 labelled frames from 1,653 clips (log) | Pixel check (2026-11-14): mean colour 0.1 = "monochrome / NIR-sensitive (daylight, not active IR)". The repo docs and the old report call it infrared | rear-view mirror | main training + test | **Used** (main dataset) |
 | SynDD A1 dash / right views | same | 20 drivers downloaded | same | dashboard, side window | detector training test | Dropped: FA 5.2 → 24.1 /h |
-| SynDD A2 | same | 15 or 10 drivers (sources disagree) | same | rear | pseudo-labels | Dropped: noisier, more FA |
-| Roboflow DMS_Project v2 | Roboflow | 10,198 (Task 6 report only) | IR + colour | DMS | detector training | **Used** (filtered) |
-| Roboflow ADMS_FINAL_3 v1 | Roboflow | 2,698 (Task 6 report only) | colour | in-car | detector training | **Used** |
+| SynDD A2 | same | 21 GB; 15 entries in the folder listing (session 2026-10-26 00:03) vs "10 drivers" (INVENTORY 2026-11-14), conflicting; 30 videos (OVERNIGHT) | same | rear | pseudo-labels | Dropped: noisier, more FA |
+| Roboflow DMS_Project v2 | Roboflow | 10,198 kept after filters: from old report, not verified (typed as 7,244 / 2,121 / 833 in the 2026-10-18 chart script; no log line seen) | IR + colour | DMS | detector training | **Used** (filtered) |
+| Roboflow ADMS_FINAL_3 v1 | Roboflow | 2,698 kept after filters: from old report, not verified (typed as 2,149 / 549 / 0 in the chart script) | colour | in-car | detector training | **Used** |
 | DAD part 1 | TU Munich | 3 drivers, 224×171, 45 fps | real IR | front + top | test only | **Used** (test only); parts 2…N missing |
 | Drive&Act | registration | 15 drivers, NIR videos on D: | NIR | inner mirror, wheel | — | Not used: annotation files missing |
 | DMD | request | — | IR + RGB | — | planned night test | Missing (requested) |
@@ -456,28 +554,38 @@ marked "(reset period)" below. The remote transcripts above survived both.
 | 10-11 | Target switched to laptop colour webcam; IR parked | Live testing | LAPTOP_TESTING |
 | 10-11 | Placement target: centre mirror, 0.6–0.8 m, 20–30°, NoIR + 850 nm LEDs | Placement report | session 10-11 |
 | 10-17 | Back to IR: detector trained gray-only | Match the IR mirror camera | OVERNIGHT §3 step 4 |
+| 10-25 | det_v2d INT8 on the Pi: detector every 2nd frame, pose every 6th → 24.5 FPS at 58 °C; camera listed as `ov5647`, captured 1296×972 → 640×480 view; picture "nearly black", needs light or the IR LEDs | Lower load for the Pi | session 10-25 21:29, 23:20, 23:30 |
 | 10-26 | Camera mounted upside down → stream rotated 180°; Pi on Ethernet hub; reboots seen | — | session 10-26 |
 | 11-08 | Pi profile: rectification off (camera not calibrated), INT8 detector, LiteRT face mesh | Speed; no calibration yet | `configs/profiles/pi.yaml` |
 | 11-14 | Pi unreachable; PC blocks `ncnn` | — | session 11-14 |
 
 ## Questions for me
 
-1. **Reset date.** You wrote "<RESET DATE>". The transcripts show one reset before 2026-10-16
-   02:23 and a recent one. Which one do you mean, and on what date was the first?
-2. **Task 6 version 1:** when was it written, and do you still have it? NOT FOUND.
-3. **Unread transcript ranges:** 2026-10-10 16:07 → 10-11 00:16 and 2026-10-16 18:27 → 10-25 23:26.
-   Repo docs cover both, but I can read them page by page if you want reasons that aren't in the
-   docs (it is slow: about 5–15 minutes of session per page).
-4. **Why YOLO26n** replaced the YOLOv8n plan on 2026-10-10: NOT FOUND in what I read.
-5. **CEW / MRL Eye / eye-state CNN:** done outside Claude Code, or never done?
-6. **SynDD modality:** infrared (docs) or monochrome daylight (2026-11-14 pixel check)?
-7. **SynDD A2:** 15 or 10 drivers?
-8. **SynDD eating frames:** 3 or 5?
-9. **Camera now:** still the RGB OV5647 stand-in, or the IR 160° NoIR? Date of the change?
-10. **`overnight/held-object` branch:** does it still exist after the reset? Should the new report
-    present IR-3 as "current state" even though it is not on the Pi or in the repo?
-11. **Eating temporal head (2026-11-14/15):** did it finish, and with what numbers?
-12. **Iris landmarks:** 478 with iris (session 08-28 01:34, Pi notes) or 468 without
+**Still open: your last reply kept the template placeholders for these four**, e.g.
+"<only the one before Oct 16 / a second one on DATE>". Please pick one option for each:
+
+1. **Reset:** only the one before 2026-10-16, or also a second one (on what date)?
+2. **CEW / MRL Eye:** done outside Claude Code by Omar (files where?), or remove that section?
+3. **Camera on the Pi now:** RGB stand-in or IR NoIR 160°? The last record (2026-10-25) only
+   shows the sensor name `ov5647`, which both modules use.
+4. **`overnight/held-object` branch:** still exists (pushed as which branch?) or lost? Count IR-3
+   as the current drinking state, or not?
+
+**Other open questions:**
+
+5. **Dataset files:** the D: drive is on your PC, not on this cloud machine, so I could not
+   recount anything directly. The counts above come from log output printed in the transcripts.
+   If you want a direct recount, run the counting commands on that drive and paste the output.
+6. **SynDD A2:** the 2026-10-26 folder listing shows 15 entries; the 2026-11-14 inventory says 10
+   drivers. Kept both, marked conflicting.
+7. **SynDD eating frames:** the labelling log shows 3 (train only, none in val/test).
+   OVERNIGHT_REPORT §8 says "only 5 eating frames". Kept both; the 3 is the log count.
+8. **Still unread:** 2026-10-10 16:07 → 10-11 00:16, and 2026-10-16 18:27 → 10-18 03:44. Both
+   are covered by docs written in them. Do you want me to page through them anyway (roughly 30+
+   pages each)?
+9. **Why YOLO26n** replaced the YOLOv8n plan on 2026-10-10: NOT FOUND in what I read.
+10. **Eating temporal head (2026-11-14/15):** did it finish, and with what numbers?
+11. **Iris landmarks:** 478 with iris (session 08-28 01:34, Pi notes) or 468 without
     (session 08-28 16:56)?
-13. **Team scope:** should the storyline include Ziad Teama's State Farm phone model (stage 3) as
-    "our" version 1, and leave out physiology and Garmin?
+12. **Team scope:** include Ziad Teama's State Farm phone model (stage 3) as "our" version 1,
+    and leave out physiology and Garmin?
