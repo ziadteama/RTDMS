@@ -18,6 +18,10 @@ export function AppTabs() {
         <NativeTabs.Trigger.Label>{t('tab.live')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="video" md="videocam" />
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="trips">
+        <NativeTabs.Trigger.Label>{t('tab.trips')}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="road.lanes" md="route" />
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="health">
         <NativeTabs.Trigger.Label>{t('tab.health')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="cpu" md="memory" />
