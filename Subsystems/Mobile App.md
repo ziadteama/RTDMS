@@ -46,14 +46,14 @@ Build order: **1 → 2 → 7 → 8 → 9 → 3 → 4 → 5 → 6**
 
 | # | Feature | What it does |
 |---|---|---|
-| 1 | **Connect + live view** | Join the Pi hotspot by QR code; live IR view; driver state (Alert / Distracted / Drowsy / Phone) |
+| 1 | **Connect + live view** | Join the Pi hotspot by QR code; auto reconnect + "Pi offline" banner; live IR view; driver state (Alert / Distracted / Drowsy / Phone); EAR, PERCLOS, blink rate, live HR / RR + signal quality, fatigue score; alert level + reason |
 | 2 | **Alerts + voice** | Phone notification with the buzzer; voice alerts in Arabic and English |
 | 3 | **Crash detection** | Accelerometer spike > ~4 g + GPS speed drops to ~0; only armed during a trip above ~20 km/h |
 | 4 | **Emergency** | 30 s countdown with "I'm OK" → SMS with GPS link to contacts → call 123 (ambulance) or first contact |
 | 5 | **Incident recording** | Pi keeps the last 20 s in RAM; on crash saves 15 s before + 10 s after with sensor data; app downloads the clip |
-| 6 | **Trip history + safety score** | Events per trip, alert counts, score trend |
-| 7 | **Calibration + settings** | Guided calibration, driver profiles, sensitivity and thresholds, detectors on/off |
-| 8 | **Pi health** | CPU, temperature, throttling, 5 V, fps, model status, restart / shutdown |
+| 6 | **Trip history + safety score** | Trips start / end automatically when the Pi connects / disconnects; per trip: duration, alerts by type, longest eye closure, phone-use time, HR trend, event timeline; safety score per trip + weekly trend; only event logs saved, never video (except incidents) |
+| 7 | **Calibration + settings** | Guided calibration, driver profiles, sensitivity, thresholds (eye-closure s, off-road gaze s, phone duration), detectors on/off, alert sound / volume / vibration strength, language, units, theme |
+| 8 | **Pi health** | CPU, temperature, throttling, 5 V, fps, model status, camera status, storage, uptime, restart / shutdown |
 | 9 | **Demo mode** | Replay recorded `/status` data without the Pi, test-alert button, fake crash |
 
 ## Architecture
@@ -215,13 +215,15 @@ app/
 - **Emergency:** nearest hospital, manual SOS, notify contacts of a high-fatigue trip
 - **Trips:** route map, fatigue pattern ("drowsy after 90 min"), PDF / CSV export
 - **Calibration:** camera-alignment helper, glasses / sunglasses check
-- **Garmin:** battery, packet loss, loose-strap warning, baseline HR recording
+- **Garmin:** connection status, battery, packet loss, loose-strap / RR-dropout warning, baseline HR recording
 - **Pi:** update over git bundle from the phone, log download, model switch v1 / v2
-- **Privacy:** pause monitoring, delete all data, PIN lock
+- **Privacy:** "what is processed and stored" screen (MVP: part of onboarding consent), pause monitoring, delete all data, PIN lock
 - **Fleet mode (B2B):** manager dashboard, driver ranking. Needs a cloud backend → conflicts with
   the no-cloud rule; opt-in, future work only.
 - **Extras:** Android Auto view, widget, streaks / badges, road-facing phone recording (second
-  view), onboarding tutorial
+  view), onboarding tutorial, weather and night-driving warnings
+- **Dev / demo:** record labelled clips with consent to build the custom dataset (no more
+  self-recording), model confidence-score overlay on the live view
 
 ## Open questions
 
