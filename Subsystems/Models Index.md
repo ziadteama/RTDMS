@@ -24,6 +24,7 @@ consume them. Code lives in `models/`; see `models/README.md` for on-disk conven
 | Distraction (IR camera) | [[Distraction Subsystem]] | `models/distraction/` | Phone call, texting, drinking, eating | **v2 live on Pi** for call + texting (action classifier + ear / lap phone checks, INT8 NCNN); drinking via the det_v2d detector (off on the Pi stream) |
 | Decision fusion | *(stub)* | `fusion/` | Combines models → alert pattern | **Stub `decide()`** |
 | Alert subsystem | *(pending)* | *(pending)* | Buzzer + vibration patterns | Planned (Phase 4) |
+| Mobile app (Sahi) | [[Mobile App]] | `app/` (proposed) | Live view, alerts, crash detection, incident clip | **Planned** (React Native) |
 | Wearable firmware | *(pending)* | *(pending)* | ESP32-C3 + MAX30102, BLE only | Planned (Phase 1) |
 
 > [!note] Report listed two vision models
