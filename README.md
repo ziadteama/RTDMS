@@ -21,6 +21,7 @@ RTDMS/
 │  ├─ face/                 EAR/PERCLOS/gaze/head-pose (MediaPipe)   [IMPLEMENTED]
 │  └─ phone/                phone + eating distraction (ONNX @ 5 Hz) [SCAFFOLDED]
 ├─ fusion/                  Decision fusion stub (owns alerts)       [STUB]
+├─ app/                     Sahi driver phone app (Expo, Android)    [MVP BUILT]
 └─ .claude/skills/          Agent skills adopted into this workspace
 ```
 
@@ -34,7 +35,7 @@ RTDMS/
 | Decision fusion | `fusion/` | Stub `decide()` mapping scores → alert patterns |
 | Alert subsystem (buzzer/vibration) | *(GPIO from fusion later)* | Planned — Phase 4 |
 | Wearable firmware (ESP32-C3) | *(not yet created)* | Planned — Phase 1 |
-| Mobile app — Sahi (React Native) | `app/` (proposed) | Planned — spec in [Subsystems/Mobile App.md](Subsystems/Mobile%20App.md) |
+| Mobile app — Sahi (React Native) | `app/` | MVP built: mock Pi + demo mode, gates pass; not yet on a phone; Pi endpoints pending — [app/README.md](app/README.md), [Subsystems/Mobile App.md](Subsystems/Mobile%20App.md) |
 
 Each model is a self-contained package (`pyproject.toml`, `src/`, `tests/`, `docs/`, Docker
 `verify`) so teammates can develop in parallel. Ownership and conflict-avoidance rules:
