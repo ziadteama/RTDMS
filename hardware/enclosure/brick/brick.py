@@ -41,6 +41,7 @@ PI_HOLES = [(3.5, 3.5), (61.5, 3.5), (3.5, 52.5), (61.5, 52.5)]
 PCB_Z0, PCB_T = 5.2, 1.5
 USBC_NX = 11.2
 SD_NY = 28.0
+SD_SLOT = False          # microSD access slot in the right wall (off: openings only for power and air)
 PI_FRONT_Y = 15.0        # GPIO edge
 
 
@@ -121,11 +122,12 @@ def shell():
     # back: USB-C (fits an overmoulded plug) + vents
     cuts.append(ybox(pb(USBC_NX, 0)[0], D - WALL - 1, PCB_Z0 + PCB_T + 1.65, 14.0, WALL + 2, 8.5, 3.0))
     cuts += [ybox(0, D - WALL - 1, z, 44.0, WALL + 2, 3.0, 1.45) for z in (13.0, 18.0, 23.0)]
-    # sides: vents; right side: microSD access under the board
+    # sides: vents; right side: optional microSD access under the board
     for sx in (-1, 1):
         cuts += [xslot(sx * (W / 2 - WALL / 2), 44.0, z, 36.0, WALL + 2, 3.0) for z in (11.0, 16.0, 21.0)]
-    sd_y = pb(0, SD_NY)[1]
-    cuts.append(cq.Workplane().box(WALL + 2, 14.0, 3.4).translate((W / 2 - WALL / 2, sd_y, 4.7)))
+    if SD_SLOT:
+        sd_y = pb(0, SD_NY)[1]
+        cuts.append(cq.Workplane().box(WALL + 2, 14.0, 3.4).translate((W / 2 - WALL / 2, sd_y, 4.7)))
     for c in cuts:
         s = s.cut(c)
     return s

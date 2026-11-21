@@ -1,7 +1,7 @@
 # Brick enclosure (concept B)
 
 Pi 5 with the Active Cooler lying flat, the IR camera on the front wall. Openings are only for
-**USB-C power** and **air**: fan grille on the lid, vents on the sides and back, plus a microSD slot.
+**USB-C power** and **air**: fan grille on the lid, vents on the sides and back. (A microSD slot exists as an option, `SD_SLOT` in `brick.py`, off by default.)
 
 **Outer size: 108.8 × 85 × 30 mm** (W × D × H). The back 10 mm is empty space behind the Pi, so the camera ribbon has room to turn into the Pi's connector (the Pi's camera ports are on the back edge, the camera is at the front).
 

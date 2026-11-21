@@ -34,8 +34,8 @@ camera with its two IR boards**. It is the physical unit for [[5.2 Phase Two Pla
 ## Requirements (from the team)
 
 - Holds the Pi 5 + Active Cooler and the IR camera with both IR boards. **No AI HAT.**
-- Openings **only for power and air**: USB-C in, fan intake, exhaust vents. (A microSD slot was
-  added for convenience.)
+- Openings **only for power and air**: USB-C in, fan intake, exhaust vents. (A microSD slot is in the model as an
+  option, off: the team only cares about the USB-C opening.)
 - Placement in the car is **deliberately set aside** for now; the shape was chosen first.
 - **Printed in PLA** (team decision, see [[#Material]]).
 - Screws easy to buy: **one size, M2.5**.
@@ -80,7 +80,8 @@ camera with its two IR boards**. It is the physical unit for [[5.2 Phase Two Pla
   the longer lid stiff. The team's ribbon is long (photo, 22 Nov), so reach is not the problem; the
   turn is. I could not pick the camera connector out of the reference Pi model, so the route is
   **not modelled or verified**.
-- **microSD:** slot in the right wall, under the board.
+- **microSD:** no opening (option `SD_SLOT`, off). Change the card with the lid open.
+- **USB-C hole confirmed** against the Pi model: port centre 32.8 mm = hole centre 32.8 mm; hole 14 × 8.5 mm around an 8.9 × 4.0 mm port.
 - **Camera:** front wall with a Ø15.4 lens hole + Ø17 lens collar, two Ø21.4 IR openings at ±27.5 mm,
   and two Ø7 notches for the IR boards' light sensors, so the IR lights still switch on in the dark.
   A shallow stadium-shaped "eye" recess frames them.
