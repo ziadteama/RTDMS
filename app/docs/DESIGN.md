@@ -103,8 +103,7 @@ shut down the Pi) use the native alert dialog.
 - Live tab, top to bottom: banners → state indicator (what) → live view → eyes → heart → phone →
   hold-to-SOS. Above ~10 km/h (unlock below 7, hysteresis) only the state indicator, the speed
   and hold-to-SOS remain: the driving lock.
-- Arabic: real RTL via `I18nManager.forceRTL` + reload on Android; layouts use `start`/`end`, rows
-  mirror, numbers stay Western digits (as on Egyptian dashboards and the Pi's own page).
+- English only (user decision 2026-11-21): no RTL, no locale switch.
 
 ## Banned (from the brief and `expo-design-system` → native slop)
 
@@ -119,3 +118,119 @@ An open eye with a green pupil (the `none` color: awake, all good) on the dark b
 Source: [`assets/images/icon-mark.svg`](../assets/images/icon-mark.svg); every PNG is rendered
 from it by `node scripts/render-icons.mjs` (adaptive foreground inside the 66 % safe zone,
 monochrome layer for themed icons, splash, favicon).
+
+## Components added in the UX redesign
+
+The UX redesign introduces five component patterns to support the permission, status, feedback,
+countdown, and warning flows. Each pattern is constructed strictly from existing design tokens; no
+new hex values, type sizes, or arbitrary dimensions are introduced.
+
+### 1. Status pill
+
+An always-visible instrument indicator displaying system arming and Pi connectivity. Sits in screen
+headers or navigation bars, and functions as an interactive touchpoint for system diagnostics.
+
+- **Structure & Container**:
+  - Background: `alert.none` (Armed), `alert.short_beep` (Not armed: speed/GPS), `surfaceRaised` (Paused or Pi offline).
+  - Corner radius: `radius.sm` (8 dp) for structured instrument-panel feel (never an over-rounded pill).
+  - Padding: `paddingHorizontal: spacing.md` (12 dp), `paddingVertical: spacing.xs` (4 dp).
+  - Interactive touch bounds: `minHeight: touch.min` (48 dp) via `hitSlop: 12` to ensure accessibility compliance.
+- **Typography & Content**:
+  - Text label: `label` (15/20, weight 600).
+  - Text color: `onAlert.none` (Armed), `onAlert.short_beep` (Not armed), `textSecondary` (Paused), `unknown` (Pi offline).
+  - Dot indicator: `size.dot` (10 dp) in matching text color.
+- **Reduce Motion**:
+  - Color transitions between states use `motion.base` (250 ms, cubic-bezier ease-out).
+  - No pulse animations or scaling transforms under any state.
+
+### 2. Checklist row
+
+A specialized row component for pre-flight permissions and OEM background battery protection.
+Follows the grouped list convention (`Section` + `Row`).
+
+- **Structure & Container**:
+  - Container surface: `surface` (`#14171A` dark / `#FFFFFF` light) inside a grouped `Section`.
+  - Row height: `minHeight: touch.min + spacing.sm` (56 dp).
+  - Padding: `paddingHorizontal: spacing.lg` (16 dp), `paddingVertical: spacing.md` (12 dp), column gap `spacing.md` (12 dp).
+  - Hairline separator: height `StyleSheet.hairlineWidth`, color `separator` (`#2A2F35` dark / `#D5DADF` light), offset `marginStart: spacing.lg`.
+- **Typography & Labels**:
+  - Permission / Feature label: `body` (17/24, weight 400) in `text`.
+  - One-line plain reason: `caption` (13/18, weight 400) in `textSecondary`.
+- **Status & Actions**:
+  - Granted status: `label` (15/20, weight 600) in `alert.none`.
+  - Needed / Blocked status: `Button` variant `secondary` (background `surfaceRaised`, text `text`), `minHeight: touch.min` (48 dp), `radius.md` (12 dp).
+- **Reduce Motion**:
+  - Instant background highlight on press (`surfaceRaised`); no press-scale spring (`transform: [{ scale: 1 }]`, dim to `0.7` opacity).
+
+### 3. Feedback chip
+
+A low-profile feedback trigger attached to alert banners, incident review screens, and the SOS
+countdown to record false positives locally.
+
+- **Structure & Container**:
+  - Background: `surfaceRaised` (`#1C2024` dark / `#ECEEF0` light).
+  - Corner radius: `radius.sm` (8 dp).
+  - Padding: `paddingHorizontal: spacing.md` (12 dp), `paddingVertical: spacing.sm` (8 dp).
+  - Touch target: enforced `minHeight: touch.min` (48 dp) and `hitSlop: 8`.
+- **Typography & Content**:
+  - Text: `label` (15/20, weight 600) in `text` (idle) or `onAction` (selected).
+  - Leading icon: size 18 dp in `textSecondary`.
+- **Selection State**:
+  - Selected / Pressed: background switches to `action`, text switches to `onAction`.
+- **Reduce Motion**:
+  - Press feedback replaces 3% scale transform with a discrete opacity dim to `0.7` over `motion.fast` (120 ms).
+
+### 4. Countdown variants (Stage 1 vs Stage 2)
+
+Two distinct emergency countdown surfaces separating initial driver cancellation from emergency dispatch.
+
+#### Stage 1: Crash & SOS Countdown
+- **Canvas & Background**:
+  - Full-screen modal background: `alert.max` (`#FF2E3A` dark / `#B0001A` light).
+  - Primary text and icon color: `onAlert.max` (`#FFFFFF`).
+- **Typography**:
+  - Title: `title` (28/34, weight 700).
+  - Subtitle / prompt: `headline` (20/26, weight 600).
+  - Numeric timer: `countdown` (120/132, weight 800, tabular figures).
+- **Progress Bar**:
+  - Height 10 dp, track color `rgba(255, 255, 255, 0.25)`, fill color `onAlert.max` (`#FFFFFF`).
+- **Actions**:
+  - "I'm OK" primary dismissal button: `Button` variant `primary`, size `xl` (`minHeight: touch.huge` 96 dp), radius `radius.md` (12 dp), background `action`, text `onAction`.
+  - "False alarm" chip: `FeedbackChip`, `touch.min` (48 dp), background `surfaceRaised`.
+  - "Send now" secondary button: `Button` variant `ghost`, `touch.min` (48 dp).
+- **Reduce Motion**:
+  - Progress bar advances in 1-second discrete steps rather than fluid linear interpolation.
+  - Background pulse on `alert.max` is disabled.
+
+#### Stage 2: Emergency Call Staging ("Calling 123 in 15 s")
+- **Canvas & Background**:
+  - Screen background: neutral `background` (`#0B0D0F` dark / `#F5F6F7` light).
+  - Card container: `surface` (`#14171A` dark / `#FFFFFF` light), radius `radius.md` (12 dp), padding `spacing.lg` (16 dp).
+- **Typography**:
+  - Stage header: `headline` (20/26, weight 600) in `text`.
+  - Numeric timer: `state` (44/52, weight 800, tabular figures) in `alert.max`.
+  - Motion status notice: `caption` (13/18, weight 400) in `textSecondary`.
+- **Actions**:
+  - "Cancel call" primary button: `Button` variant `destructive`, size `lg` (`minHeight: touch.large` 64 dp), radius `radius.md` (12 dp), background `alert.continuous`, text `onAlert.continuous`.
+  - "Call now" manual trigger: `Button` variant `secondary`, `touch.min` (48 dp).
+- **Reduce Motion**:
+  - Timer decrements numerically with zero layout transition; cancel button uses opacity dim on press.
+
+### 5. Warning banner variant (Camera covered / Calibration lost)
+
+A high-visibility, non-dismissible warning banner positioned on the Live screen when camera
+tracking is occluded or lost.
+
+- **Structure & Container**:
+  - Background: `surfaceRaised` (`#1C2024` dark / `#ECEEF0` light).
+  - Corner radius: `radius.md` (12 dp), continuous curve.
+  - Padding: `padding: spacing.md` (12 dp), gap `spacing.md` (12 dp).
+  - Leading accent bar: width 4 dp, vertical alignment full stretch, color `alert.continuous` (Camera covered / danger) or `alert.short_beep` (Calibration lost / warning).
+- **Typography & Content**:
+  - Icon: size 22 dp in matching accent color.
+  - Warning title: `label` (15/20, weight 600) in `text`.
+  - Descriptive guidance: `caption` (13/18, weight 400) in `textSecondary`.
+  - Recovery action: inline `Button` variant `secondary`, `minHeight: touch.min` (48 dp), `radius.sm` (8 dp).
+- **Reduce Motion**:
+  - Static display; no pulsing or flashing accent lines.
+
