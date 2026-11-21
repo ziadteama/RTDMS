@@ -29,12 +29,26 @@
       "skillPath": "plugin/skills/competitor-analysis/SKILL.md",
       "computedHash": "abe910355856d91540fcdcbb65c9da4ce5fdb0acdf8b275af329b8b32babae43"
     },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "commit": "b49177d32788f2dc585c42831d845dacf1ebed2c",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/impeccable/SKILL.md",
+      "computedHash": "08bd5bf141cb507f46bd8347890cd985865606f15adf88295ed3a73bc9ad5d96"
+    },
     "obsidian-documentation": {
       "source": "MatheusPBC/Crafting-Table",
       "commit": "f54a3da8d99e79fa4c38f6f77897b372e20ba822",
       "sourceType": "github",
       "skillPath": ".kilocode/skills/obsidian-documentation/SKILL.md",
       "computedHash": "357230a466c6cccbd74c25d6b86b547aad0d9c24e51ed037bea2cf949a5697aa"
+    },
+    "taste-design": {
+      "source": "google-labs-code/stitch-skills",
+      "commit": "62fdcd679747aca0792e5dd6591b10ddfad56825",
+      "sourceType": "github",
+      "skillPath": "plugins/stitch-utilities/skills/taste-design/SKILL.md",
+      "computedHash": "4ff03a5f77abd909807af1f9921266483caf14eed4f1228bcfc3b4fa93bda4b4"
     },
     "ui-ux-pro-max": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
