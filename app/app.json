@@ -39,7 +39,8 @@
     },
     "ios": {
       "bundleIdentifier": "edu.aast.rtdms.sahi",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {}
     },
     "web": {
       "output": "single",
@@ -84,6 +85,18 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "supportsRTL": true,
+      "eas": {
+        "projectId": "01bc3e69-724b-4a2f-bb88-43d2ffb71563"
+      }
+    },
+    "owner": "teamaziad"
   }
 }
