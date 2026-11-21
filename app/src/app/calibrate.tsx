@@ -71,27 +71,29 @@ export default function Calibrate() {
 
   const step = shown === 'open' ? t('cal.step1') : shown === 'closed' ? t('cal.step2') : shown === 'waiting' ? t('cal.waiting') : null;
   return (
-    <Screen>
-      <LiveView url={online ? pi().streamUrl() : null} emptyLabel={t('live.noVideo')} />
-      {shown === 'intro' ? <Text tone="secondary">{online ? t('cal.intro') : t('cal.offline')}</Text> : null}
-      {step ? (
-        <View style={{ gap: spacing.md }} accessibilityLiveRegion="assertive">
-          <Text variant="title">{step}</Text>
-          {shown === 'open' || shown === 'closed' ? (
-            <ProgressBar key={shown} durationMs={shown === 'open' ? OPEN_MS : CLOSED_MS} running />
-          ) : null}
-        </View>
-      ) : null}
-      {shown === 'done' ? (
-        <Text variant="title" color={colors.alert.none}>
-          {t('cal.done')}
-        </Text>
-      ) : null}
-      {shown === 'failed' ? (
-        <Text variant="headline" color={colors.alert.continuous} selectable>
-          {t('cal.failed', { m: reason })}
-        </Text>
-      ) : null}
+    <Screen contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}>
+      <View style={{ gap: spacing.lg }}>
+        <LiveView url={online ? pi().streamUrl() : null} emptyLabel={t('live.noVideo')} />
+        {shown === 'intro' ? <Text tone="secondary">{online ? t('cal.intro') : t('cal.offline')}</Text> : null}
+        {step ? (
+          <View style={{ gap: spacing.md }} accessibilityLiveRegion="assertive">
+            <Text variant="title">{step}</Text>
+            {shown === 'open' || shown === 'closed' ? (
+              <ProgressBar key={shown} durationMs={shown === 'open' ? OPEN_MS : CLOSED_MS} running />
+            ) : null}
+          </View>
+        ) : null}
+        {shown === 'done' ? (
+          <Text variant="title" color={colors.alert.none}>
+            {t('cal.done')}
+          </Text>
+        ) : null}
+        {shown === 'failed' ? (
+          <Text variant="headline" color={colors.alert.continuous} selectable>
+            {t('cal.failed', { m: reason })}
+          </Text>
+        ) : null}
+      </View>
       {shown === 'intro' || shown === 'failed' ? (
         <Button title={shown === 'failed' ? t('cal.again') : t('cal.start')} size="lg" disabled={!online} onPress={() => void start()} />
       ) : null}

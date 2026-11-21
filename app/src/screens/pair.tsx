@@ -76,25 +76,16 @@ export function Pair({ onDone }: { onDone: () => void }) {
   const camera = process.env.EXPO_OS !== 'web' && permission?.granted;
   return (
     <View style={{ gap: spacing.xl }}>
-      <Text tone="secondary">{t('onb.pair.lead')}</Text>
-      <View style={{ aspectRatio: 1, borderRadius: radius.lg, borderCurve: 'continuous', overflow: 'hidden', backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.lg }}>
-        {camera ? (
+      <Text tone="secondary">{t(camera ? 'onb.pair.lead' : 'onb.pair.noCamera')}</Text>
+      {camera ? (
+        <View style={{ aspectRatio: 1, borderRadius: radius.lg, borderCurve: 'continuous', overflow: 'hidden', backgroundColor: colors.surface }}>
           <CameraView
             style={{ position: 'absolute', top: 0, bottom: 0, start: 0, end: 0 }}
             barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
             onBarcodeScanned={(r) => onScan(r.data)}
           />
-        ) : (
-          <>
-            <Text tone="tertiary" align="center">
-              {t('onb.pair.noCamera')}
-            </Text>
-            {process.env.EXPO_OS !== 'web' ? (
-              <Button title={t('onb.perm.allow')} icon="camera" variant="secondary" onPress={() => void requestPermission()} />
-            ) : null}
-          </>
-        )}
-      </View>
+        </View>
+      ) : null}
       <View style={{ gap: spacing.md }}>
         <Text variant="label" tone="secondary">
           {t('onb.pair.manual')}
@@ -113,7 +104,10 @@ export function Pair({ onDone }: { onDone: () => void }) {
             {phase.label}
           </Text>
         ) : null}
-        <Button title={t('onb.pair.connect')} icon="wifi" onPress={onManual} loading={phase.kind === 'busy'} />
+        <Button title={t('onb.pair.connect')} icon="wifi" size="lg" onPress={onManual} loading={phase.kind === 'busy'} />
+        {!camera && process.env.EXPO_OS !== 'web' ? (
+          <Button title={t('onb.perm.camera')} icon="camera" variant="secondary" onPress={() => void requestPermission()} />
+        ) : null}
         <Button
           title={t('onb.pair.demo')}
           variant="ghost"

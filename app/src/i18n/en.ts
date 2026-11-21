@@ -80,6 +80,7 @@ export const en = {
   'live.noVideo': 'No video',
   'live.calibrate': 'Set up driving position in Settings',
   'live.speed': '{v} {u}',
+  'live.lastTrip': 'Last trip',
   'live.statusPill': 'Monitoring · unit connected',
   'live.context': '{speed} · {time}',
 
@@ -284,11 +285,11 @@ export const en = {
   'contacts.max': 'Up to 5 contacts.',
   'contacts.invalid': 'Enter a name and a phone number.',
   'contacts.consentNote': 'Emergency contacts receive a WhatsApp message through the Sahi service asking them to accept. They can reply STOP to opt out. Location is sent only when an alert fires.',
-  'contacts.status.pending': 'Waiting for reply',
-  'contacts.status.ok': 'Will receive WhatsApp',
+  'contacts.status.pending': 'Waiting for their reply',
+  'contacts.status.ok': 'WhatsApp and SMS',
   'contacts.status.opted_out': 'Opted out',
-  'contacts.status.invalid': 'Not on WhatsApp',
-  'contacts.status.failed': 'Could not register',
+  'contacts.status.invalid': 'Not on WhatsApp, SMS only',
+  'contacts.status.failed': 'WhatsApp unavailable, SMS only',
 
   // Incident
   'incident.title': 'Incident',

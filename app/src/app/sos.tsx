@@ -117,17 +117,19 @@ export default function Sos() {
       </Text>
       {phase.kind === 'countdown' ? (
         <>
-          <View style={{ flex: 1, justifyContent: 'center', gap: spacing.lg }}>
-            <Text variant="headline" color={fg}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md }}>
+            <Text variant="headline" color={fg} align="center">
               {t('sos.sendingIn')}
             </Text>
-            <Text variant="countdown" color={fg} accessibilityLiveRegion="assertive" accessibilityLabel={`${left}`}>
+            <Text variant="countdown" color={fg} align="center" accessibilityLiveRegion="assertive" accessibilityLabel={`${left}`}>
               {left}
             </Text>
-            <ProgressBar durationMs={total * 1000} running color={fg} height={spacing.sm} />
+            <View style={{ width: '100%', paddingHorizontal: spacing.md, marginTop: spacing.md }}>
+              <ProgressBar durationMs={total * 1000} running color={fg} height={spacing.sm} />
+            </View>
           </View>
           <Button title={t('sos.ok')} size="xl" variant="primary" onPress={ok} />
-          <Button title={t('sos.sendNow')} variant="ghost" onPress={send} />
+          <Button title={t('sos.sendNow')} variant="ghost" color={fg} onPress={send} />
         </>
       ) : null}
       {phase.kind === 'active' ? (
@@ -143,9 +145,9 @@ export default function Sos() {
                 : t('sos.smsSentPlural', { n: smsSent })}
             </Text>
             {callState === 'waiting' ? (
-              <View style={{ gap: spacing.sm, marginTop: spacing.xs }}>
+              <View style={{ gap: spacing.md, marginTop: spacing.sm }}>
                 <Text tone="secondary">{t('sos.callDelay', { n: callNumber })}</Text>
-                <Button title={t('sos.cancelCall')} onPress={ok} />
+                <Button title={t('sos.cancelCall')} variant="destructive" size="lg" onPress={ok} />
               </View>
             ) : null}
             {callState === 'starting' ? (

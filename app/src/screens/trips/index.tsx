@@ -38,7 +38,7 @@ function TripRow({ trip, first, last }: { trip: Trip; first: boolean; last: bool
         borderTopEndRadius: first ? radius.md : 0,
         borderBottomStartRadius: last ? radius.md : 0,
         borderBottomEndRadius: last ? radius.md : 0,
-        minHeight: touch.min + spacing.xl,
+        minHeight: touch.large,
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.md,
         flexDirection: 'row',
@@ -80,7 +80,7 @@ function Header({ trips }: { trips: Trip[] }) {
   const linked = new Set(incidents.map((i) => i.piId));
   const piOnly = (piClips ?? []).filter((c) => !linked.has(c.id));
   return (
-    <View style={{ gap: spacing.xl, paddingBottom: spacing.xl }}>
+    <View style={{ gap: spacing.lg, paddingBottom: spacing.md }}>
       <Section title={t('trips.weekly')}>
         <View style={{ padding: spacing.lg }}>
           <BarChart

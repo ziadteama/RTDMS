@@ -24,6 +24,7 @@ export function Button({
   style,
   accessibilityHint,
   right,
+  color,
 }: {
   title: string;
   onPress?: () => void;
@@ -35,6 +36,7 @@ export function Button({
   style?: StyleProp<ViewStyle>;
   accessibilityHint?: string;
   right?: ReactNode;
+  color?: string;
 }) {
   const { colors } = useTheme();
   const [pressed, setPressed] = useState(false);
@@ -49,7 +51,8 @@ export function Button({
           ? colors.surfaceRaised
           : 'transparent';
   const fg =
-    variant === 'primary' ? colors.onAction : variant === 'destructive' ? colors.onAlert.continuous : colors.text;
+    color ??
+    (variant === 'primary' ? colors.onAction : variant === 'destructive' ? colors.onAlert.continuous : colors.text);
   const off = disabled || loading;
   return (
     <Pressable
@@ -68,7 +71,7 @@ export function Button({
       <Animated.View
         style={{
           minHeight: size === 'xl' ? touch.huge : size === 'lg' ? touch.large : touch.min,
-          paddingHorizontal: spacing.xl,
+          paddingHorizontal: variant === 'ghost' ? spacing.md : spacing.xl,
           borderRadius: radius.md,
           borderCurve: 'continuous',
           backgroundColor: bg,

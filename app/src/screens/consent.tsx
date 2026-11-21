@@ -1,4 +1,5 @@
-import { View } from 'react-native';
+import { Fragment } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { Icon, type IconName } from '@/components/icon';
 import { Text } from '@/components/text';
@@ -17,27 +18,42 @@ export function ConsentStatement() {
   const t = useT();
   const { colors } = useTheme();
   return (
-    <View style={{ gap: spacing.xl }}>
+    <View style={{ gap: spacing.lg }}>
       <Text variant="body" tone="secondary">
         {t('onb.consent.lead')}
       </Text>
-      {GROUPS.map((g) => (
-        <View key={g.title} style={{ gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, borderCurve: 'continuous', padding: spacing.lg }}>
-          <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-            <Icon name={g.icon} size={22} color={colors.textSecondary} />
-            <Text variant="headline" accessibilityRole="header" style={{ flex: 1 }}>
-              {t(g.title)}
-            </Text>
-          </View>
-          {g.items.map((i) => (
-            <View key={i} style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Text tone="tertiary">•</Text>
-              <Text style={{ flex: 1 }}>{t(i)}</Text>
+      <View
+        style={{
+          backgroundColor: colors.surface,
+          borderRadius: radius.md,
+          borderCurve: 'continuous',
+          overflow: 'hidden',
+        }}
+      >
+        {GROUPS.map((g, gi) => (
+          <Fragment key={g.title}>
+            {gi > 0 ? (
+              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginStart: spacing.lg }} />
+            ) : null}
+            <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.sm }}>
+              <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+                <Icon name={g.icon} size={20} color={colors.textSecondary} />
+                <Text variant="label" accessibilityRole="header" style={{ flex: 1 }}>
+                  {t(g.title)}
+                </Text>
+              </View>
+              <View style={{ gap: spacing.xs, paddingStart: spacing.xl + spacing.xs }}>
+                {g.items.map((i) => (
+                  <Text key={i} variant="caption" tone="secondary">
+                    {t(i)}
+                  </Text>
+                ))}
+              </View>
             </View>
-          ))}
-        </View>
-      ))}
-      <Text variant="caption" tone="secondary">
+          </Fragment>
+        ))}
+      </View>
+      <Text variant="caption" tone="tertiary">
         {t('onb.consent.control')}
       </Text>
     </View>

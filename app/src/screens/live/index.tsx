@@ -19,6 +19,7 @@ import { useSettings } from '@/state/settings';
 import { radius, spacing, useTheme } from '@/theme';
 import { formatDuration } from '@/utils/format';
 
+import { LastTrip } from './last-trip';
 import { useDrivingLock } from './use-driving-lock';
 
 const EMPTY: string[] = [];
@@ -148,12 +149,13 @@ export function Live() {
   }
 
   return (
-    <Screen>
+    <Screen contentContainerStyle={{ flexGrow: 1 }}>
       <Banners />
       <StatusPill />
       <State size="full" />
       <ContextLine />
       <Sos />
+      <LastTrip />
     </Screen>
   );
 }

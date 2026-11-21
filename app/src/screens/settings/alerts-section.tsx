@@ -73,7 +73,7 @@ export function AlertsSection() {
           ) : undefined
         }
       />
-      <View style={{ padding: spacing.lg }}>
+      <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}>
         <Button
           title={sent ? t('settings.testSent') : t('settings.testAlert')}
           icon="notifications"
