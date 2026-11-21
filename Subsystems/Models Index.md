@@ -18,7 +18,7 @@ consume them. Code lives in `models/`; see `models/README.md` for on-disk conven
 
 | Model | Note | Code | Detects | Status |
 |---|---|---|---|---|
-| Physiology | [[Physiology Subsystem]] | `models/physiology/` | Fatigue/stress from HR + PRV | **Replay pipeline implemented**; Garmin FR265 RR stream to the Pi + live HRV |
+| Physiology | [[Physiology Subsystem]] · [[Physiology Fusion Approach]] | `models/physiology/` | Confirming fatigue score (HR/PRV) for fusion | **Replay + Garmin RR→HRV**; fusion role = confirm drowsy; face-aligned retrain next |
 | Face (drowsiness + gaze) | [[Face Subsystem]] | `models/face/` | Eye closure, PERCLOS, blink, gaze, head pose | **Core + demo runner**; live on Pi via LiteRT at 30 fps |
 | Phone / eating | [[Phone Subsystem]] | `models/phone/` | Phone + eating distraction scores | **ONNX wired** (Safe-Drive-TN); superseded for the IR camera by Distraction |
 | Distraction (IR camera) | [[Distraction Subsystem]] | `models/distraction/` | Phone call, texting, drinking, eating | **v2 live on Pi** for call + texting (action classifier + ear / lap phone checks, INT8 NCNN); drinking via the det_v2d detector (off on the Pi stream) |

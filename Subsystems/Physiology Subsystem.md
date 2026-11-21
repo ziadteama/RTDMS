@@ -18,9 +18,13 @@ language: Python 3.11
 
 ↑ [[Home]] | Model index: [[Models Index]]
 
-The first of the three DMS models to be implemented. Turns raw wrist PPG from a MAX30102 bracelet
-into quality-gated heart rate, pulse-rate variability, and an optional fatigue probability for
+The first of the three DMS models to be implemented. Turns wearable beat intervals into
+quality-gated heart rate, pulse-rate variability, and an optional fatigue probability for
 [[3.1 System Architecture|decision fusion]].
+
+**Live path in Project 2:** Garmin FR265 RR stream → Pi `RrHrv` (see
+[[Physiology Fusion Approach]]). **MAX30102 / ESP** remains the report BOM path and the original
+replay implementation below.
 
 **Code:** `models/physiology/` — adopted 2026-08-28 from `Z:\Programming\Grad\HR&HRV`
 (standalone repo `github.com/ziadteama/HR-HRV`, single commit `3339d58`).
@@ -146,6 +150,10 @@ HTTP server.
 > [[3.1 System Architecture]] Table 3-2, where the maximum alert requires *combined* behavioural
 > **and** physiological risk.
 
+**Agreed approach (Garmin confirm path):** [[Physiology Fusion Approach]] — physiology confirms /
+escalates face (and phone) risk; train next on face-aligned live Garmin logs; WESAD stress is only
+a bring-up prior.
+
 ## Model artifact
 
 Trained with `StandardScaler` + `LogisticRegression`. Runtime loads a **JSON artifact, never a
@@ -203,10 +211,11 @@ reported **per quality state** — never hidden in one aggregate.
 | Unit tests (17), lint, strict typecheck | Done |
 | Initial BIDMC HR validation | Done (clean-signal only) |
 | Public dataset adapters (PPG-DaLiA, BUT PPG) | **Open** |
-| Trained fatigue artifact (LOSO-validated) | **Open** |
+| Trained fatigue artifact (LOSO-validated) | **Partial** — experimental WESAD→`RrHrv` prior; face-aligned Garmin retrain still open ([[Physiology Fusion Approach]]) |
 | Two-hour long-replay soak | **Open** |
 | Concurrent Pi benchmark with both CV models | **Open** |
-| Hardware integration (real bracelet) | **Open** |
+| Hardware integration (Garmin FR265 RR) | **In progress** (stream + live HRV); MAX30102 bracelet still open |
+| Fusion confirm calibration on Pi | **Open** — see [[Physiology Fusion Approach]] |
 
 ## Spec vs. implementation gaps
 
@@ -256,8 +265,10 @@ Carried from `docs/VALIDATION.md`, each needing explicit closure:
 | [[3.3 Dataset Selection and Collection]] | Report selects **WESAD**; this subsystem validates against **BIDMC / PPG-DaLiA / BUT PPG** — a broader, signal-validation-first set |
 | [[4.5 Cost Calculation and BOM]] | MAX30102 wristband, 95–520 EGP |
 | [[5.2 Phase Two Plan]] | Phase 1 (wearable + BLE <100 ms), Phase 2 (fatigue classifier), Phase 4 (fusion) |
+| [[Physiology Fusion Approach]] | How Garmin RR + fusion confirm role replace “train on WESAD then ship as drowsiness” |
 
-> [!note] Two documented divergences from the report
-> **Model choice** (Logistic Regression vs. the report's Random Forest/SVM) and **datasets**
-> (signal-validation datasets added ahead of WESAD). Both are defensible engineering decisions, but
-> the final report should be updated to match what was actually built, or the divergence explained.
+> [!note] Documented divergences from the report
+> **Model choice** (Logistic Regression vs. the report's Random Forest/SVM), **datasets**
+> (signal-validation sets + WESAD as prior, not the sole graded train set), and **wearable**
+> (Garmin FR265 RR for the live confirm path alongside / ahead of MAX30102). Defensible for Pi
+> budget and fusion semantics — final report should match what was built.
