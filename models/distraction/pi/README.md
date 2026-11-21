@@ -11,6 +11,7 @@ camera and serves a live page on `http://<pi>:8080` with:
 | Script | What it does |
 |---|---|
 | `start_stream.sh` | **Current setup**: face mesh + drowsiness + v2 phone alerts, no box detector (`--hybrid --no-detect`), image rotated 180° (the camera is mounted upside down) |
+| `rtdms-camera.service` + `install-service.sh` | Run once: starts the server at every boot and restarts it on a crash |
 | `start_stream_v1.sh` | Old setup: det_v2d phone / drink boxes (every 2nd frame) + drowsiness |
 | `install.sh` | Offline install of the runtime into `.venv` from a `wheels/` folder (no internet on the Pi) |
 | `power_log.sh` | Logs 5 V input, throttling flags and temperature every 2 s to `power.log` |
