@@ -20,6 +20,9 @@ Project 2 (the build phase this repo is for).
 
 ## Implementation (Project 2)
 
+- [[Open Items and Next Steps]] — **what is not done yet** (hardware, app, SOS, product questions)
+- [[Project Log 2026-11]] — decisions, evidence and lessons of 21–22 Nov 2026
+- [[Orchestration Playbook]] · [[Dev Environment and Test Devices]] · [[Coordination Board 2026-11]] — how the agents work, how to run and test everything, the raw trail
 - [[Agent Guide]] — **start here if you're an agent about to dev, explore, or delegate work**
 - [[Models Index]] — status of all models + fusion/alert/firmware
   - [[Physiology Subsystem]] — HR/PRV fatigue inference · `models/physiology/` · **implemented**
@@ -32,6 +35,7 @@ Project 2 (the build phase this repo is for).
 - [[Raspberry Pi 5 Target]] — the deployment device, surveyed live over SSH
 - [[Pi Setup Plan]] — researched optimal configuration + the blockers to resolve first
 - [[Competitor App Study]] — dashcam, fleet/driver-monitoring and crash-detection apps studied for Sahi: patterns to copy, mistakes to avoid, gaps · **research (web only, no hands-on teardown yet)**
+- [[WhatsApp SOS Relay]] — crash SOS over WhatsApp (unofficial lib) + link-free SMS backup · `relay/` · **verified end to end with real messages**
 - [[Pi Runtime]] — the Pi-side runtime (`pi/`): fusion loop, buzzer, BLE phone service, incidents, hotspot · **built, Docker-verified only, not run on the Pi**
 - [[Phone-Pi Link]] — Sahi app ↔ Pi transport: research, dashcam reference pattern, recommended BLE + Wi-Fi hybrid, bench-spike plan · **proposed, nothing measured**
 

@@ -179,13 +179,26 @@ new model must follow (including **ownership zones for parallel work**).
   NCNN models in `models/distraction/models/action_v2/`, `scripts/stream.py --hybrid`) for call and
   texting alerts. Notes:
   [Subsystems/Distraction Subsystem.md](Subsystems/Distraction%20Subsystem.md).
-- `fusion/` — decision stub (`decide()` → alert patterns). GPIO wiring still pending.
+- `fusion/` — `decide()` → alert patterns; accepts the IR pipeline's debounced `call` / `texting` flags;
+  now runs per frame inside `pi/`. Thresholds still fixed; GPIO buzzer is wired in `pi/`.
 - `app/` — **Sahi**, the driver's Android app (Expo SDK 58, React Native, TypeScript strict, dev
-  build + a local Kotlin module for SMS / call / background sensors). **MVP built** against a mock
-  Pi (`app/mock-pi/`) and an in-app demo mode; not yet run on a phone; the Pi-side endpoints it
-  proposes (`/alert`, `/physio`, `/health`, incident ring buffer, …) are not built. Gates:
-  `cd app && npx tsc --noEmit && npx eslint . && npm test`. Notes:
-  [Subsystems/Mobile App.md](Subsystems/Mobile%20App.md), code docs in `app/docs/`.
+  build + a local Kotlin module for SMS / call / background sensors). **An end-user product, English
+  only**: tabs Drive / Trips / Settings, hidden Diagnostics. Runs on a real phone (realme GT 6T) and
+  has talked to the Pi's camera server; SOS = WhatsApp first via the relay + link-free SMS. Bluetooth
+  transport, Wi-Fi-only-for-video and UI polish not built. Gates:
+  `cd app && npx tsc --noEmit && npx eslint . && npx jest`. Notes:
+  [Subsystems/Mobile App.md](Subsystems/Mobile%20App.md), [Mobile App End-User Scope](Subsystems/Mobile%20App%20End-User%20Scope.md), code docs in `app/docs/`.
+- `pi/` — **Pi runtime** (per-frame fusion, buzzer patterns, Bluetooth phone service, incident
+  recording, hotspot and systemd scripts, health/settings). Merged; **Docker-verified only
+  (154 tests), never run on the Pi**. Notes: [Subsystems/Pi Runtime.md](Subsystems/Pi%20Runtime.md).
+- `relay/` — **SOS relay**: Node service that sends the crash SOS over WhatsApp (unofficial
+  Baileys library, ban risk accepted by the user). Verified end to end with real messages. Notes:
+  [Subsystems/WhatsApp SOS Relay.md](Subsystems/WhatsApp%20SOS%20Relay.md).
+- `contracts/` — `pi-link/` (phone↔Pi GATT layout, JSON Schemas, fixtures, `validate.py`) and
+  `sos-relay/` (app↔relay API). Coordinator-owned; change only through a CR on the coordination board.
+- Where things stand and what is next: [Subsystems/Open Items and Next Steps.md](Subsystems/Open%20Items%20and%20Next%20Steps.md);
+  decisions and lessons: [Subsystems/Project Log 2026-11.md](Subsystems/Project%20Log%202026-11.md);
+  how the agents work: [Subsystems/Orchestration Playbook.md](Subsystems/Orchestration%20Playbook.md).
 - Wearable firmware: not yet created.
 
 Verify physiology with `cd models/physiology && docker compose run --rm verify` (Docker is

@@ -25,7 +25,16 @@ owner: TBD
 what the Pi sees and decides, adds the things the Pi cannot do on its own (GPS, internet, calls,
 SMS, a screen), and turns a crash into an emergency call with a recorded clip.
 
-> [!info] Status (2026-11-20): MVP code built, not yet run on a phone or against the real Pi
+> [!success] Status (2026-11-22): runs on a real phone; talked to the Pi; SOS via WhatsApp + SMS
+> Installed on a realme GT 6T (Android 16) from an Expo cloud build, served by Metro over Tailscale; it
+> paired with the Pi's running camera server by typing its address. **English only; an end-user
+> product** ([[Mobile App End-User Scope]]); tabs Drive / Trips / Settings, hidden Diagnostics. Crash
+> and SOS hardened; SOS goes WhatsApp first through the relay ([[WhatsApp SOS Relay]]) plus a
+> link-free SMS. **Not built:** Bluetooth transport, Wi-Fi-only-for-video, UI polish. **Not verified:**
+> crash detector on real motion, background kill on ColorOS. Full list: [[Open Items and Next Steps]].
+> Decisions and evidence: [[Project Log 2026-11]].
+
+> [!info] Earlier status (2026-11-20): MVP code built, not yet run on a phone or against the real Pi
 > The app is in `app/` (Expo SDK 58, TypeScript strict, Android development build): every MVP
 > screen, the crash detector, the emergency flow, trips, demo mode and a mock Pi. Gates pass
 > (types, lint, 55 unit + replay tests, expo-doctor 20/20, Android debug build). It has **not**

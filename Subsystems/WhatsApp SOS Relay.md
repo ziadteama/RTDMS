@@ -8,13 +8,20 @@ tags:
 aliases:
   - SOS Relay
   - relay server
-status: built-not-verified-with-real-whatsapp
+status: verified-end-to-end-via-script-app-test-pending
 updated: 2026-11-21
 ---
 
 # WhatsApp SOS Relay
 
 Small server in `relay/` that turns a crash alert from the Sahi phone app into a WhatsApp message to the driver's emergency contacts. Spec: `contracts/sos-relay/CONTRACT.md` (v1). Code: `relay/` (README there has the run instructions). Related: [[Mobile App]], [[Phone-Pi Link]], [[Pi Runtime]].
+
+> [!success] Update 2026-11-22
+> Linked a dedicated number and **verified end to end** with the smoke script: register → opt-in → test SOS
+> → `delivered`; the recipient confirmed the messages arrived. Runs on the dev machine on port 8088; the
+> phone reaches it over Tailscale. The first real-mode start crashed (Node strip-only mode) and was
+> fixed in PRs #39/#40. **Not yet verified:** the app → relay path with demo mode off, inbound `STOP`, and
+> reconnect after a dropped session. See [[Project Log 2026-11]] and [[Dev Environment and Test Devices]].
 
 > [!warning] Status
 > Built and tested against a fake transport and a dry-run instance. **Never run against real WhatsApp**: no account linked, no message sent, receipts and inbound `STOP` unverified.

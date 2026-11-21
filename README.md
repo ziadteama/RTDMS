@@ -20,10 +20,11 @@ RTDMS/
 │  ├─ physiology/           HR/PRV fatigue inference from wrist PPG  [IMPLEMENTED]
 │  ├─ face/                 EAR/PERCLOS/gaze/head-pose (MediaPipe)   [IMPLEMENTED]
 │  └─ phone/                phone + eating distraction (ONNX @ 5 Hz) [SCAFFOLDED]
-├─ fusion/                  Decision fusion stub (owns alerts)       [STUB]
+├─ fusion/                  Decision fusion (owns alerts)            [RUNS IN pi/]
 ├─ app/                     Sahi driver phone app (Expo, Android)    [MVP BUILT]
-├─ pi/                      Pi runtime (fusion loop, phone link, incidents) [PLANNED]
-├─ contracts/pi-link/       Phone↔Pi link contract + schemas         [PLANNED]
+├─ pi/                      Pi runtime (fusion loop, phone link, incidents) [MERGED, not run on Pi]
+├─ relay/                   SOS relay: app → WhatsApp (Baileys)      [VERIFIED]
+├─ contracts/               pi-link/ and sos-relay/ API contracts    [v1]
 └─ .claude/skills/          Agent skills adopted into this workspace
 ```
 
@@ -34,10 +35,12 @@ RTDMS/
 | Physiology (HR/PRV, fatigue) | `models/physiology/` | Replay pipeline implemented; hardware + trained artifact pending |
 | Face (drowsiness + gaze) | `models/face/` | Core + demo runner; Pi throughput pending |
 | Phone / eating distraction | `models/phone/` | ONNX wired from Safe-Drive-TN; Pi concurrent bench pending |
-| Decision fusion | `fusion/` | Stub `decide()` mapping scores → alert patterns |
+| Decision fusion | `fusion/` | `decide()` maps scores and phone flags → alert patterns; runs per frame in `pi/` |
+| Pi runtime | `pi/` | Merged; 154 Docker tests; not run on the Pi yet — [Pi Runtime](Subsystems/Pi%20Runtime.md) |
+| SOS relay | `relay/` | WhatsApp SOS server; verified with real messages — [WhatsApp SOS Relay](Subsystems/WhatsApp%20SOS%20Relay.md) |
 | Alert subsystem (buzzer/vibration) | *(GPIO from fusion later)* | Planned — Phase 4 |
 | Wearable firmware (ESP32-C3) | *(not yet created)* | Planned — Phase 1 |
-| Mobile app — Sahi (React Native) | `app/` | MVP built: mock Pi + demo mode, gates pass; not yet on a phone; Pi endpoints pending — [app/README.md](app/README.md), [Subsystems/Mobile App.md](Subsystems/Mobile%20App.md) |
+| Mobile app — Sahi (React Native) | `app/` | End-user product, English only; runs on a real phone and talked to the Pi; Bluetooth transport + UI polish pending — [app/README.md](app/README.md), [Subsystems/Mobile App.md](Subsystems/Mobile%20App.md) |
 
 Each model is a self-contained package (`pyproject.toml`, `src/`, `tests/`, `docs/`, Docker
 `verify`) so teammates can develop in parallel. Ownership and conflict-avoidance rules:

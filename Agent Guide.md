@@ -128,9 +128,12 @@ These are cross-model architectural decisions, not one component's preference â€
 
 ## 5. Raspberry Pi hardware access
 
-- Connect over the **LAN IP with SSH key auth**, not the Tailscale IP â€” Tailscale SSH on this
-  tailnet runs in check mode and demands an interactive browser re-auth that breaks non-interactive
-  use. Current IP/user/key path: [[Raspberry Pi 5 Target]].
+- Connect with **SSH key auth**. As of 2026-11-22 the Pi is reached over Tailscale
+  (`khalifa@100.113.107.122`) and key auth works non-interactively (earlier, Tailscale SSH ran in
+  check mode and forced a browser re-auth; the LAN IP in older notes is stale, `eth0` is now
+  `192.168.137.118`). Verify the host key against `tailscale status --json` before accepting it.
+  Tailscale is relayed (~150 ms): never take latency numbers over it. Details and the safety rules
+  for hardware work: [[Raspberry Pi 5 Target]], [[Orchestration Playbook]].
 - **Never write the Pi's password into any git-tracked file, commit, or persistent memory file.**
   This vault is a git repo that may be pushed to GitHub. Key auth only, always, in anything written
   down.

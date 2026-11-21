@@ -23,7 +23,17 @@ The physical machine everything deploys to. First surveyed **2026-08-28**; re-ch
 **2026-09-20** (LAN `192.168.100.181` and Tailscale `100.113.107.122` both answered), and on
 **2026-10-10** when the first camera went on and the face model ran live — see [[#Camera]].
 
-> [!warning] Current state (2026-10-10): stand-in camera attached, face model running
+> [!info] Update 2026-11-22: network and access
+> The Pi is reached over **Tailscale**: `ssh khalifa@100.113.107.122` with key auth works
+> non-interactively (the host key matches the one Tailscale records for the machine). The old LAN
+> address `192.168.100.181` below is **stale**: `eth0` is now `192.168.137.118`. State seen on
+> 2026-11-22: Debian 13 trixie, no power throttling (`0x0`), ~35-38 °C, `wlan0` down, Bluetooth
+> controller powered, the distraction camera server running on port 8080 (autostarts at boot).
+> **The Pi rebooted by itself** (uptime under a minute at 22:50): cause unknown. Tailscale links are
+> relayed (~150 ms): never take latency numbers over them. The `pi/` runtime is **not yet deployed**
+> here. See [[Dev Environment and Test Devices]] and [[Open Items and Next Steps]].
+
+> [!warning] State at 2026-10-10: stand-in camera attached, face model running
 > A third-party **OV5647 5 MP** camera (not the BOM's IR 160° module) is on the CSI port and the
 > [[Face Subsystem]] runs live on it via `stream.py`. Still **no AI accelerator** and no wearable.
 > See [[#Hardware gaps]] and [[#Camera]].
