@@ -40,27 +40,10 @@ const SHOTS = [
   ['10-calibrate', '/calibrate', {}],
   ['11-contacts', '/contacts', {}],
   ['12-privacy', '/privacy', {}],
-  ['13-sos', '/settings', { demo: true }, async (p, t) => {
-    for (let i = 0; i < 7; i++) await p.getByText(t.version).click();
-    await p.waitForTimeout(1000);
-    await p.getByText(t.fake).click();
-    await p.waitForTimeout(3500);
-  }],
-  ['14-incident', '/settings', { demo: true }, async (p, t) => {
-    for (let i = 0; i < 7; i++) await p.getByText(t.version).click();
-    await p.waitForTimeout(1000);
-    await p.getByText(t.fake).click();
-    await p.waitForTimeout(1500);
-    await p.getByText(t.ok).click();
-    await p.waitForTimeout(1000);
-    await p.getByText(t.trips, { exact: true }).last().click(); // in-app: a reload wipes the web in-memory DB
-    await p.waitForTimeout(2000);
-    await p.getByText(t.crash).first().click();
-    await p.waitForTimeout(3000);
-  }],
+  ['13-sos', '/sos?incident=1', { demo: true }, async (p) => p.waitForTimeout(3000)],
 ];
 
-const TEXT = { version: '1.0.0', fake: 'Simulate crash', ok: "I'm OK", trips: 'Trips', crash: /Crash detected/ };
+const TEXT = { version: '0.1.0', fake: 'Simulate crash', ok: "I'm OK", trips: 'Trips', crash: /Crash detected/ };
 
 const only = process.argv[2];
 const browser = await chromium.launch();
@@ -78,7 +61,7 @@ for (const theme of ['dark', 'light']) {
     }, [settings(theme, extra), contacts]);
     await page.goto(WEB + route);
     await page.waitForTimeout(5000);
-    if (steps) await steps(page, TEXT);
+    if (steps) await steps(page, TEXT).catch((e) => console.warn(`  step failed for ${name}: ${String(e).split('\n')[0]}`));
     await page.screenshot({ path: join(dir, `${name}.png`) });
     await page.close();
     console.log(`${theme}-en/${name}.png`);

@@ -60,7 +60,7 @@ const light: Palette = {
   separator: '#D5DADF',
   text: '#0E1114',
   textSecondary: '#4D555D',
-  textTertiary: '#79828B',
+  textTertiary: '#5A626A',
   action: '#0E1114',
   onAction: '#FFFFFF',
   alert: {
@@ -77,7 +77,7 @@ const light: Palette = {
     continuous: '#FFFFFF',
     max: '#FFFFFF',
   },
-  unknown: '#79828B',
+  unknown: '#5A626A',
   scrim: 'rgba(0,0,0,0.5)',
 };
 

@@ -92,10 +92,7 @@ export function ContactsRelayEditor() {
   };
 
   return (
-    <View style={{ gap: spacing.xl }}>
-      <Text variant="caption" tone="secondary">
-        {t('contacts.consentNote')}
-      </Text>
+    <View style={{ gap: spacing.lg }}>
       <Section footer={t('contacts.max')}>
         {contacts.length === 0 ? <Row label={t('contacts.empty')} /> : null}
         {contacts.map((c) => (
@@ -103,13 +100,13 @@ export function ContactsRelayEditor() {
             key={c.id}
             icon="person"
             label={c.name}
-            detail={`${c.phone} • ${t(`contacts.status.${c.relayStatus ?? 'pending'}`)}`}
+            detail={`${c.phone} · ${t(`contacts.status.${c.relayStatus ?? 'pending'}`)}`}
             right={<Button title={t('contacts.remove')} variant="ghost" onPress={() => remove(c.id)} />}
           />
         ))}
       </Section>
       {contacts.length < MAX ? (
-        <View style={{ gap: spacing.md }}>
+        <View style={{ gap: spacing.sm }}>
           <ContactField value={name} onChange={setName} label={t('contacts.name')} />
           <ContactField value={phone} onChange={setPhone} label={t('contacts.phone')} phone />
           {error ? (
@@ -120,6 +117,9 @@ export function ContactsRelayEditor() {
           <Button title={t('contacts.add')} icon="add" variant="secondary" onPress={add} />
         </View>
       ) : null}
+      <Text variant="caption" tone="tertiary">
+        {t('contacts.consentNote')}
+      </Text>
     </View>
   );
 }

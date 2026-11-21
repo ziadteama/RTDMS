@@ -8,7 +8,7 @@ import { useT } from '@/i18n';
 import { dx } from '@/i18n/diagnostics';
 import { useRuntime } from '@/services/runtime';
 import { useSettings } from '@/state/settings';
-import { ThemeProvider, useTheme } from '@/theme';
+import { ThemeProvider, type, useTheme } from '@/theme';
 
 function Navigator() {
   const t = useT();
@@ -28,6 +28,7 @@ function Navigator() {
         screenOptions={{
           headerStyle: { backgroundColor: colors.background },
           headerTintColor: colors.text,
+          headerTitleStyle: { ...type.headline },
           headerShadowVisible: false,
           contentStyle: { backgroundColor: colors.background },
         }}

@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 
 import { useT } from '@/i18n';
-import { useTheme } from '@/theme';
+import { type, useTheme } from '@/theme';
 
 export default function OnboardingLayout() {
   const t = useT();
@@ -11,6 +11,7 @@ export default function OnboardingLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,
+        headerTitleStyle: { ...type.headline },
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },
       }}

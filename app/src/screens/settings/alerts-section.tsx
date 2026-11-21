@@ -43,10 +43,12 @@ export function AlertsSection() {
   return (
     <Section title={t('settings.alerts')}>
       <Row label={t('settings.sound')} right={<Toggle label={t('settings.sound')} value={s.sound} onChange={(v) => set({ sound: v })} />} />
-      <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.sm, opacity: s.sound ? 1 : 0.45 }}>
-        <Text>{t('settings.volume')}</Text>
-        <SliderControl value={s.volume} min={0.1} max={1} step={0.1} onChange={(v) => set({ volume: v })} disabled={!s.sound} />
-      </View>
+      {s.sound ? (
+        <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.xs }}>
+          <Text variant="caption" tone="secondary">{t('settings.volume')}</Text>
+          <SliderControl value={s.volume} min={0.1} max={1} step={0.1} onChange={(v) => set({ volume: v })} />
+        </View>
+      ) : null}
       <Row
         label={t('settings.vibration')}
         right={
@@ -73,7 +75,7 @@ export function AlertsSection() {
           ) : undefined
         }
       />
-      <View style={{ padding: spacing.lg }}>
+      <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.xs }}>
         <Button
           title={sent ? t('settings.testSent') : t('settings.testAlert')}
           icon="notifications"

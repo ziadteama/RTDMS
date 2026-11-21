@@ -3,7 +3,7 @@ import { ContactsEditor } from '@/screens/contacts';
 
 export default function Contacts() {
   return (
-    <Screen>
+    <Screen contentContainerStyle={{ flexGrow: 1 }}>
       <ContactsEditor />
     </Screen>
   );

@@ -11,7 +11,7 @@ import { Text } from './text';
 export function BarChart({
   data,
   max,
-  height = 120,
+  height = 130,
   label,
 }: {
   data: { key: string; value: number | null; label: string; color?: string }[];
@@ -22,7 +22,7 @@ export function BarChart({
   const { colors } = useTheme();
   return (
     <View accessible accessibilityLabel={`${label}: ${data.map((d) => `${d.label} ${d.value ?? '—'}`).join(', ')}`}>
-      <View style={{ height, flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm }}>
+      <View style={{ height, flexDirection: 'row', alignItems: 'flex-end', gap: spacing.xs }}>
         {data.map((d) => (
           <View key={d.key} style={{ flex: 1, alignItems: 'center', gap: spacing.xs }}>
             <Text variant="caption" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
@@ -30,7 +30,7 @@ export function BarChart({
             </Text>
             <View
               style={{
-                width: '70%',
+                width: '60%',
                 height: d.value === null ? 2 : Math.max(4, (d.value / max) * (height - 24)),
                 backgroundColor: d.value === null ? colors.separator : (d.color ?? colors.textSecondary),
                 borderRadius: radius.sm / 2,
@@ -39,7 +39,7 @@ export function BarChart({
           </View>
         ))}
       </View>
-      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+      <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm }}>
         {data.map((d) => (
           <Text key={d.key} variant="caption" tone="tertiary" style={{ flex: 1, textAlign: 'center' }} numberOfLines={1}>
             {d.label}

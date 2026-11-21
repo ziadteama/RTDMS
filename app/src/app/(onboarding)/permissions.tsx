@@ -33,7 +33,6 @@ export default function Permissions() {
 
   return (
     <Screen>
-      <Text tone="secondary">{t('onb.perm.lead')}</Text>
       <Section>
         {ITEMS.map((i) => {
           const s = state[i.key];

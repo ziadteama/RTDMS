@@ -48,34 +48,36 @@ export default function TripDetail() {
   };
   const dot = (e: (typeof events)[number]) =>
     e.kind === 'alert' ? colors.alert[e.value as AlertPattern] : e.kind === 'crash' || e.kind === 'sos' ? colors.alert.max : colors.textTertiary;
+  const activePatterns = PATTERNS.filter((p) => s.alerts[p] > 0);
+
   return (
     <Screen>
       <Text variant="headline">{formatDateTime(trip.startedAt)}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xl, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg }}>
         <Metric label={t('trip.score')} value={trip.score} color={scoreColor(trip.score, colors)} />
         <Metric label={t('trip.duration')} value={formatDuration((trip.endedAt ?? now) - trip.startedAt, units)} />
-        <Metric label={t('trip.longestClosure')} value={(s.longestClosureMs / 1000).toFixed(1)} unit={t('live.s')} />
-        <Metric label={t('trip.phoneTime')} value={formatDuration(s.phoneMs, units)} />
+        {s.longestClosureMs > 0 ? (
+          <Metric label={t('trip.longestClosure')} value={(s.longestClosureMs / 1000).toFixed(1)} unit={t('live.s')} />
+        ) : null}
+        {s.phoneMs > 0 ? <Metric label={t('trip.phoneTime')} value={formatDuration(s.phoneMs, units)} /> : null}
       </View>
-      <Section title={t('trip.alertsByType')}>
-        {PATTERNS.map((p) => (
-          <Row key={p} label={t(`pattern.${p}`)} value={String(s.alerts[p])} right={<Dot large color={colors.alert[p]} />} />
-        ))}
-      </Section>
-      <Section title={t('trip.hrTrend')}>
-        <View style={{ padding: spacing.lg, gap: spacing.sm }}>
-          {hr.length >= 2 ? (
-            <>
-              <Sparkline points={hr.map((h) => h.bpm)} />
-              <Text variant="caption" tone="secondary">
-                {Math.round(Math.min(...hr.map((h) => h.bpm)))}–{Math.round(Math.max(...hr.map((h) => h.bpm)))} {t('live.bpm')}
-              </Text>
-            </>
-          ) : (
-            <Text tone="tertiary">{t('trip.noHr')}</Text>
-          )}
-        </View>
-      </Section>
+      {activePatterns.length > 0 ? (
+        <Section title={t('trip.alertsByType')}>
+          {activePatterns.map((p) => (
+            <Row key={p} label={t(`pattern.${p}`)} value={String(s.alerts[p])} right={<Dot large color={colors.alert[p]} />} />
+          ))}
+        </Section>
+      ) : null}
+      {hr.length >= 2 ? (
+        <Section title={t('trip.hrTrend')}>
+          <View style={{ padding: spacing.lg, gap: spacing.sm }}>
+            <Sparkline points={hr.map((h) => h.bpm)} />
+            <Text variant="caption" tone="secondary">
+              {Math.round(Math.min(...hr.map((h) => h.bpm)))}–{Math.round(Math.max(...hr.map((h) => h.bpm)))} {t('live.bpm')}
+            </Text>
+          </View>
+        </Section>
+      ) : null}
       {incidents.length ? (
         <Section title={t('trip.incidents')}>
           {incidents.map((i) => (
@@ -91,18 +93,19 @@ export default function TripDetail() {
           ))}
         </Section>
       ) : null}
-      <Section title={t('trip.timeline')}>
-        {events.length === 0 ? <Row label={t('trip.noEvents')} /> : null}
-        {events.slice(-200).map((e) => (
-          <Row
-            key={e.id}
-            label={label(e)}
-            detail={e.kind === 'alert' && e.detail ? e.detail : undefined}
-            value={formatTime(e.t)}
-            right={<Dot color={dot(e)} />}
-          />
-        ))}
-      </Section>
+      {events.length > 0 ? (
+        <Section title={t('trip.timeline')}>
+          {events.slice(-200).map((e) => (
+            <Row
+              key={e.id}
+              label={label(e)}
+              detail={e.kind === 'alert' && e.detail ? e.detail : undefined}
+              value={formatTime(e.t)}
+              right={<Dot color={dot(e)} />}
+            />
+          ))}
+        </Section>
+      ) : null}
       <Section>
         <Row
           label={t('trip.delete')}
