@@ -29,6 +29,8 @@ Project 2 (the build phase this repo is for).
 - [[Mobile App]] — **Sahi**, the React Native driver app (live view, alerts, crash detection, incident clip) · `app/` · **MVP built** (mock Pi + demo mode; not yet on a phone, Pi endpoints pending)
 - [[Raspberry Pi 5 Target]] — the deployment device, surveyed live over SSH
 - [[Pi Setup Plan]] — researched optimal configuration + the blockers to resolve first
+- [[Competitor App Study]] — dashcam, fleet/driver-monitoring and crash-detection apps studied for Sahi: patterns to copy, mistakes to avoid, gaps · **research (web only, no hands-on teardown yet)**
+- [[Phone-Pi Link]] — Sahi app ↔ Pi transport: research, dashcam reference pattern, recommended BLE + Wi-Fi hybrid, bench-spike plan · **proposed, nothing measured**
 
 > [!warning] Working principle
 > The report is a **starting point, not a spec**. Prefer the better/optimal technical option, then
