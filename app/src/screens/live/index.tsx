@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
 
 import { Banner } from '@/components/banner';
+import { HoldButton } from '@/components/hold-button';
 import { LiveView } from '@/components/live-view';
 import { Metric } from '@/components/metric';
 import { Screen } from '@/components/screen';
@@ -11,6 +12,8 @@ import { StateIndicator } from '@/components/state-indicator';
 import { Text } from '@/components/text';
 import { translateReason, useT, type StringKey } from '@/i18n';
 import { driverState } from '@/pi/alert';
+import { triggerSos } from '@/services/emergency';
+import { gpsLost } from '@/services/monitor';
 import { pi } from '@/services/pi';
 import { useLive } from '@/state/live';
 import { useSettings } from '@/state/settings';
@@ -30,12 +33,16 @@ function Banners() {
   const { demo, paused } = useSettings(useShallow((s) => ({ demo: s.demo, paused: s.paused })));
   const offline = useLive((s) => s.connection === 'offline');
   const noAlertApi = useLive((s) => s.connection === 'online' && s.alertSupported === false);
+  // re-evaluated every poll; the selector returns a boolean so this only re-renders on change
+  const noGps = useLive((s) => s.connection === 'online' && gpsLost(s.gpsAt, Date.now()));
+  const crashOn = useSettings((s) => s.crashDetection);
   return (
     <>
       {paused ? <Banner icon="pause" title={t('banner.paused')} /> : null}
       {demo ? <Banner icon="play" title={t('banner.demo')} /> : null}
       {offline && !paused ? <Banner icon="wifiOff" tone="danger" title={t('banner.offline')} detail={t('banner.offlineHint')} /> : null}
       {noAlertApi ? <Banner icon="info" tone="warning" title={t('banner.noAlertApi')} /> : null}
+      {noGps && crashOn ? <Banner icon="gps" tone="warning" title={t('banner.gpsLost')} /> : null}
     </>
   );
 }
@@ -157,6 +164,11 @@ function Speed() {
   );
 }
 
+function Sos() {
+  const t = useT();
+  return <HoldButton label={t('live.sos')} hint={t('live.sosHint')} onComplete={() => triggerSos('manual')} />;
+}
+
 function Video() {
   const t = useT();
   const online = useLive((s) => s.connection === 'online');
@@ -180,6 +192,7 @@ export function Live() {
         <Text variant="caption" tone="tertiary" align="center">
           {t('live.locked')}
         </Text>
+        <Sos />
       </View>
     );
   return (
@@ -190,6 +203,7 @@ export function Live() {
       <Eyes />
       <Heart />
       <Phone />
+      <Sos />
     </Screen>
   );
 }

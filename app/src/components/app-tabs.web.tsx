@@ -33,6 +33,9 @@ export function AppTabs() {
         <TabTrigger name="live" href="/live" asChild>
           <TabButton icon="live" label={t('tab.live')} />
         </TabTrigger>
+        <TabTrigger name="trips" href="/trips" asChild>
+          <TabButton icon="trips" label={t('tab.trips')} />
+        </TabTrigger>
         <TabTrigger name="health" href="/health" asChild>
           <TabButton icon="health" label={t('tab.health')} />
         </TabTrigger>

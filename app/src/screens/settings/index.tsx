@@ -13,11 +13,13 @@ import { Text } from '@/components/text';
 import { useT } from '@/i18n';
 import { normalizeBaseUrl } from '@/pi/parse';
 import { ALERT_PATTERNS, type AlertPattern, type PiSettings, type Sensitivity } from '@/pi/types';
+import { db } from '@/state/db';
 import { useLive } from '@/state/live';
 import { useSecure } from '@/state/secure';
-import { useSettings, type Language, type ThemeSetting, type Units, type Vibration } from '@/state/settings';
+import { useSettings, type CallTarget, type Language, type ThemeSetting, type Units, type Vibration } from '@/state/settings';
 import { clearKv } from '@/state/storage';
 import { haptic, speak } from '@/services/alerts';
+import { simulateCrash } from '@/services/monitor';
 import { pi } from '@/services/pi';
 import { ALERT_PRESENTATION } from '@/pi/alert';
 import { radius, spacing, touch, type, useTheme } from '@/theme';
@@ -153,6 +155,34 @@ function PhoneAlerts() {
   );
 }
 
+function Emergency() {
+  const t = useT();
+  const s = useSettings(useShallow((x) => ({ crash: x.crashDetection, callTarget: x.callTarget, ambulance: x.ambulanceNumber })));
+  const set = useSettings((x) => x.set);
+  const contacts = useSecure((x) => x.contacts.length);
+  return (
+    <Section title={t('settings.emergency')} footer={t('settings.crashFooter')}>
+      <Row label={t('settings.contacts')} icon="person" value={String(contacts)} chevron onPress={() => router.push('/contacts')} />
+      <Row
+        label={t('settings.callTarget')}
+        icon="call"
+        right={
+          <Choice<CallTarget>
+            label={t('settings.callTarget')}
+            value={s.callTarget}
+            options={[
+              { value: 'ambulance', label: t('settings.call.ambulance', { n: s.ambulance }) },
+              { value: 'contact', label: t('settings.call.contact') },
+            ]}
+            onChange={(v) => set({ callTarget: v })}
+          />
+        }
+      />
+      <Row label={t('settings.crash')} icon="crash" right={<Toggle label={t('settings.crash')} value={s.crash} onChange={(v) => set({ crashDetection: v })} />} />
+    </Section>
+  );
+}
+
 function Connection() {
   const t = useT();
   const { colors } = useTheme();
@@ -189,6 +219,7 @@ function Connection() {
       </View>
       <Row label={t('settings.pair')} icon="qr" chevron onPress={() => router.push('/pair')} />
       <Row label={t('settings.demo')} icon="play" right={<Toggle label={t('settings.demo')} value={s.demo} onChange={(v) => set({ demo: v })} />} />
+      {s.demo ? <Row label={t('settings.fakeCrash')} icon="crash" chevron onPress={simulateCrash} /> : null}
     </Section>
   );
 }
@@ -243,6 +274,7 @@ function Privacy() {
         text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
+          db.wipe();
           useSecure.getState().wipe();
           useSettings.getState().reset();
           clearKv();
@@ -265,6 +297,7 @@ export function Settings() {
     <Screen>
       <PiDetection />
       <PhoneAlerts />
+      <Emergency />
       <Connection />
       <AppPrefs />
       <Privacy />

@@ -34,10 +34,16 @@ function Navigator() {
         </Stack.Protected>
         <Stack.Protected guard={onboarded}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="trip/[id]" options={{ title: t('trip.title') }} />
+          <Stack.Screen name="incident/[id]" options={{ title: t('incident.title') }} />
           <Stack.Screen name="calibrate" options={{ title: t('cal.title'), presentation: 'modal' }} />
           <Stack.Screen name="contacts" options={{ title: t('contacts.title') }} />
           <Stack.Screen name="pair" options={{ title: t('onb.pair.title'), presentation: 'modal' }} />
           <Stack.Screen name="privacy" options={{ title: t('settings.whatStored') }} />
+          <Stack.Screen
+            name="sos"
+            options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false, headerShown: false }}
+          />
         </Stack.Protected>
       </Stack>
     </NavigationTheme>
