@@ -32,7 +32,9 @@ Measured from the reference models in `../ref/` (see `../ref/SOURCES.md`):
 
 Like the original mount, the camera is **clamped, not screwed**. Two identical clips (print 2) press
 on the back of the IR boards and push the camera against the front wall. Its screw-hole spacing
-doesn't matter. **If it rattles, stick 1 mm foam tape on the clip pads.**
+doesn't matter. The pads are deliberately 0.5 mm too long, so each clip **bends slightly and keeps
+pressing like a spring.** Tighten until the camera doesn't move; you don't need to go all the way
+if it gets stiff. If it still rattles, stick 1 mm foam tape on the pads.
 
 The light-sensor notches assume the camera is upright, with the left IR board's sensor at the top
 (as in your photo). If the image comes out upside down, rotate it in software.
@@ -52,9 +54,16 @@ The light-sensor notches assume the camera is upright, with the left IR board's 
 
 | Qty | Part | Use |
 |---|---|---|
-| 4 | M2.5 × 5 pan-head | Pi → standoffs (self-tapping, 2.1 mm pilots) |
-| 2 | M2.5 × 6 pan-head | camera clips → front bosses |
-| 4 | M3 × 10 countersunk | lid → corner posts (2.5 mm pilots) |
+**One size for everything: M2.5 × 6 mm (10 screws).** Any "Raspberry Pi M2.5 screw kit" has them.
+Any length from 5–8 mm works. Countersunk heads sit flush in the lid; pan heads work too.
+
+| Qty | Use |
+|---|---|
+| 4 | Pi → standoffs |
+| 2 | camera clips → front bosses |
+| 4 | lid → corner posts |
+
+The screws cut their own thread into the printed holes. No nuts or inserts needed.
 
 ## Assembly
 

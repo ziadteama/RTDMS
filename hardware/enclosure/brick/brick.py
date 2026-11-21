@@ -13,7 +13,8 @@ Where the numbers come from (see ../ref/SOURCES.md):
     lens Ø15, IR spots Ø21 at ±27.5 mm, light-sensor notches Ø7, 7.0 mm from the inside of the
     front face to the back of the IR boards.
 The camera is clamped by two clips pressing the IR boards against the front wall (no screws into
-the camera board, so its hole spacing doesn't matter). If it rattles, add 1 mm foam tape to the pads.
+the camera board, so its hole spacing doesn't matter). The pads are 0.5 mm long on purpose, so the
+clip flexes like a spring; if it still rattles, add 1 mm foam tape to the pads.
 """
 from pathlib import Path
 
@@ -58,6 +59,7 @@ LDR_D = 7.0
 EYE_L, EYE_H, EYE_DEPTH = 82.0, 24.6, 0.4   # stadium recess around the camera (face stays 2.0 mm)
 CLAMP = 7.0              # inside of front face -> back of IR boards
 PAD_D, PAD_L = 6.0, 1.0
+PRELOAD = 0.5            # pads reach 0.5 mm past the nominal IR-board plane: the clip flexes and keeps pressing
 CLIP_T, CLIP_H = 2.5, 12.0
 CLIP_X0, CLIP_X1, CLIP_SCREW_X = 20.5, 48.0, 44.0
 BAR_Y0 = WALL + CLAMP + PAD_L               # clip's front face (10.4)
@@ -114,7 +116,7 @@ def shell():
     cuts += [cyl(LDR_D, WALL + 2, (x, -1, CAM_ZC + z), (0, 1, 0)) for x, z in LDR]
     cuts += [cyl(2.1, 7.0, (sx * CLIP_SCREW_X, BAR_Y0 + 0.01, CAM_ZC), (0, -1, 0)) for sx in (-1, 1)]
     cuts += [cyl(2.1, 4.5, (*pb(*h), PCB_Z0 + 0.01), (0, 0, -1)) for h in PI_HOLES]
-    cuts += [cyl(2.5, 10.0, (x, y, H_SHELL + 0.01), (0, 0, -1)) for x, y in POSTS]
+    cuts += [cyl(2.1, 10.0, (x, y, H_SHELL + 0.01), (0, 0, -1)) for x, y in POSTS]   # M2.5 self-tapping
     # back: USB-C (fits an overmoulded plug) + vents
     cuts.append(ybox(pb(USBC_NX, 0)[0], D - WALL - 1, PCB_Z0 + PCB_T + 1.65, 14.0, WALL + 2, 8.5, 3.0))
     cuts += [ybox(0, D - WALL - 1, z, 44.0, WALL + 2, 3.0, 1.45) for z in (13.0, 18.0, 23.0)]
@@ -138,8 +140,8 @@ def lid():
     l = plate.union(lip)
     for x, y in POSTS:
         l = l.cut(cyl(6.5 + 2 * CLR, 1.6, (x, y, H_SHELL - 1.6), (0, 0, 1)))
-        l = l.cut(cyl(3.4, LID_T + 2, (x, y, H_SHELL - 1), (0, 0, 1)))
-        l = l.cut(cq.Workplane().add(cq.Solid.makeCone(1.7, 3.3, 1.6, Vector(x, y, H_SHELL + LID_T - 1.6 + 0.001))))
+        l = l.cut(cyl(2.8, LID_T + 2, (x, y, H_SHELL - 1), (0, 0, 1)))                 # M2.5 countersunk
+        l = l.cut(cq.Workplane().add(cq.Solid.makeCone(1.4, 2.8, 1.4, Vector(x, y, H_SHELL + LID_T - 1.4 + 0.001))))
     for i in range(9):   # fan grille over the Active Cooler
         y = 23.0 + i * 5.5
         l = l.cut(cq.Workplane().box(72.0, 3.0, LID_T + 4).edges("|Z").fillet(1.45).translate((0, y, H_SHELL)))
@@ -150,7 +152,7 @@ def camera_clip():
     """Print two. The same part fits both sides (rotate 180 deg about the front-back axis)."""
     c = ybox((CLIP_X0 + CLIP_X1) / 2, BAR_Y0, CAM_ZC, CLIP_X1 - CLIP_X0, CLIP_T, CLIP_H, 0)
     c = c.edges("|Y").fillet(2.0)
-    c = c.union(cyl(PAD_D, PAD_L + 0.01, (IR_DX, BAR_Y0 + 0.01, CAM_ZC), (0, -1, 0)))
+    c = c.union(cyl(PAD_D, PAD_L + PRELOAD + 0.01, (IR_DX, BAR_Y0 + 0.01, CAM_ZC), (0, -1, 0)))
     c = c.cut(cyl(2.8, CLIP_T + 2, (CLIP_SCREW_X, BAR_Y0 - 1, CAM_ZC), (0, 1, 0)))
     c = c.cut(cyl(5.4, 1.2, (CLIP_SCREW_X, BAR_Y0 + CLIP_T - 1.2, CAM_ZC), (0, 1, 0)))
     return c
