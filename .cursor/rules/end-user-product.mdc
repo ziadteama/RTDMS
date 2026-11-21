@@ -1,0 +1,47 @@
+---
+description: Sahi is a consumer product for the driver, not an admin or engineering tool
+alwaysApply: true
+---
+
+# End-user product rule (Sahi app and anything the driver sees)
+
+Decided 2026-11-21. Full audit and rationale: `Subsystems/Mobile App End-User Scope.md`.
+
+**The audience is the driver of a personal car.** Fleet managers, OEM engineers and the team are
+not the audience of the main app. Anything only they need lives in the hidden **Diagnostics** screen
+(tap the version number 7 times, labeled "for the Sahi team") or in team tooling, never in the
+tabs, onboarding or notifications.
+
+## Audience test (apply to every screen, setting, string and notification)
+
+"Would a driver who has never seen the code know what this is and why they would touch it?" If not:
+move it to Diagnostics or delete it.
+
+## Structure
+
+- Three tabs: **Drive**, **Trips**, **Settings**. Driving lock hides everything except the state.
+- No "Pi" tab, no health/CPU/throttle/memory/disk, no restart/shutdown, no per-model switches, no
+  numeric thresholds, no address entry and no demo mode outside Diagnostics (pairing may offer
+  "Having trouble?" for the manual path).
+- **Defaults over settings:** good default first, then a 3-way choice (Low / Normal / High), then
+  Diagnostics. Never a numeric threshold in the main app.
+- **No metric without meaning:** show a state or a plain sentence unless the driver can act on the
+  number. Raw EAR / PERCLOS / RR / fps / FOV do not appear in the main app.
+- **Live camera video is for setup and calibration only,** not while driving (it distracts).
+
+## Vocabulary (driver-facing copy)
+
+| Never | Say |
+|---|---|
+| Pi, Raspberry Pi, fusion, model, MJPEG, fps, EAR, PERCLOS, RR, throttled | your Sahi unit, camera, alert, eyes closed, heart rate |
+| monitoring paused (technical) | "Sahi stopped monitoring at 14:32 because your phone closed it. Tap to fix." |
+| offline / not paired | "Unit not connected. Check it is powered on." |
+| error codes, HTTP/BLE terms | what happened and the one thing to do |
+
+English only, plain words, specific, short. Alerts say why in one line.
+
+## Review gate
+
+Every UI PR body must include: "Audience check: <screens touched> pass the audience test; engineer
+items moved to Diagnostics: <list or none>". Reviewers reject a PR that adds an admin/engineer item
+to a main screen.
