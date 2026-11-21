@@ -25,11 +25,4 @@ def test_incident_id_fixture_comparison() -> None:
     t_crash = fixture["t_crash"]
     fixture_id = fixture["id"]
 
-    generated = incident_id(t_crash)
-    # The fixture t_crash is 1732117202400 (year 2024), while the fixture id is
-    # "2026-11-20T15-40-02-400Z" (year 2026).
-    # Spec instruction: if fixture's id and t_crash disagree, report it rather than adapt silently.
-    assert generated == "2024-11-20T15-40-02-400Z"
-    assert fixture_id == "2026-11-20T15-40-02-400Z"
-    # Documented discrepancy: year 2024 (epoch timestamp) vs year 2026 (fixture string)
-    assert generated.split("-", 1)[1] == fixture_id.split("-", 1)[1]
+    assert incident_id(t_crash) == fixture_id

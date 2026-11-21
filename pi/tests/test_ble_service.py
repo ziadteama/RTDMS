@@ -153,7 +153,7 @@ def test_incident_clock(service: PhoneService, clock: Clock) -> None:
     assert service.state.clock_offset_ms == offset
     write(service, Char.INCIDENT, fixture("incident_request"))
     result = json.loads(service.port.notifications[-1][1])
-    assert result == {"ok": True, "id": "2024-11-20T15-40-02-400Z"}
+    assert result == {"ok": True, "id": "2026-11-20T15-40-02-400Z"}
     assert validate("incident_response", result) == result
     write(service, Char.INCIDENT, fixture("incident_request"))
     assert json.loads(service.port.notifications[-1][1]) == result
