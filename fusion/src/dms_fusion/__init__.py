@@ -31,6 +31,12 @@ def decide(
     pattern = AlertPattern.NONE
 
     if phone:
+        # The IR pipeline (models/distraction hybrid) already debounces: `call` / `texting` are
+        # booleans that are true only after a sustained detection, so they alert directly.
+        for action in ("call", "texting"):
+            if phone.get(action) is True:
+                pattern = AlertPattern.CONTINUOUS
+                reasons.append(f"phone {action}")
         phone_score = phone.get("phone_score")
         sustained = float(phone.get("sustained_phone_ms") or 0.0)
         if isinstance(phone_score, (int, float)) and phone_score >= 0.55 and sustained >= 300:
