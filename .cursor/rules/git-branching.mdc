@@ -26,10 +26,12 @@ Trunk-based development with **short-lived, zone-scoped** branches. Do not use l
 | `physio/` | `models/physiology/**` | Ziad |
 | `phone/` | `models/phone/**` | TBD |
 | `fusion/` | `fusion/**` | Joint |
+| `app/` | `app/**` (Sahi mobile app + its `app/mock-pi/`) | TBD |
 | `docs/` | shared status only: root `README.md`, `CLAUDE.md`, `Agent Guide.md`, `Home.md`, `models/README.md`, `Subsystems/Models Index.md`, `Subsystems/*` narrative | Anyone |
-| `meta/` | `.cursor/rules/**`, `.github/**`, repo tooling | Anyone |
+| `meta/` | `.cursor/rules/**`, `.github/**`, `.claude/skills/**`, repo tooling | Anyone |
 
-Examples: `face/perclos-window`, `physio/ble-reconnect`, `phone/statefarm-train`, `docs/models-status`.
+Examples: `face/perclos-window`, `physio/ble-reconnect`, `phone/statefarm-train`, `app/live-view`,
+`docs/models-status`.
 
 Also always apply `.cursor/rules/pi-performance-pipeline.mdc` — Pi concurrent performance beats laptop DX.
 
@@ -52,6 +54,7 @@ Also always apply `.cursor/rules/pi-performance-pipeline.mdc` — Pi concurrent 
 
 ✅ face/<topic> touching only models/face/
 ✅ physio/<topic> touching only models/physiology/
+✅ app/<topic> touching only app/ (Pi-side endpoints go on a phone/ branch)
 ✅ docs/<topic> for one-line status table updates
 ```
 

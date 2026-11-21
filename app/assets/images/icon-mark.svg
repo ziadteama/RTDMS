@@ -1,0 +1,5 @@
+<!-- Sahi (صاحي, "awake") mark: an open eye. Source for every icon / splash PNG (scripts/render-icons.mjs). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <path d="M10 50 C 26 24, 74 24, 90 50 C 74 76, 26 76, 10 50 Z" fill="none" stroke="var(--line, #F1F3F5)" stroke-width="7" stroke-linejoin="round"/>
+  <circle cx="50" cy="50" r="13" fill="var(--pupil, #3FB97A)"/>
+</svg>
