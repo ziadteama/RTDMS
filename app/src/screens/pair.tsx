@@ -75,8 +75,7 @@ export function Pair({ onDone }: { onDone: () => void }) {
 
   const camera = process.env.EXPO_OS !== 'web' && permission?.granted;
   return (
-    <View style={{ gap: spacing.xl }}>
-      <Text tone="secondary">{t(camera ? 'onb.pair.lead' : 'onb.pair.noCamera')}</Text>
+    <View style={{ gap: spacing.lg }}>
       {camera ? (
         <View style={{ aspectRatio: 1, borderRadius: radius.lg, borderCurve: 'continuous', overflow: 'hidden', backgroundColor: colors.surface }}>
           <CameraView

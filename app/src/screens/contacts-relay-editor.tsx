@@ -100,13 +100,13 @@ export function ContactsRelayEditor() {
             key={c.id}
             icon="person"
             label={c.name}
-            detail={`${c.phone}\n${t(`contacts.status.${c.relayStatus ?? 'pending'}`)}`}
+            detail={`${c.phone} · ${t(`contacts.status.${c.relayStatus ?? 'pending'}`)}`}
             right={<Button title={t('contacts.remove')} variant="ghost" onPress={() => remove(c.id)} />}
           />
         ))}
       </Section>
       {contacts.length < MAX ? (
-        <View style={{ gap: spacing.md }}>
+        <View style={{ gap: spacing.sm }}>
           <ContactField value={name} onChange={setName} label={t('contacts.name')} />
           <ContactField value={phone} onChange={setPhone} label={t('contacts.phone')} phone />
           {error ? (

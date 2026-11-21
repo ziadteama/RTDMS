@@ -23,7 +23,7 @@ export function EmergencyNumber() {
       ]} onChange={(value) => { setCustom(value === 'custom'); if (value !== 'custom') set({ emergencyNumber: value }); }} />} />
     {custom ? <CustomNumber key={number} number={number} /> : null}
     <Row label={t('settings.countdown')} right={<Choice label={t('settings.countdown')}
-      value={String(seconds)} options={([30, 45, 60] as const).map((value) => ({ value: String(value), label: `${value} seconds` }))}
+      value={String(seconds)} options={([30, 45, 60] as const).map((value) => ({ value: String(value), label: `${value}s` }))}
       onChange={(value) => set({ sosCountdownSeconds: Number(value) as 30 | 45 | 60 })} />} />
   </>;
 }
@@ -33,7 +33,7 @@ function CustomNumber({ number }: { number: string }) {
   const { colors } = useTheme();
   const [draft, setDraft] = useState(number);
   const set = useSettings((s) => s.set);
-  return <View style={{ padding: spacing.lg, gap: spacing.sm }}>
+  return <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.xs }}>
     <TextInput value={draft} onChangeText={setDraft} keyboardType="phone-pad"
       accessibilityLabel={t('settings.customNumber')} autoCorrect={false}
       style={[type.body, { minHeight: touch.min, paddingHorizontal: spacing.md,

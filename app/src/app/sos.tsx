@@ -173,7 +173,7 @@ export default function Sos() {
                   key={c.id}
                   icon="person"
                   label={c.name}
-                  detail={`${t('sos.whatsapp')}: ${formatWhatsappStatus(c.whatsapp, t)}\n${t('sos.sms')}: ${formatSmsStatus(c.sms, t)}`}
+                  detail={`${t('sos.whatsapp')}: ${formatWhatsappStatus(c.whatsapp, t)} · ${t('sos.sms')}: ${formatSmsStatus(c.sms, t)}`}
                 />
               ))}
             </Section>

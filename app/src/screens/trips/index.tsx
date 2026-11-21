@@ -80,7 +80,7 @@ function Header({ trips }: { trips: Trip[] }) {
   const linked = new Set(incidents.map((i) => i.piId));
   const piOnly = (piClips ?? []).filter((c) => !linked.has(c.id));
   return (
-    <View style={{ gap: spacing.lg, paddingBottom: spacing.md }}>
+    <View style={{ gap: spacing.lg, paddingBottom: spacing.lg }}>
       <Section title={t('trips.weekly')}>
         <View style={{ padding: spacing.lg }}>
           <BarChart
@@ -118,11 +118,6 @@ function Header({ trips }: { trips: Trip[] }) {
             />
           ))}
         </Section>
-      ) : null}
-      {trips.length ? (
-        <Text variant="label" tone="secondary" accessibilityRole="header" style={{ paddingHorizontal: spacing.lg }}>
-          {t('trips.title')}
-        </Text>
       ) : null}
     </View>
   );
