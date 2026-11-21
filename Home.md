@@ -32,6 +32,7 @@ Project 2 (the build phase this repo is for).
 - [[Raspberry Pi 5 Target]] — the deployment device, surveyed live over SSH
 - [[Pi Setup Plan]] — researched optimal configuration + the blockers to resolve first
 - [[Competitor App Study]] — dashcam, fleet/driver-monitoring and crash-detection apps studied for Sahi: patterns to copy, mistakes to avoid, gaps · **research (web only, no hands-on teardown yet)**
+- [[Pi Runtime]] — the Pi-side runtime (`pi/`): fusion loop, buzzer, BLE phone service, incidents, hotspot · **built, Docker-verified only, not run on the Pi**
 - [[Phone-Pi Link]] — Sahi app ↔ Pi transport: research, dashcam reference pattern, recommended BLE + Wi-Fi hybrid, bench-spike plan · **proposed, nothing measured**
 
 > [!warning] Working principle

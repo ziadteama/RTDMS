@@ -22,7 +22,7 @@ consume them. Code lives in `models/`; see `models/README.md` for on-disk conven
 | Face (drowsiness + gaze) | [[Face Subsystem]] | `models/face/` | Eye closure, PERCLOS, blink, gaze, head pose | **Core + demo runner**; live on Pi via LiteRT at 30 fps |
 | Phone / eating | [[Phone Subsystem]] | `models/phone/` | Phone + eating distraction scores | **ONNX wired** (Safe-Drive-TN); superseded for the IR camera by Distraction |
 | Distraction (IR camera) | [[Distraction Subsystem]] | `models/distraction/` | Phone call, texting, drinking, eating | **v2 live on Pi** for call + texting (action classifier + ear / lap phone checks, INT8 NCNN); drinking via the det_v2d detector (off on the Pi stream) |
-| Decision fusion | *(stub)* | `fusion/` | Combines models → alert pattern | **Stub `decide()`** |
+| Decision fusion | [[Pi Runtime]] | `fusion/` | Combines models → alert pattern | **`decide()` now runs per frame in `pi/`** (accepts call/texting flags); thresholds still fixed; not run on the Pi |
 | Alert subsystem | *(pending)* | *(pending)* | Buzzer + vibration patterns | Planned (Phase 4) |
 | Mobile app (Sahi) | [[Mobile App]] | `app/` | Live view, alerts, crash detection, incident clip | **MVP built** (Expo SDK 58): gates pass, mock Pi + demo mode; not yet run on a phone; Pi-side endpoints pending |
 | Wearable firmware | *(pending)* | *(pending)* | ESP32-C3 + MAX30102, BLE only | Planned (Phase 1) |
