@@ -22,6 +22,8 @@ RTDMS/
 │  └─ phone/                phone + eating distraction (ONNX @ 5 Hz) [SCAFFOLDED]
 ├─ fusion/                  Decision fusion stub (owns alerts)       [STUB]
 ├─ app/                     Sahi driver phone app (Expo, Android)    [MVP BUILT]
+├─ pi/                      Pi runtime (fusion loop, phone link, incidents) [PLANNED]
+├─ contracts/pi-link/       Phone↔Pi link contract + schemas         [PLANNED]
 └─ .claude/skills/          Agent skills adopted into this workspace
 ```
 

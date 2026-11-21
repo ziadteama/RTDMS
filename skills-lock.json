@@ -1,6 +1,20 @@
 {
   "version": 2,
   "skills": {
+    "agy-delegate": {
+      "source": "amElnagdy/delegate-skills",
+      "commit": "48b53d33b53ef260de76c3d2c1313e2c62a24820",
+      "sourceType": "github",
+      "skillPath": "skills/agy-delegate/SKILL.md",
+      "computedHash": "8d5b92d293187bdfeccabc17d84c4711b8c6f35d22aae839c1430e0ea9252b10"
+    },
+    "codex-delegate": {
+      "source": "amElnagdy/delegate-skills",
+      "commit": "48b53d33b53ef260de76c3d2c1313e2c62a24820",
+      "sourceType": "github",
+      "skillPath": "skills/codex-delegate/SKILL.md",
+      "computedHash": "e9ea57d35e0ab1de5789193288723d264db0ceb7f0308b6359fe550e0c6f0911"
+    },
     "competitive-brief": {
       "source": "anthropics/knowledge-work-plugins",
       "commit": "0e0fcacddcc892eb92a1b7873ff9d68159c47571",
@@ -14,6 +28,27 @@
       "sourceType": "github",
       "skillPath": "plugin/skills/competitor-analysis/SKILL.md",
       "computedHash": "abe910355856d91540fcdcbb65c9da4ce5fdb0acdf8b275af329b8b32babae43"
+    },
+    "obsidian-documentation": {
+      "source": "MatheusPBC/Crafting-Table",
+      "commit": "f54a3da8d99e79fa4c38f6f77897b372e20ba822",
+      "sourceType": "github",
+      "skillPath": ".kilocode/skills/obsidian-documentation/SKILL.md",
+      "computedHash": "357230a466c6cccbd74c25d6b86b547aad0d9c24e51ed037bea2cf949a5697aa"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "commit": "f76d1653d7467fc11fb9d9d79295a421c92ab958",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "e521187cf7538619acb336c79ba3dc12f7b2670e6a8f03db59167b5f1c603906"
+    },
+    "wireframe-spec": {
+      "source": "Owl-Listener/designer-skills",
+      "commit": "9a6930cf84a822eb458624bd11c61aac5bbdf224",
+      "sourceType": "github",
+      "skillPath": "prototyping-testing/skills/wireframe-spec/SKILL.md",
+      "computedHash": "1ea6a01aede70b9fd177e8a4241bc923da1663c589e9b6f2ea37712b6644ea23"
     }
   }
 }
