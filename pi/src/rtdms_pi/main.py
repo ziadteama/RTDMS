@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
+import importlib.util
 import os
+import time
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .config import RuntimeConfig
+    from .runtime import Runtime
 
 
-def main() -> None:
-    os.environ["OPENBLAS_NUM_THREADS"] = "1"
-    os.environ["OMP_NUM_THREADS"] = "1"
-
+def build_runtime(config: RuntimeConfig, ble: bool) -> Runtime:
     from .buzzer import (
         BuzzerBackend,
         ConsoleBuzzer,
@@ -17,8 +22,6 @@ def main() -> None:
         PatternPlayer,
         SilentBuzzer,
     )
-    from .config import RuntimeConfig
-    from .http_debug import DebugServer
     from .runtime import Runtime
     from .sources import (
         FrameSource,
@@ -30,7 +33,6 @@ def main() -> None:
     )
     from .state import RuntimeState
 
-    config = RuntimeConfig.from_args()
     backend: BuzzerBackend
     if config.buzzer == "gpio":
         backend = GpioBuzzer(config.buzzer_pin)
@@ -45,17 +47,82 @@ def main() -> None:
         ScriptedFrameSource([]) if config.no_camera else StreamPipelineSource(config)
     )
     physio: PhysioSource = (
-        GarminPhysioSource(config.physio_stale_s) if config.physiology else NullPhysioSource()
+        GarminPhysioSource(config.physio_stale_s)
+        if config.physiology or ble
+        else NullPhysioSource()
     )
-    runtime = Runtime(source, physio, player, state, tick_rate=config.tick_rate)
-    server: DebugServer | None = None
+    return Runtime(source, physio, player, state, tick_rate=config.tick_rate)
+
+
+def main() -> None:
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    os.environ["OMP_NUM_THREADS"] = "1"
+    from .config import RuntimeConfig
+    from .http_debug import DebugServer
+    from .incidents.http_server import serve as serve_incidents
+    from .incidents.ring import Entry, FrameRing
+    from .incidents.sink import RingIncidentSink
+    from .incidents.store import IncidentStore
+    from .pairing import load_or_create_token
+    from .payloads import alert_payload, status_payload
+
+    config = RuntimeConfig.from_args()
+    ble = (
+        config.ble
+        if config.ble is not None
+        else (not config.no_camera and importlib.util.find_spec("bless") is not None)
+    )
+    ble = ble or config.fake_ble
+    runtime = build_runtime(config, ble)
+
+    token = load_or_create_token(config.state_dir / "token")
+    store = IncidentStore(config.state_dir / "incidents")
+    ring = FrameRing(seconds=25.0, fps=10.0)
+    sink = RingIncidentSink(ring=ring, store=store)
+
+    orig_start = runtime.frame_source.start
+    last_ring_push = 0.0
+
+    def start_with_ring(on_frame: Any) -> None:
+        def on_frame_wrapper(frame: Any) -> None:
+            on_frame(frame)
+            nonlocal last_ring_push
+            now = time.monotonic()
+            if now - last_ring_push >= 0.1:  # <= 10 fps
+                last_ring_push = now
+                s = runtime.state.snapshot()
+                # TODO(P5-wiring): jpeg from stream Shared
+                ring.push(
+                    Entry(
+                        t_mono=now,
+                        t_wall=time.time(),
+                        jpeg=None,
+                        status=status_payload(s),
+                        alert=alert_payload(s.decision, time.time()),
+                    )
+                )
+
+        orig_start(on_frame_wrapper)
+
+    runtime.frame_source.start = start_with_ring  # type: ignore[method-assign]
+
+    debug_server: DebugServer | None = None
+    incident_server = None
     try:
-        server = DebugServer(state, player, config)
-        server.start()
-        runtime.run_forever()
+        debug_server = DebugServer(runtime.state, runtime.player, config)
+        debug_server.start()
+        incident_server = serve_incidents(config.host, config.incident_port, store, sink, token)
+        if ble:
+            from .ble.server import run_runtime_ble
+
+            asyncio.run(run_runtime_ble(config, runtime, incidents=sink))
+        else:
+            runtime.run_forever()
     finally:
-        if server:
-            server.stop()
+        if incident_server:
+            incident_server.stop()
+        if debug_server:
+            debug_server.stop()
         runtime.stop()
 
 

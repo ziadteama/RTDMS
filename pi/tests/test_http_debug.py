@@ -37,3 +37,42 @@ def test_http() -> None:
         server.stop()
         player.close()
     assert not server._thread.is_alive()
+
+
+def test_health_models_distraction_reporting() -> None:
+    import time
+
+    state = RuntimeState()
+    # Camera ok, but phone report is None (driver turned away) -> distraction must report "running"
+    state.update_frame(None, None, 15.0, None, True, time.monotonic())
+    player = PatternPlayer(RecordingBuzzer(), autostart=False)
+    cfg_camera = RuntimeConfig(host="127.0.0.1", http_port=0, no_camera=False)
+    server = DebugServer(state, player, cfg_camera)
+    server.start()
+    base = f"http://127.0.0.1:{server.port}"
+    try:
+        with urlopen(base + "/health", timeout=2) as resp:
+            data = json.load(resp)
+            assert data["models"]["distraction"] == "running"
+
+        # When camera/pipeline is lost -> "error"
+        state.update_frame(None, None, 0.0, None, False, time.monotonic())
+        with urlopen(base + "/health", timeout=2) as resp:
+            data = json.load(resp)
+            assert data["models"]["distraction"] == "error"
+    finally:
+        server.stop()
+        player.close()
+
+    # When detector is disabled (no_camera=True) -> "off"
+    cfg_nocam = RuntimeConfig(host="127.0.0.1", http_port=0, no_camera=True)
+    server_nocam = DebugServer(state, player, cfg_nocam)
+    server_nocam.start()
+    base_nocam = f"http://127.0.0.1:{server_nocam.port}"
+    try:
+        with urlopen(base_nocam + "/health", timeout=2) as resp:
+            data = json.load(resp)
+            assert data["models"]["distraction"] == "off"
+    finally:
+        server_nocam.stop()
+

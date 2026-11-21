@@ -62,7 +62,9 @@ else
 fi
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
-    echo "nmcli connection add type wifi ifname '*' con-name $CON_NAME ssid $SSID 802-11-wireless.mode ap band $BAND channel $CHANNEL wifi.powersave 2 ipv4.method shared ipv4.addresses 10.42.0.1/24 wifi-sec.key-mgmt wpa-psk wifi-sec.psk <redacted> connection.autoconnect no"
+    echo "nmcli connection add type wifi ifname '*' con-name $CON_NAME ssid $SSID 802-11-wireless.mode ap 802-11-wireless.band $BAND 802-11-wireless.channel $CHANNEL wifi.powersave 2 ipv4.method shared ipv4.addresses 10.42.0.1/24 wifi-sec.key-mgmt wpa-psk connection.autoconnect no"
+    echo "printf '%s\\n' '<psk from file>' | nmcli --ask connection modify $CON_NAME wifi-sec.psk"
+    echo "nmcli radio wifi on"
     echo "nmcli con up $CON_NAME"
     exit 0
 fi
@@ -81,20 +83,20 @@ if nmcli connection show "$CON_NAME" >/dev/null 2>&1; then
         ipv4.method shared \
         ipv4.addresses 10.42.0.1/24 \
         wifi-sec.key-mgmt wpa-psk \
-        wifi-sec.psk "$PSK" \
         connection.autoconnect no
 else
     nmcli connection add type wifi ifname '*' con-name "$CON_NAME" \
         ssid "$SSID" \
         802-11-wireless.mode ap \
-        band "$BAND" \
-        channel "$CHANNEL" \
+        802-11-wireless.band "$BAND" \
+        802-11-wireless.channel "$CHANNEL" \
         wifi.powersave 2 \
         ipv4.method shared \
         ipv4.addresses 10.42.0.1/24 \
         wifi-sec.key-mgmt wpa-psk \
-        wifi-sec.psk "$PSK" \
         connection.autoconnect no
 fi
 
+printf '%s\n' "$PSK" | nmcli --ask connection modify "$CON_NAME" wifi-sec.psk
+nmcli radio wifi on
 nmcli con up "$CON_NAME"

@@ -106,3 +106,28 @@ def test_injected_sleep(clock: Clock) -> None:
     player._thread.join(timeout=1)
     assert not player._thread.is_alive() and calls == 3
     player.close()
+
+
+def test_close_race_backend_off() -> None:
+    class FragileBackend(RecordingBuzzer):
+        def __init__(self) -> None:
+            super().__init__()
+            self.is_closed = False
+
+        def off(self) -> None:
+            if self.is_closed:
+                raise RuntimeError("off called after close")
+            super().off()
+
+        def close(self) -> None:
+            self.is_closed = True
+            super().close()
+
+    backend = FragileBackend()
+    player = PatternPlayer(backend, autostart=True)
+    player.set_pattern(AlertPattern.SHORT_BEEP)
+    # close while worker thread is active
+    player.close()
+    assert backend.is_closed
+    assert not player._thread.is_alive()
+

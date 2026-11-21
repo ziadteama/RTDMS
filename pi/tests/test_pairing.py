@@ -160,3 +160,22 @@ def test_main_cli_rotate_token(
     assert len(new_token) >= 16
     captured = capsys.readouterr()
     assert f"K:{new_token};" in captured.out
+
+
+def test_main_cli_enforces_psk_mode_0600(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    psk_file = tmp_path / "wifi_psk"
+    psk_file.write_text("preexisting_psk_secret\n", encoding="utf-8")
+    psk_file.chmod(0o644)
+    assert stat.S_IMODE(psk_file.stat().st_mode) == 0o644
+
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+    exit_code = main(["--state-dir", str(tmp_path), "--psk-file", str(psk_file)])
+    assert exit_code == 0
+
+    # load_or_create_psk must have enforced mode 0o600
+    assert stat.S_IMODE(psk_file.stat().st_mode) == 0o600
+    captured = capsys.readouterr()
+    assert "P:preexisting_psk_secret;" in captured.out
+

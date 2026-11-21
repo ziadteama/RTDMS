@@ -87,6 +87,8 @@ class RuntimeState:
         self.clock = clock
         self._lock = threading.Lock()
         self._data = Snapshot()
+        self._clock_offset_ms: int | None = None
+        self._decision_listeners: list[Callable[[DecisionSnapshot], None]] = []
 
     def update_frame(
         self,
@@ -115,9 +117,20 @@ class RuntimeState:
 
     def set_decision(self, decision: FusionDecision) -> None:
         with self._lock:
-            self._data = replace(
-                self._data, decision=DecisionSnapshot(decision.pattern, tuple(decision.reasons))
-            )
+            changed = self._data.decision.pattern != decision.pattern
+            current = DecisionSnapshot(decision.pattern, tuple(decision.reasons))
+            self._data = replace(self._data, decision=current)
+            if changed:
+                for callback in self._decision_listeners:
+                    callback(current)  # enqueue only; never perform transport I/O here
+
+    def subscribe_decisions(self, callback: Callable[[DecisionSnapshot], None]) -> None:
+        with self._lock:
+            self._decision_listeners.append(callback)
+
+    def unsubscribe_decisions(self, callback: Callable[[DecisionSnapshot], None]) -> None:
+        with self._lock:
+            self._decision_listeners.remove(callback)
 
     def request_calibration(self, requested: bool = True) -> None:
         with self._lock:
@@ -139,3 +152,12 @@ class RuntimeState:
                 face=s.face if camera_ok else None,
                 phone=s.phone if camera_ok else None,
             )
+
+    @property
+    def clock_offset_ms(self) -> int | None:
+        with self._lock:
+            return self._clock_offset_ms
+
+    def set_clock_offset(self, offset: int | None) -> None:
+        with self._lock:
+            self._clock_offset_ms = offset

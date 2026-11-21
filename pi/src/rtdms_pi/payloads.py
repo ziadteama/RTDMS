@@ -61,10 +61,11 @@ def status_payload(snapshot: Snapshot) -> dict[str, object]:
         "temp_c",
     ]
     if f:
-        for key in ("perclos", "openness", "blink_rate", "closure_ms"):
-            value = number(getattr(f, key))
-            if value is not None:
-                d[key] = value
+        if f.face and s.camera_ok:
+            for key in ("perclos", "openness", "blink_rate", "closure_ms"):
+                value = number(getattr(f, key))
+                if value is not None:
+                    d[key] = value
         if f.calibrated is not None:
             d["calibrated"] = f.calibrated
         if f.calibration in ("ok", "calibrating", "failed", "lost"):

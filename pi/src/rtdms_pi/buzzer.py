@@ -177,9 +177,11 @@ class PatternPlayer:
                 self.step()
                 self._sleep(0.01)
         finally:
-            self.backend.off()
-            if self.vibration:
-                self.vibration.off()
+            with self._lock:
+                if not self._closed:
+                    self.backend.off()
+                    if self.vibration:
+                        self.vibration.off()
 
     def close(self) -> None:
         with self._lock:
