@@ -1,0 +1,8 @@
+{
+  "ssid": "RTDMS-Pi",
+  "psk": "example-passphrase",
+  "url": "http://10.42.0.1:8080",
+  "ble": "RTDMS-Pi",
+  "token": "k3Jx9mQ2pL7vN4wR8tY1",
+  "contract": 1
+}

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "physio",
+  "type": "object",
+  "required": [
+    "watch_connected",
+    "t"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "watch_connected": {
+      "type": "boolean"
+    },
+    "hr_bpm": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "rr_ms": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "maxItems": 8
+    },
+    "fatigue_probability": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "hrv_state": {
+      "enum": [
+        "warmup",
+        "valid",
+        "degraded",
+        "bad",
+        "stale"
+      ]
+    },
+    "rmssd_ms": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "quality": {
+      "enum": [
+        "good",
+        "degraded",
+        "bad"
+      ]
+    },
+    "t": {
+      "type": "number"
+    }
+  }
+}

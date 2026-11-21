@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "alert",
+  "type": "object",
+  "required": [
+    "pattern",
+    "reasons",
+    "t"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "pattern": {
+      "enum": [
+        "none",
+        "short_beep",
+        "repeated",
+        "continuous",
+        "max"
+      ]
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 48
+      },
+      "maxItems": 4
+    },
+    "t": {
+      "type": "number"
+    }
+  }
+}

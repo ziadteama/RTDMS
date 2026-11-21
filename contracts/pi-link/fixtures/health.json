@@ -1,0 +1,20 @@
+{
+  "contract": 1,
+  "cpu_pct": 61.2,
+  "temp_c": 66.1,
+  "throttled": 0,
+  "volts_5v": 5.08,
+  "fps": 14.6,
+  "uptime_s": 3725,
+  "mem_used_mb": 2140,
+  "mem_total_mb": 8064,
+  "disk_free_mb": 41210,
+  "camera": "ok",
+  "models": {
+    "face": "running",
+    "distraction": "running",
+    "physiology": "running",
+    "fusion": "running"
+  },
+  "wifi": "off"
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "qr",
+  "type": "object",
+  "required": [
+    "ssid",
+    "psk",
+    "url",
+    "ble",
+    "token",
+    "contract"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "ssid": {
+      "type": "string"
+    },
+    "psk": {
+      "type": "string"
+    },
+    "url": {
+      "type": "string"
+    },
+    "ble": {
+      "type": "string"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 16
+    },
+    "contract": {
+      "type": "integer"
+    }
+  }
+}

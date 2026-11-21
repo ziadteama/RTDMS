@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "incident_item",
+  "type": "object",
+  "required": [
+    "id",
+    "t_crash",
+    "g_peak",
+    "clip_ready"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "t_crash": {
+      "type": "integer"
+    },
+    "g_peak": {
+      "type": "number"
+    },
+    "lat": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "lon": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "duration_s": {
+      "type": "number"
+    },
+    "clip_ready": {
+      "type": "boolean"
+    }
+  }
+}

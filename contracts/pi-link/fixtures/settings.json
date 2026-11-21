@@ -1,0 +1,17 @@
+{
+  "profile": "default",
+  "profiles": [
+    "default",
+    "driver-2"
+  ],
+  "sensitivity": "normal",
+  "eye_closure_s": 2.0,
+  "offroad_gaze_s": 2.0,
+  "phone_s": 1.0,
+  "detectors": {
+    "drowsiness": true,
+    "distraction": true,
+    "phone": true,
+    "physiology": true
+  }
+}

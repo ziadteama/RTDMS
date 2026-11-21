@@ -1,0 +1,16 @@
+{
+  "fps": 14.3,
+  "face": true,
+  "state": "drowsy",
+  "perclos": 0.31,
+  "openness": 0.31,
+  "blink_rate": 9.5,
+  "closure_ms": 2400,
+  "calibrated": true,
+  "calibration": "ok",
+  "camera_covered": false,
+  "call": false,
+  "texting": true,
+  "phone_p": 0.91,
+  "temp_c": 64.2
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "command",
+  "type": "object",
+  "required": [
+    "cmd"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cmd": {
+      "enum": [
+        "test_alert",
+        "calibrate",
+        "restart",
+        "shutdown"
+      ]
+    },
+    "pattern": {
+      "enum": [
+        "none",
+        "short_beep",
+        "repeated",
+        "continuous",
+        "max"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "maxLength": 16
+    }
+  }
+}

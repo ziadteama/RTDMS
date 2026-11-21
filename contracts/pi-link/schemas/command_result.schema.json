@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "command_result",
+  "type": "object",
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "error": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "id": {
+      "type": "string",
+      "maxLength": 16
+    }
+  }
+}

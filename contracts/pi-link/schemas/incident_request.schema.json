@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "incident_request",
+  "type": "object",
+  "required": [
+    "t_crash",
+    "g_peak"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "t_crash": {
+      "type": "integer"
+    },
+    "g_peak": {
+      "type": "number"
+    },
+    "lat": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "lon": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "client_id": {
+      "type": "string",
+      "maxLength": 36
+    }
+  }
+}

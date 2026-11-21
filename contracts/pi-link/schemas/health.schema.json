@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "health",
+  "type": "object",
+  "required": [
+    "cpu_pct",
+    "fps",
+    "uptime_s",
+    "camera",
+    "models",
+    "contract"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "contract": {
+      "type": "integer"
+    },
+    "cpu_pct": {
+      "type": "number"
+    },
+    "temp_c": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "throttled": {
+      "type": "integer"
+    },
+    "volts_5v": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "fps": {
+      "type": "number"
+    },
+    "uptime_s": {
+      "type": "integer"
+    },
+    "mem_used_mb": {
+      "type": "integer"
+    },
+    "mem_total_mb": {
+      "type": "integer"
+    },
+    "disk_free_mb": {
+      "type": "integer"
+    },
+    "camera": {
+      "enum": [
+        "ok",
+        "lost"
+      ]
+    },
+    "models": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "running",
+          "off",
+          "error"
+        ]
+      }
+    },
+    "wifi": {
+      "enum": [
+        "off",
+        "on",
+        "clients"
+      ]
+    }
+  }
+}
