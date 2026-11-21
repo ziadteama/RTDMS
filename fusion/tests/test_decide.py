@@ -14,3 +14,25 @@ def test_face_distracted_beep():
 def test_drowsy_plus_physio_max():
     d = decide(face={"state": "drowsy"}, physiology={"fatigue_probability": 0.8})
     assert d.pattern is AlertPattern.MAX
+
+
+def test_phone_call_flag_alerts_without_score():
+    d = decide(phone={"call": True, "texting": False, "p": 0.4})
+    assert d.pattern is AlertPattern.CONTINUOUS
+    assert d.reasons == ["phone call"]
+
+
+def test_phone_texting_flag_alerts():
+    d = decide(phone={"call": False, "texting": True})
+    assert d.pattern is AlertPattern.CONTINUOUS
+    assert d.reasons == ["phone texting"]
+
+
+def test_phone_flags_false_do_nothing():
+    d = decide(phone={"call": False, "texting": False, "p": 0.2})
+    assert d.pattern is AlertPattern.NONE
+
+
+def test_phone_flag_plus_physio_max():
+    d = decide(phone={"texting": True}, physiology={"fatigue_probability": 0.8})
+    assert d.pattern is AlertPattern.MAX
