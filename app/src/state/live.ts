@@ -1,0 +1,44 @@
+import { create } from 'zustand';
+
+import type { PiAlert, PiPhysio, PiStatus } from '@/pi/types';
+
+export type Connection = 'connecting' | 'online' | 'offline';
+
+/**
+ * Live data from the Pi + phone sensors. Written by services at 5 Hz; screens subscribe with
+ * narrow selectors so a poll only re-renders what changed.
+ */
+export type LiveState = {
+  connection: Connection;
+  lastOkAt: number | null;
+  status: PiStatus | null;
+  alert: PiAlert | null;
+  /** null = not known yet, false = this Pi has no /alert (older stream.py). */
+  alertSupported: boolean | null;
+  physio: PiPhysio | null;
+  physioSupported: boolean | null;
+  /** GPS speed (km/h), null when there is no fix with speed. */
+  speedKmh: number | null;
+  gpsAt: number | null;
+  location: { lat: number; lon: number; at: number } | null;
+  /** Crash detection currently armed (connected, moving fast enough). */
+  armed: boolean;
+};
+
+export const INITIAL_LIVE: LiveState = {
+  connection: 'connecting',
+  lastOkAt: null,
+  status: null,
+  alert: null,
+  alertSupported: null,
+  physio: null,
+  physioSupported: null,
+  speedKmh: null,
+  gpsAt: null,
+  location: null,
+  armed: false,
+};
+
+export const useLive = create<LiveState>(() => INITIAL_LIVE);
+
+export const setLive = (patch: Partial<LiveState>) => useLive.setState(patch);
