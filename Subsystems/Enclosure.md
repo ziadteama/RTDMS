@@ -37,7 +37,7 @@ camera with its two IR boards**. It is the physical unit for [[5.2 Phase Two Pla
 - Openings **only for power and air**: USB-C in, fan intake, exhaust vents. (A microSD slot was
   added for convenience.)
 - Placement in the car is **deliberately set aside** for now; the shape was chosen first.
-- **Printed in PLA** (team decision, see [[#Material PLA]]).
+- **Printed in PLA** (team decision, see [[#Material]]).
 - Screws easy to buy: **one size, M2.5**.
 
 ## How the design was chosen
@@ -121,7 +121,7 @@ Stored in `hardware/enclosure/ref/` with origin and license in `ref/SOURCES.md`.
 | Active Cooler clearance | Not in any model; 4.7 mm headroom over the USB stack | **not verified** |
 | Printed, assembled, heat in a car | Nothing printed | **not done** |
 
-## Material: PLA
+## Material
 
 Team decision: **PLA**. Its limits and how to live with them:
 
