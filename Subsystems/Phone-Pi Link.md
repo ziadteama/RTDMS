@@ -279,7 +279,20 @@ and one viewer.
 
 ### Results
 
-*Not run yet.*
+*Not run yet. The Pi was offline on 2026-11-21.*
+
+**Tooling status (2026-11-21):** the spike tools were written under `pi/tools/link_spike/` (not
+`models/physiology/tools/pi/link_spike/` as planned: the real phone service in [[Pi Runtime]] uses
+the contract's characteristics, so the spike measures the real service). Written and unit-tested
+for their pure parts; **never run on hardware**. Run order and go criteria are unchanged above.
+
+### Pi-side implementation status (not verified on hardware)
+
+The phone service, auth gate, notifier rates and incident store are implemented and tested in
+Docker with a simulated GATT layer (one Bluetooth adapter cannot loop back to itself, so a bleak
+loopback on the dev machine was not possible). Open items for the spike: `bless` has no
+disconnect event (auth uses a TTL), ATT error mapping for rejected writes, one service holding 11
+characteristics with the watch connected. Details: [[Pi Runtime]].
 
 ## Open questions
 
