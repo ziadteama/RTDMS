@@ -1,0 +1,53 @@
+---
+description: Code structure rules for all agents: patterns, small files, reuse before writing
+alwaysApply: true
+---
+
+# Code structure (RTDMS)
+
+Applies to every zone (app/, pi/, fusion/, models/, tools). Reviewers and delegates are held to it.
+
+## Reuse first, always
+
+1. **Search before writing.** Before adding a function, component, hook, type, schema or script,
+   grep the repo (and `contracts/`, `app/src/components/`, `app/src/theme/`, `models/*/src/`,
+   `fusion/`) for an existing one. Reuse or extend it. Name what you reused in the PR body.
+2. **One source of truth per fact.** Payload shapes live in `contracts/pi-link/schemas/`; tokens in
+   `app/src/theme/`; alert patterns in `fusion/` (`AlertPattern`); UUIDs in one constants module.
+   Never copy a value into a second file: import it or generate it.
+3. **Do not fork or copy other zones' code.** Import it (e.g. `pi/` imports `models/` and `fusion/`).
+   If it needs a change, ask that zone's owner or open a CR/PR there.
+4. **No new dependency** if the standard library or an existing dependency does the job.
+
+## Small, single-purpose files
+
+- **Code files: target ≤ 250 lines, hard limit 300** (tests may reach 400). Functions/components
+  ≤ 50 lines. Split by responsibility (parse / state / transport / view), not by arbitrary length.
+- **No grab-bag modules** (`utils.ts`, `helpers.py`, `common.py`). Name files for what they do.
+- **One screen = a thin route file + a screen folder** (`screens/<name>/index.tsx` composing small
+  components and a hook). Business logic stays out of components (services/hooks), I/O stays out of
+  pure logic (the crash detector and parsers stay pure and unit-tested).
+- **Docs: ≤ 400 lines per note.** Split longer ones into linked notes with an index; do not pile
+  everything into one file.
+
+## Patterns (use the one that fits; do not invent frameworks)
+
+- **Strategy / interface** for swappable I/O: `PiTransport` (HTTP, BLE, demo) on the app side,
+  `Source` protocols on the Pi side. Callers depend on the interface, never on a concrete class.
+- **Pure core, thin shell:** decisions (fusion, crash detection, parsing) are pure functions over
+  data; sockets, GPIO, BLE, files and the clock are injected at the edge. This is what makes them
+  testable without hardware.
+- **State machines as data** for lifecycles (a transition table + a reducer), not nested `if`s.
+- **Dependency injection by parameter**, not module-level singletons or hidden globals.
+- **Validate at the boundary** (schemas for payloads, parsers returning `null` on bad input) and
+  trust internal types after that.
+- **Design-system components** for UI: no hex, font size or spacing literal in a screen file;
+  compose existing components before adding one; add a component only when 2+ screens need it.
+
+## Gates that enforce this (run them; do not just claim it)
+
+- Longest-files check: `git ls-files '*.ts' '*.tsx' '*.py' | xargs wc -l | sort -rn | head` and
+  list any file over 300 lines in the PR body with the reason (or split it).
+- Reuse check in the PR body: "Reused: …" and "New and why: …".
+- App: `npx tsc --noEmit && npx eslint . && npm test` plus the design-token grep in
+  `app/docs/VALIDATION.md`. Pi: `ruff`, `mypy --strict`, `pytest` in Docker.
