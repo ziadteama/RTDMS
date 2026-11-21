@@ -1,0 +1,17 @@
+[Unit]
+Description=RTDMS camera + monitoring server (http://<pi>:8080, used by the Sahi app)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/rtdms/start_stream.sh
+WorkingDirectory=%h/rtdms
+Restart=always
+RestartSec=3
+# the camera server is the product: never let the service give up after repeated crashes
+StartLimitIntervalSec=0
+Nice=-2
+
+[Install]
+WantedBy=default.target
