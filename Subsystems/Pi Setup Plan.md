@@ -290,6 +290,13 @@ and keep the display stack while it is still a development machine.
 
 ---
 
+## Status update 2026-11-21 (code written, not on hardware)
+
+A systemd unit (`pi/deploy/systemd/rtdms-pi.service`, `Nice=-5`, `MemoryMax=3G`) and `nmcli`
+hotspot scripts (`pi/deploy/hotspot/`) now exist in the repo. **Neither has been installed or run
+on the Pi.** Physiology runs in-process in `rtdms-pi`, so there is no separate physiology unit
+(this refines item 5 above). See [[Pi Runtime]].
+
 ## Deployment strategy
 
 Recommended shape once hardware lands:
