@@ -23,7 +23,8 @@ Project 2 (the build phase this repo is for).
 - [[Agent Guide]] — **start here if you're an agent about to dev, explore, or delegate work**
 - [[Models Index]] — status of all models + fusion/alert/firmware
   - [[Physiology Subsystem]] — HR/PRV fatigue inference · `models/physiology/` · **implemented**
-  - [[Physiology Fusion Approach]] — Garmin confirm role + training tiers for fusion
+    - [[Physiology Decision Log]] — Nov 2026: is the HR/HRV fatigue model usable? MPD-DF results, Codex reviews, next steps
+    - [[Physiology Fusion Approach]] — Garmin confirm role + training tiers for fusion
   - [[Face Subsystem]] — EAR/PERCLOS/gaze/head-pose · `models/face/` · **implemented (core)** · live on the Pi via LiteRT, 2026-10-10 ([[Face Subsystem#Running on the Pi|status]])
   - [[Phone Subsystem]] — phone/eating distraction · `models/phone/` · **ONNX wired**
 - [[Mobile App]] — **Sahi**, the React Native driver app (live view, alerts, crash detection, incident clip) · `app/` · **MVP built** (mock Pi + demo mode; not yet on a phone, Pi endpoints pending)
