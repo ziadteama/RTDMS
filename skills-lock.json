@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "skills": {
+    "competitive-brief": {
+      "source": "anthropics/knowledge-work-plugins",
+      "commit": "0e0fcacddcc892eb92a1b7873ff9d68159c47571",
+      "sourceType": "github",
+      "skillPath": "marketing/skills/competitive-brief/SKILL.md",
+      "computedHash": "55e85d63b80e2559a8248c72838c655e3c22c5066182462c558fe42699117ec8"
+    },
+    "competitor-analysis": {
+      "source": "appeeky/aso-skills",
+      "commit": "f46308d300e24ad3988f7880d987d22e6bcda136",
+      "sourceType": "github",
+      "skillPath": "plugin/skills/competitor-analysis/SKILL.md",
+      "computedHash": "abe910355856d91540fcdcbb65c9da4ce5fdb0acdf8b275af329b8b32babae43"
+    }
+  }
+}
