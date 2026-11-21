@@ -27,6 +27,8 @@ Trunk-based development with **short-lived, zone-scoped** branches. Do not use l
 | `phone/` | `models/phone/**` | TBD |
 | `fusion/` | `fusion/**` | Joint |
 | `app/` | `app/**` (Sahi mobile app + its `app/mock-pi/`) | TBD |
+| `pi/` | `pi/**` (Pi runtime: fusion loop, buzzer, phone BLE/HTTP link, incidents, hotspot, systemd). Imports the models and `fusion/`; never edits them | TBD |
+| `contracts/` | `contracts/pi-link/**` (phone↔Pi link contract, schemas, fixtures). Changed only through the coordination board's CR process | Coordinator |
 | `docs/` | shared status only: root `README.md`, `CLAUDE.md`, `Agent Guide.md`, `Home.md`, `models/README.md`, `Subsystems/Models Index.md`, `Subsystems/*` narrative | Anyone |
 | `meta/` | `.cursor/rules/**`, `.github/**`, `.claude/skills/**`, repo tooling | Anyone |
 
@@ -54,7 +56,7 @@ Also always apply `.cursor/rules/pi-performance-pipeline.mdc` — Pi concurrent 
 
 ✅ face/<topic> touching only models/face/
 ✅ physio/<topic> touching only models/physiology/
-✅ app/<topic> touching only app/ (Pi-side endpoints go on a phone/ branch)
+✅ app/<topic> touching only app/ (Pi-side endpoints go on a pi/ branch)
 ✅ docs/<topic> for one-line status table updates
 ```
 

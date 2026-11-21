@@ -212,5 +212,6 @@ Copied from `Z:\Plegmo\.agents\skills\`:
 For the mobile app (`app/`), from `expo/skills`, `emilkowalski/skills`, `callstackincubator/agent-skills`:
 - `expo-design-system`, `expo-native-ui`, `expo-ui` — tokens and components, platform styling, `@expo/ui` native controls (load first for UI work)
 - `expo-animation`, `gestures` — motion and gestures (every animation); `review-animations`, `improve-animations` — motion review / audit; `apple-design` — motion and feedback principles
+- `codex-delegate`, `agy-delegate` — hand implementation to Codex / Antigravity and review the diff yourself; `ui-ux-pro-max` (design guidance and design-system generator), `wireframe-spec` (wireframe specs), `obsidian-documentation` (vault docs); `competitive-brief`, `competitor-analysis` — competitor studies
 - `expo-router`, `expo-project-structure`, `expo-data-fetching`, `expo-dev-client`, `expo-module` — navigation, layout, data loading, dev builds, native modules
 - `react-native-best-practices` — FPS, re-renders, bundle size (before finishing app work)
