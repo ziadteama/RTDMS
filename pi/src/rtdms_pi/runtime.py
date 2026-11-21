@@ -47,7 +47,12 @@ class Runtime:
         s = self.state.snapshot()
         face: dict[str, object] | None = {"state": s.face.state} if s.face and s.face.face else None
         phone: dict[str, object] | None = (
-            {"phone_score": s.phone.phone_score, "sustained_phone_ms": s.phone.sustained_phone_ms}
+            {
+                "call": s.phone.call,
+                "texting": s.phone.texting,
+                "phone_score": s.phone.phone_score,
+                "sustained_phone_ms": s.phone.sustained_phone_ms,
+            }
             if s.phone
             else None
         )

@@ -248,3 +248,20 @@ def test_watchdog_drops_frozen_camera(clock: Clock) -> None:
         finally:
             runtime.stop()
             runtime.stop()  # idempotent cleanup, including hardware ownership
+
+
+def test_hybrid_call_flag_reaches_fusion(clock: Clock) -> None:
+    from rtdms_pi.sources import FrameResult
+    from rtdms_pi.state import PhoneReport
+
+    rec = RecordingBuzzer()
+    runtime = Runtime(
+        ScriptedFrameSource([]),
+        NullPhysioSource(),
+        PatternPlayer(rec),
+        RuntimeState(clock=clock),
+        clock,
+    )
+    runtime.on_frame(FrameResult(None, PhoneReport(call=True), 10.0, None, True, clock()))
+    assert runtime.state.snapshot().decision.reasons == ("phone call",)
+    runtime.stop()
