@@ -24,9 +24,20 @@ def test_hotspot_up_dry_run(tmp_path: Path) -> None:
     )
 
     stdout = res.stdout
-    assert "band a" in stdout
-    assert "36" in stdout
+    assert "802-11-wireless.band a" in stdout
+    assert "802-11-wireless.channel 36" in stdout
     assert "autoconnect no" in stdout
+    assert "nmcli radio wifi on" in stdout
+    assert "nmcli con up rtdms-ap" in stdout
+    expected_modify = (
+        "printf '%s\\n' '<psk from file>' | "
+        "nmcli --ask connection modify rtdms-ap wifi-sec.psk"
+    )
+    assert expected_modify in stdout
+
+    # PSK argument must never appear in nmcli connection add
+    first_cmd = stdout.splitlines()[0]
+    assert "wifi-sec.psk" not in first_cmd
 
     # PSK file should be created with mode 0o600
     assert psk_file.exists()

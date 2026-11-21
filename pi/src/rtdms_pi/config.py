@@ -16,12 +16,16 @@ class RuntimeConfig:
     physio_stale_s: float = 10.0
     tick_rate: float = 1.0
     http_port: int = 8080
+    incident_port: int = 8081
     host: str = "::"
     state_dir: Path = Path("/var/lib/rtdms")
     rotate: int = 0
     no_camera: bool = True
     buzzer: str = "none"
     physiology: bool = False
+    ble: bool | None = None
+    fake_ble: bool = False
+    ble_name: str = "RTDMS-Pi"
     repo_root: Path = Path(__file__).resolve().parents[3]
 
     def __post_init__(self) -> None:
@@ -47,10 +51,19 @@ class RuntimeConfig:
         p.add_argument(
             "--port", dest="http_port", type=int, default=int(os.getenv("RTDMS_HTTP_PORT", "8080"))
         )
+        p.add_argument(
+            "--incident-port",
+            type=int,
+            default=int(os.getenv("RTDMS_INCIDENT_PORT", "8081")),
+            help="HTTP port for incident server (default: 8081)",
+        )
         p.add_argument("--host", default=os.getenv("RTDMS_HOST", "::"))
         p.add_argument(
             "--state-dir", type=Path, default=Path(os.getenv("STATE_DIRECTORY", "/var/lib/rtdms"))
         )
         p.add_argument("--rotate", type=int, choices=[0, 90, 180, 270], default=0)
         p.add_argument("--physiology", action="store_true")
+        p.add_argument("--ble", action=argparse.BooleanOptionalAction, default=None)
+        p.add_argument("--fake-ble", action="store_true")
+        p.add_argument("--ble-name", default=os.getenv("RTDMS_BLE_NAME", "RTDMS-Pi"))
         return cls(**vars(p.parse_args(argv)))

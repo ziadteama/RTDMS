@@ -180,14 +180,11 @@ def main(argv: list[str] | None = None) -> int:
     else:
         token = load_or_create_token(token_path)
 
-    if args.psk_file.exists() and args.psk_file.is_file():
-        psk = args.psk_file.read_text(encoding="utf-8").strip()
-    else:
-        try:
-            psk = load_or_create_psk(args.psk_file)
-        except Exception:
-            sys.stderr.write(f"Error: PSK file not found or cannot be created: {args.psk_file}\n")
-            return 1
+    try:
+        psk = load_or_create_psk(args.psk_file)
+    except Exception:
+        sys.stderr.write(f"Error: PSK file not found or cannot be created: {args.psk_file}\n")
+        return 1
 
     pairing = build_pairing(
         ssid=args.ssid,

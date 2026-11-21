@@ -61,10 +61,10 @@ class DebugServer:
                             else "off"
                             if config.no_camera
                             else "error",
-                            "distraction": "running"
-                            if s.phone
-                            else "off"
+                            "distraction": "off"
                             if config.no_camera
+                            else "running"
+                            if s.camera_ok
                             else "error",
                             "physiology": "running"
                             if s.physio

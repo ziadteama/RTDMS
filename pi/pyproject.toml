@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "rtdms-pi"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["dms-fusion"]
+dependencies = ["dms-fusion", "jsonschema"]
 
 [project.optional-dependencies]
 pi = ["gpiozero"]
@@ -47,3 +47,7 @@ follow_imports = "silent"
 module = ["qrcode", "qrcode.*"]
 follow_untyped_imports = false
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["dms_physiology.*"]
+follow_imports = "silent"

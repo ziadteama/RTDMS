@@ -68,6 +68,10 @@ def map_status(status: dict[str, Any], t: float) -> FrameResult:
     if isinstance(d, dict):
         visible = visible and d.get("face") is True
         reasons = d.get("reasons", ())
+        calibrated = d.get("calibrated") if isinstance(d.get("calibrated"), bool) else None
+        msg = d.get("message")
+        is_failed = isinstance(msg, str) and msg.startswith("calibration failed")
+        calibration = "ok" if calibrated is True else ("failed" if is_failed else None)
         face = FaceReport(
             state=str(d.get("state", "unavailable")) if visible else "unavailable",
             reasons=tuple(r for r in reasons if isinstance(r, str))
@@ -78,8 +82,8 @@ def map_status(status: dict[str, Any], t: float) -> FrameResult:
             blink_rate=number(d.get("blink_rate")),
             closure_ms=number(d.get("closure_ms")),
             face=visible,
-            calibrated=d.get("calibrated") if isinstance(d.get("calibrated"), bool) else None,
-            calibration=d.get("calibration") if isinstance(d.get("calibration"), str) else None,
+            calibrated=calibrated,
+            calibration=calibration,
         )
     hybrid = status.get("hybrid")
     phone = None
@@ -153,6 +157,7 @@ class StreamPipelineSource:
             [
                 "--hybrid",
                 "--drowsiness",
+                "--no-detect",
                 "--face-backend",
                 "litert",
                 "--rotate",

@@ -142,6 +142,45 @@ def test_map_status_no_guesses() -> None:
     assert map_status({}, 100).phone is None
 
 
+def test_map_status_calibration() -> None:
+    # calibrated True -> "ok"
+    f1 = map_status(
+        {"face": True, "drowsiness": {"face": True, "calibrated": True, "message": "calibrated"}},
+        100,
+    )
+    assert f1.face is not None and f1.face.calibration == "ok" and f1.face.calibrated is True
+
+    # message startswith "calibration failed" -> "failed"
+    f2 = map_status(
+        {
+            "face": True,
+            "drowsiness": {
+                "face": True,
+                "calibrated": False,
+                "message": "calibration failed: face moved",
+            },
+        },
+        100,
+    )
+    assert f2.face is not None and f2.face.calibration == "failed" and f2.face.calibrated is False
+
+    # otherwise None (do not guess "calibrating")
+    f3 = map_status(
+        {"face": True, "drowsiness": {"face": True, "calibrated": False, "message": "calibrating"}},
+        100,
+    )
+    assert f3.face is not None and f3.face.calibration is None
+
+    f4 = map_status(
+        {
+            "face": True,
+            "drowsiness": {"face": True, "message": "not calibrated: press Calibrate"},
+        },
+        100,
+    )
+    assert f4.face is not None and f4.face.calibration is None
+
+
 def test_threads_stop(clock: Clock) -> None:
     runtime = Runtime(
         ScriptedFrameSource([]),
@@ -204,6 +243,7 @@ def test_stream_hook_and_shutdown(monkeypatch: pytest.MonkeyPatch, clock: Clock)
         assert arguments == [
             "--hybrid",
             "--drowsiness",
+            "--no-detect",
             "--face-backend",
             "litert",
             "--rotate",
@@ -265,3 +305,19 @@ def test_hybrid_call_flag_reaches_fusion(clock: Clock) -> None:
     runtime.on_frame(FrameResult(None, PhoneReport(call=True), 10.0, None, True, clock()))
     assert runtime.state.snapshot().decision.reasons == ("phone call",)
     runtime.stop()
+
+
+def test_runtime_start_lifecycle(clock: Clock) -> None:
+    runtime = Runtime(
+        ScriptedFrameSource([]),
+        NullPhysioSource(),
+        PatternPlayer(RecordingBuzzer(), autostart=False),
+        RuntimeState(clock=clock),
+        clock,
+    )
+    runtime.start()
+    with pytest.raises(RuntimeError, match="runtime already started"):
+        runtime.start()
+    runtime.stop()
+    with pytest.raises(RuntimeError, match="runtime is closed"):
+        runtime.start()

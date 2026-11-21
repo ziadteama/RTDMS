@@ -124,3 +124,41 @@ def test_invalid_values_omitted() -> None:
     )
     validate("status", status_payload(s))
     validate("physio", physio_payload(s))
+
+
+def test_status_payload_no_face_or_camera_lost() -> None:
+    s1 = Snapshot(
+        face=FaceReport(
+            "drowsy",
+            perclos=0.4,
+            openness=0.2,
+            blink_rate=12.0,
+            closure_ms=500.0,
+            face=False,
+        ),
+        camera_ok=True,
+    )
+    p1 = status_payload(s1)
+    validate("status", p1)
+    assert p1["state"] == "unavailable"
+    assert p1["face"] is False
+    for k in ("perclos", "openness", "blink_rate", "closure_ms"):
+        assert k not in p1
+
+    s2 = Snapshot(
+        face=FaceReport(
+            "drowsy",
+            perclos=0.4,
+            openness=0.2,
+            blink_rate=12.0,
+            closure_ms=500.0,
+            face=True,
+        ),
+        camera_ok=False,
+    )
+    p2 = status_payload(s2)
+    validate("status", p2)
+    assert p2["state"] == "unavailable"
+    assert p2["face"] is False
+    for k in ("perclos", "openness", "blink_rate", "closure_ms"):
+        assert k not in p2

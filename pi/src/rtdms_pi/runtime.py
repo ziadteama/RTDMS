@@ -28,7 +28,7 @@ class Runtime:
         self.frame_source, self.physio_source = frame_source, physio_source
         self.player, self.state, self.clock = player, state, clock
         self._period = 1.0 / tick_rate
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._stop = threading.Event()
         self._closed = False
         self._thread: threading.Thread | None = None
@@ -72,11 +72,14 @@ class Runtime:
             self.tick()
 
     def start(self) -> None:
-        if self._thread is not None:
-            raise RuntimeError("runtime already started")
-        self.frame_source.start(self.on_frame)
-        self._thread = threading.Thread(target=self._watchdog, daemon=True, name="watchdog")
-        self._thread.start()
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("runtime is closed")
+            if self._thread is not None:
+                raise RuntimeError("runtime already started")
+            self.frame_source.start(self.on_frame)
+            self._thread = threading.Thread(target=self._watchdog, daemon=True, name="watchdog")
+            self._thread.start()
 
     def stop(self) -> None:
         with self._lock:
