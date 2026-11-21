@@ -36,4 +36,4 @@ EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:8787/v1/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-CMD ["node", "--experimental-strip-types", "src/main.ts"]
+CMD ["node", "--experimental-transform-types", "src/main.ts"]
