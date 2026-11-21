@@ -1,0 +1,11 @@
+{
+  "source": "phone",
+  "closed_ratio": 0.38,
+  "ear_open": 0.29,
+  "ear_closed": 0.11,
+  "snr": 46.2,
+  "quality": "good",
+  "samples_open": 118,
+  "samples_closed": 21,
+  "created": 1795189202400
+}
