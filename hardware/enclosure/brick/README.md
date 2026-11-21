@@ -3,7 +3,7 @@
 Pi 5 with the Active Cooler lying flat, the IR camera on the front wall. Openings are only for
 **USB-C power** and **air**: fan grille on the lid, vents on the sides and back, plus a microSD slot.
 
-**Outer size: 108.8 × 75 × 30 mm** (W × D × H).
+**Outer size: 108.8 × 85 × 30 mm** (W × D × H). The back 10 mm is empty space behind the Pi, so the camera ribbon has room to turn into the Pi's connector (the Pi's camera ports are on the back edge, the camera is at the front).
 
 | Front | Back | Inside |
 |---|---|---|
@@ -52,14 +52,14 @@ The light-sensor notches assume the camera is upright, with the left IR board's 
 
 ## Hardware
 
-**One size for everything: M2.5 × 6 mm (10 screws).** Any "Raspberry Pi M2.5 screw kit" has them.
+**One size for everything: M2.5 × 6 mm (11 screws).** Any "Raspberry Pi M2.5 screw kit" has them.
 Any length from 5–8 mm works. Countersunk heads sit flush in the lid; pan heads work too.
 
 | Qty | Use |
 |---|---|
 | 4 | Pi → standoffs |
 | 2 | camera clips → front bosses |
-| 4 | lid → corner posts |
+| 5 | lid → posts (4 corners + 1 behind the Pi) |
 
 The screws cut their own thread into the printed holes. No nuts or inserts needed.
 
@@ -67,8 +67,9 @@ The screws cut their own thread into the printed holes. No nuts or inserts neede
 
 1. Put the camera into the front from inside, lens and IR lights through their holes.
 2. Screw the two clips on over the IR boards.
-3. Screw the Pi onto the standoffs (USB-C at the back) and connect the camera ribbon. The ribbon runs
-   back over the board, under the lid.
+3. Screw the Pi onto the standoffs (USB-C at the back) and connect the camera ribbon. **The ribbon
+   path is not verified**: it must go back over the board, turn in the 10 mm gap behind the Pi and
+   enter the connector pointing forward. Check it on the test print before closing the lid.
 4. Close the lid. Power goes in through the back.
 
 ## Not verified yet

@@ -63,7 +63,7 @@ archived in [[Coordination Board 2026-11]].
 | App passes its gates | tsc, eslint, 398 jest tests, token grep (re-run by MAIN before each merge) | **verified on x86** |
 | Bluetooth phone↔Pi, hotspot, Garmin coexistence | Spike tooling written, never run | **not measured** |
 | Crash detector on real motion | Replay tests only | **not measured** |
-| Enclosure fits the Pi 5 | Exact solid intersection vs the OpenPiCase Pi 5 model: 0 mm³ after widening 2 mm (USB stack overhangs 0.9 mm past spec) | **verified in CAD only**, nothing printed |
+| Enclosure fits the Pi 5 | Exact solid intersection vs the OpenPiCase Pi 5 model: 0 mm³ after widening 2 mm (USB stack overhangs 0.9 mm past spec); box deepened to 85 mm (ribbon turn space), still 0 mm³ | **verified in CAD only**, nothing printed |
 
 ## Bugs found by running on a device, and their fixes
 

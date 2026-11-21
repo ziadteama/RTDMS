@@ -29,7 +29,7 @@ FLOOR = 2.4
 LID_T = 2.4
 CLR = 0.3
 INNER_W = 104.0          # Pi model spans x -44.9..44.2 (USB stack overhangs 0.9 mm more than spec)
-D = 75.0                 # depth, front to back
+D = 85.0                 # depth, front to back (10 mm of it is empty space behind the Pi: room for the camera ribbon to turn into the CSI connector)
 H_SHELL = 27.6           # shell height = lid's inner face (USB stack top is 22.9)
 W = INNER_W + 2 * WALL   # 108.8
 R_V = 5.0                # vertical corner radius
@@ -65,6 +65,7 @@ CLIP_X0, CLIP_X1, CLIP_SCREW_X = 20.5, 48.0, 44.0
 BAR_Y0 = WALL + CLAMP + PAD_L               # clip's front face (10.4)
 
 POSTS = [(sx * 49.0, y) for sx in (-1, 1) for y in (20.0, D - WALL - 3.0)]   # sink 0.25 mm into the walls (no tangent edges)
+POSTS.append((12.0, D - WALL - 5.0))   # 5th post behind the Pi, keeps the longer lid stiff (clear of the ribbon and USB-C)
 
 
 def cyl(d, h, pnt, dirn):

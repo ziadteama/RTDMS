@@ -24,7 +24,7 @@ camera with its two IR boards**. It is the physical unit for [[5.2 Phase Two Pla
 
 > [!abstract] State at 21 Nov 2026
 > **Designed (concept B, "Brick"), printable files ready, nothing printed yet.**
-> 108.8 × 75 × 30 mm. CadQuery model + STEP + STL in `hardware/enclosure/brick/`.
+> 108.8 × 85 × 30 mm. CadQuery model + STEP + STL in `hardware/enclosure/brick/`.
 > Checked against a real Pi 5 model: **0 mm³ clash**, holes and USB-C line up.
 > **Not verified:** the camera fit on the real board, the Active Cooler (not in the reference
 > model), and anything printed.
@@ -59,7 +59,7 @@ camera with its two IR boards**. It is the physical unit for [[5.2 Phase Two Pla
 | Concept | Size (W × H × D) | Why not / why |
 |---|---|---|
 | A Slab | 106 × 72 × 39 | Thinnest, but tallest face and cable out the top |
-| **B Brick** | **108.8 × 30 × 75** (as built) | **Chosen.** Lowest, sits flat, power out the back |
+| **B Brick** | **108.8 × 30 × 85** (as built) | **Chosen.** Lowest, sits flat, power out the back |
 | C Wedge | 100 × 54 × 82 | Camera aimed up, but tilt fixed and harder to print |
 | D Pod + Base | 100 × 77 × 70 | Adjustable tilt, but hinge + ribbon wear, more parts |
 
@@ -73,6 +73,13 @@ camera with its two IR boards**. It is the physical unit for [[5.2 Phase Two Pla
 - **Fan:** slotted grille in the lid right over the Active Cooler. The lid sits 4.7 mm above the
   tallest part (the USB stack). Exhaust through slots in both side walls and the back.
 - **Power:** USB-C hole in the back wall, sized for an overmoulded plug (14 × 8.5 mm).
+- **Camera ribbon (open risk).** The Pi's camera connectors are on the **back edge** (USB-C / HDMI edge)
+  and the camera is at the **front**, so the ribbon has to run back over the board and turn 180° into
+  the connector. The first 75 mm box left only about 0.4 mm behind the Pi. The box is now **85 mm
+  deep**: the extra 10 mm sits behind the Pi for the turn, plus one extra lid post (x = 12 mm) to keep
+  the longer lid stiff. The team's ribbon is long (photo, 22 Nov), so reach is not the problem; the
+  turn is. I could not pick the camera connector out of the reference Pi model, so the route is
+  **not modelled or verified**.
 - **microSD:** slot in the right wall, under the board.
 - **Camera:** front wall with a Ø15.4 lens hole + Ø17 lens collar, two Ø21.4 IR openings at ±27.5 mm,
   and two Ø7 notches for the IR boards' light sensors, so the IR lights still switch on in the dark.
@@ -82,7 +89,7 @@ camera with its two IR boards**. It is the physical unit for [[5.2 Phase Two Pla
   camera's own hole spacing (which we couldn't measure) doesn't matter. The pads are **0.5 mm too
   long on purpose**, so each clip bends and keeps pressing like a spring. Foam tape is the fallback
   if it rattles.
-- **Lid:** 4 countersunk screws into corner posts. Kept on screws rather than snap clips because
+- **Lid:** 5 countersunk screws into posts (4 corners + 1 behind the Pi). Kept on screws rather than snap clips because
   **PLA snap clips crack** after a few openings.
 
 ![Brick, back: USB-C and vents](../hardware/enclosure/brick/renders/back.png)
@@ -94,7 +101,7 @@ camera with its two IR boards**. It is the physical unit for [[5.2 Phase Two Pla
 | Shell | 1 | `out/shell.stl` / `.step` |
 | Lid | 1 | `out/lid.stl` / `.step` |
 | Camera clip | 2 (same part both sides) | `out/camera_clip.stl` / `.step` |
-| **M2.5 × 6 mm screws** (5–8 mm fine) | 10 | 4 Pi, 2 clips, 4 lid. Self-tapping into printed holes, no nuts or inserts |
+| **M2.5 × 6 mm screws** (5–8 mm fine) | 11 | 4 Pi, 2 clips, 5 lid. Self-tapping into printed holes, no nuts or inserts |
 
 ## Reference models
 
@@ -118,6 +125,7 @@ Stored in `hardware/enclosure/ref/` with origin and license in `ref/SOURCES.md`.
 | Pi holes ↔ standoffs, USB-C ↔ back hole | Line up with the model | **verified in CAD** |
 | Parts are valid closed solids | CadQuery `isValid`, STLs watertight (two tangent post/wall edges fixed) | **verified** |
 | Camera fit (clamp depth, opening sizes) on the real board | From the mount model only | **not verified**: needs a test print |
+| Camera ribbon route into the Pi connector | Not modelled; 10 mm turning space added | **not verified**: check on the test print |
 | Active Cooler clearance | Not in any model; 4.7 mm headroom over the USB stack | **not verified** |
 | Printed, assembled, heat in a car | Nothing printed | **not done** |
 
@@ -148,6 +156,7 @@ If the image is upside down, rotate it in software.
 
 - [ ] **Test print** (PLA) and shake test of the camera clamp
 - [ ] Photos of the test fit → adjust the model
+- [ ] Check the **camera ribbon route** (back over the board, turn behind the Pi, into the connector)
 - [ ] Confirm Active Cooler clearance on the real unit
 - [ ] Optional: re-check against the **official** Pi 5 STEP and Active Cooler drawing
 - [ ] **Mount** (tripod nut, suction or bracket), once placement in the car is decided ([[Open Items and Next Steps#Product questions (need the team)|who mounts the camera]])

@@ -25,7 +25,7 @@ The single list of what is **not** done. Update it when something moves.
 | ColorOS background kill and the "monitoring paused" status | not tested | |
 | Concurrent CPU / fps / temperature budget with all models, Bluetooth and hotspot | not measured | `.cursor/rules/pi-performance-pipeline.mdc` |
 | The Pi rebooted by itself twice on 22 Nov (uptime under a minute at 22:50 and 23:05) | unexplained | No reboot history (`last` empty) and no previous-boot journal. Check power supply and the 5 V rail before any long test |
-| **Enclosure test print** (PLA): shell + 2 clips, camera shake test, then lid | not printed | Files and steps in [[Enclosure]]. Camera clamp depth and Active Cooler clearance are unverified until then |
+| **Enclosure test print** (PLA): shell + 2 clips, camera shake test, then lid | not printed | Files and steps in [[Enclosure]]. Camera clamp depth, **camera ribbon route into the Pi connector** and Active Cooler clearance are unverified until then |
 | Enclosure mount (tripod nut, suction, bracket) | not designed | Waits on where the unit sits in the car |
 | Camera server autostart | unclear | An instance came up at boot with different arguments; we restarted `~/rtdms/start_stream.sh` by hand at 23:05. Make it a systemd unit (`pi/deploy/systemd/rtdms-pi.service` exists, not installed) |
 
