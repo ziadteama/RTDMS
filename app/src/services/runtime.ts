@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
+import { I18nManager } from 'react-native';
 
-import { applyDirection } from '@/i18n';
 import { seedDemoHistory } from '@/demo/seed';
 import { db } from '@/state/db';
 import { useSettings } from '@/state/settings';
@@ -19,9 +19,14 @@ export function useRuntime(): void {
   const paused = useSettings((s) => s.paused);
   const demo = useSettings((s) => s.demo);
   const baseUrl = useSettings((s) => s.baseUrl);
-  const language = useSettings((s) => s.language);
 
-  useEffect(() => applyDirection(language, true), [language]);
+  useEffect(() => {
+    // English only: clear any RTL preference an earlier build persisted natively.
+    if (I18nManager.isRTL) {
+      I18nManager.allowRTL(false);
+      I18nManager.forceRTL(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (demo) seedDemoHistory();

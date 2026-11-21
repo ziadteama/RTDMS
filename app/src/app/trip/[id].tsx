@@ -11,7 +11,6 @@ import { useT, type StringKey } from '@/i18n';
 import type { AlertPattern } from '@/pi/types';
 import { scoreColor } from '@/screens/score-color';
 import { db, useDbQuery } from '@/state/db';
-import { useSettings } from '@/state/settings';
 import { radius, spacing, useTheme } from '@/theme';
 import { formatDateTime, formatDuration, formatTime } from '@/utils/format';
 import { useNow } from '@/hooks/use-now';
@@ -21,7 +20,6 @@ const PATTERNS: Exclude<AlertPattern, 'none'>[] = ['short_beep', 'repeated', 'co
 export default function TripDetail() {
   const t = useT();
   const { colors } = useTheme();
-  const lang = useSettings((s) => s.language);
   const { id } = useLocalSearchParams<{ id: string }>();
   const now = useNow();
   const tripId = Number(id);
@@ -52,7 +50,7 @@ export default function TripDetail() {
     e.kind === 'alert' ? colors.alert[e.value as AlertPattern] : e.kind === 'crash' || e.kind === 'sos' ? colors.alert.max : colors.textTertiary;
   return (
     <Screen>
-      <Text variant="headline">{formatDateTime(trip.startedAt, lang)}</Text>
+      <Text variant="headline">{formatDateTime(trip.startedAt)}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xl, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg }}>
         <Metric label={t('trip.score')} value={trip.score} color={scoreColor(trip.score, colors)} />
         <Metric label={t('trip.duration')} value={formatDuration((trip.endedAt ?? now) - trip.startedAt, units)} />
@@ -100,7 +98,7 @@ export default function TripDetail() {
             key={e.id}
             label={label(e)}
             detail={e.kind === 'alert' && e.detail ? e.detail : undefined}
-            value={formatTime(e.t, lang)}
+            value={formatTime(e.t)}
             right={<Dot color={dot(e)} />}
           />
         ))}

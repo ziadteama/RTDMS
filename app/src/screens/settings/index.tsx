@@ -16,7 +16,7 @@ import { ALERT_PATTERNS, type AlertPattern, type PiSettings, type Sensitivity } 
 import { db } from '@/state/db';
 import { useLive } from '@/state/live';
 import { useSecure } from '@/state/secure';
-import { useSettings, type CallTarget, type Language, type ThemeSetting, type Units, type Vibration } from '@/state/settings';
+import { useSettings, type CallTarget, type ThemeSetting, type Units, type Vibration } from '@/state/settings';
 import { clearKv } from '@/state/storage';
 import { haptic, speak } from '@/services/alerts';
 import { simulateCrash } from '@/services/monitor';
@@ -226,24 +226,10 @@ function Connection() {
 
 function AppPrefs() {
   const t = useT();
-  const s = useSettings(useShallow((x) => ({ language: x.language, units: x.units, theme: x.theme })));
+  const s = useSettings(useShallow((x) => ({ units: x.units, theme: x.theme })));
   const set = useSettings((x) => x.set);
   return (
     <Section title={t('settings.app')}>
-      <Row
-        label={t('settings.language')}
-        right={
-          <Choice<Language>
-            label={t('settings.language')}
-            value={s.language}
-            options={[
-              { value: 'en', label: 'English' },
-              { value: 'ar', label: 'العربية' },
-            ]}
-            onChange={(v) => set({ language: v })}
-          />
-        }
-      />
       <Row
         label={t('settings.units')}
         right={<Choice<Units> label={t('settings.units')} value={s.units} options={[{ value: 'kmh', label: t('common.kmh') }, { value: 'mph', label: t('common.mph') }]} onChange={(v) => set({ units: v })} />}

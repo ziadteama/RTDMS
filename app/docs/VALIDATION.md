@@ -27,7 +27,6 @@ Read the output, not the exit code (Agent Guide §4).
 | `src/pi/parse.test.ts` | `/status` exactly as `stream.py` serves it (initial, v1 levels, v2 drowsiness + hybrid) round-trips; garbage → null; bad fields dropped, never invented; every second of the mock scenario round-trips; `/alert`, `/physio`, `/health` (throttle bits), `/settings`, `/incidents`; pairing QR and typed address |
 | `src/pi/alert.test.ts` | every `AlertPattern` mapped, in fusion order; output never gets quieter as severity rises; escalation; driver-state labels per scenario phase and for v1 levels; voice line per state |
 | `src/trips/score.test.ts` | safety score examples, monotonicity, short-trip floor; weekly trend |
-| `src/i18n/i18n.test.ts` | Arabic has every key, same `{placeholders}`; fusion reasons translated, unknown ones passed through |
 | `src/utils/format.test.ts` | duration labels |
 
 ## 3. Device checks (a phone, a dev build or release build)
@@ -41,7 +40,6 @@ release build (`npx expo run:android --variant release`), not Expo Go, not the d
 | D2 | Re-renders per poll | `scripts/render-count.mjs` (web) or React DevTools profiler (dev build) with `npm run mock -- --freeze 92` | metric groups render 0× while values do not change |
 | D3 | Reduce motion | Settings → Accessibility → *Remove animations* | no press scale, no `max` pulse; color changes and progress bars remain |
 | D4 | Driving lock | demo mode, wait for the scenario speed > 10 km/h | only state, speed, hold-to-SOS visible; unlocks below 7 km/h |
-| D5 | Arabic | Settings → Language → العربية | app restarts mirrored: tabs, rows, chevrons, progress bars run right-to-left |
 | D6 | Pairing | scan the Pi QR (or a test QR `WIFI:T:WPA;S:test;P:pw;U:http://<laptop>:8080;;`) | system "connect to device" prompt, then Live shows data; mobile data still works |
 | D7 | Pi offline / reconnect | stop the mock, wait 2 s, start it again | banner within ~1 s of the 3rd failed poll; recovers without a tap |
 | D8 | Alerts with the screen off | mock running, lock the phone | notification + voice + vibration on each escalation |

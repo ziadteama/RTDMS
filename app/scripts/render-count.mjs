@@ -54,7 +54,7 @@ await page.addInitScript((watch) => {
 }, WATCH);
 await page.goto('http://localhost:8081/');
 await page.evaluate(() => {
-  localStorage.setItem('sahi.settings', JSON.stringify({ version: 1, state: { consentedAt: 1, onboarded: true, language: 'en', theme: 'dark', units: 'kmh', baseUrl: 'http://localhost:8080', demo: false, paused: false, sound: false, volume: 1, vibration: 'strong', crashDetection: true, callTarget: 'ambulance', ambulanceNumber: '123' } }));
+  localStorage.setItem('sahi.settings', JSON.stringify({ version: 1, state: { consentedAt: 1, onboarded: true, theme: 'dark', units: 'kmh', baseUrl: 'http://localhost:8080', demo: false, paused: false, sound: false, volume: 1, vibration: 'strong', crashDetection: true, callTarget: 'ambulance', ambulanceNumber: '123' } }));
 });
 await page.goto('http://localhost:8081/live');
 await page.waitForTimeout(5000);

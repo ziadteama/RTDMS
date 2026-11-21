@@ -1,8 +1,8 @@
-// Screenshots of every screen, dark + light, English + Arabic, from the web build.
+// Screenshots of every screen, dark + light, English only, from the web build.
 //
 //   npm run mock -- --freeze 92          # terminal 1: mock Pi held in the "drowsy" phase
 //   npx expo start --web --port 8081     # terminal 2
-//   node scripts/screenshots.mjs         # → docs/screenshots/<theme>-<lang>/<screen>.png
+//   node scripts/screenshots.mjs         # → docs/screenshots/<theme>-en/<screen>.png
 //
 // The web build is a stand-in for the Android dev build (no emulator in CI): the native tab bar,
 // @expo/ui controls and fonts are web renderings. See docs/EVIDENCE.md.
@@ -16,10 +16,10 @@ const OUT = join(dirname(fileURLToPath(import.meta.url)), '../docs/screenshots')
 const WEB = process.env.WEB ?? 'http://localhost:8081';
 const PI = process.env.PI ?? 'http://localhost:8080';
 
-const settings = (theme, language, extra = {}) => ({
+const settings = (theme, extra = {}) => ({
   version: 1,
   state: {
-    consentedAt: 1, onboarded: true, language, theme, units: 'kmh', baseUrl: PI, demo: false, paused: false,
+    consentedAt: 1, onboarded: true, theme, units: 'kmh', baseUrl: PI, demo: false, paused: false,
     sound: false, volume: 1, vibration: 'strong', crashDetection: true, callTarget: 'ambulance', ambulanceNumber: '123',
     ...extra,
   },
@@ -35,7 +35,7 @@ const SHOTS = [
   ['05-live', '/live', {}],
   ['06-live-driving-lock', '/live', { demo: true }, async (p) => p.waitForTimeout(23_000)], // demo speed > 10 km/h after 20 s
   ['07-trips', '/trips', { demo: true }],
-  ['08-trip', '/trips', { demo: true }, async (p) => { await p.getByRole('button').filter({ hasText: /\d+ min|د/ }).nth(1).click(); await p.waitForTimeout(2500); }],
+  ['08-trip', '/trips', { demo: true }, async (p) => { await p.getByRole('button').filter({ hasText: /\d+ min/ }).nth(1).click(); await p.waitForTimeout(2500); }],
   ['09-health', '/health', {}],
   ['10-settings', '/settings', {}],
   ['11-calibrate', '/calibrate', {}],
@@ -54,32 +54,28 @@ const SHOTS = [
   }],
 ];
 
-const TEXT = {
-  en: { fake: 'Simulate a crash', ok: "I'm OK", trips: 'Trips', crash: /Crash detected/ },
-  ar: { fake: 'محاكاة حادث', ok: 'أنا بخير', trips: 'الرحلات', crash: /تم رصد حادث/ },
-};
+const TEXT = { fake: 'Simulate a crash', ok: "I'm OK", trips: 'Trips', crash: /Crash detected/ };
 
 const only = process.argv[2];
 const browser = await chromium.launch();
-for (const theme of ['dark', 'light'])
-  for (const lang of ['en', 'ar']) {
-    const dir = join(OUT, `${theme}-${lang}`);
-    mkdirSync(dir, { recursive: true });
-    for (const [name, route, extra, steps] of SHOTS) {
-      if (only && !name.includes(only)) continue;
-      const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-      await page.goto(WEB + '/');
-      await page.evaluate(([s, c]) => {
-        localStorage.clear();
-        localStorage.setItem('sahi.settings', JSON.stringify(s));
-        localStorage.setItem('sahi.contacts', JSON.stringify(c));
-      }, [settings(theme, lang, extra), contacts]);
-      await page.goto(WEB + route);
-      await page.waitForTimeout(5000);
-      if (steps) await steps(page, TEXT[lang]);
-      await page.screenshot({ path: join(dir, `${name}.png`) });
-      await page.close();
-      console.log(`${theme}-${lang}/${name}.png`);
-    }
+for (const theme of ['dark', 'light']) {
+  const dir = join(OUT, `${theme}-en`);
+  mkdirSync(dir, { recursive: true });
+  for (const [name, route, extra, steps] of SHOTS) {
+    if (only && !name.includes(only)) continue;
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    await page.goto(WEB + '/');
+    await page.evaluate(([s, c]) => {
+      localStorage.clear();
+      localStorage.setItem('sahi.settings', JSON.stringify(s));
+      localStorage.setItem('sahi.contacts', JSON.stringify(c));
+    }, [settings(theme, extra), contacts]);
+    await page.goto(WEB + route);
+    await page.waitForTimeout(5000);
+    if (steps) await steps(page, TEXT);
+    await page.screenshot({ path: join(dir, `${name}.png`) });
+    await page.close();
+    console.log(`${theme}-en/${name}.png`);
   }
+}
 await browser.close();

@@ -1,6 +1,6 @@
 /**
  * Phone-side alert output. Input: fusion's AlertPattern from GET /alert, nothing else. When the
- * pattern escalates the phone vibrates, speaks a line (ar-EG / en-US) and, if the app is not on
+ * pattern escalates the phone vibrates, speaks an English line (en-US) and, if the app is not on
  * screen, posts a notification — at the same moment the Pi's buzzer sounds.
  */
 import * as Haptics from 'expo-haptics';
@@ -8,7 +8,7 @@ import * as Speech from 'expo-speech';
 import { AppState, Platform, Vibration } from 'react-native';
 
 import SahiNative from '@modules/sahi-native';
-import { SPEECH_LOCALE, t, type StringKey } from '@/i18n';
+import { t, type StringKey } from '@/i18n';
 import { ALERT_PRESENTATION, driverState, isEscalation, voiceKey, type HapticKind } from '@/pi/alert';
 import type { AlertPattern } from '@/pi/types';
 import { useLive } from '@/state/live';
@@ -33,10 +33,10 @@ export function haptic(kind: HapticKind, pattern: AlertPattern): void {
 }
 
 export function speak(key: StringKey, params?: Record<string, string | number>): void {
-  const { sound, volume, language } = useSettings.getState();
+  const { sound, volume } = useSettings.getState();
   if (!sound) return;
   Speech.stop();
-  Speech.speak(t(key, params), { language: SPEECH_LOCALE[language], volume, rate: 1.0 });
+  Speech.speak(t(key, params), { language: 'en-US', volume, rate: 1.0 });
 }
 
 function present(pattern: AlertPattern): void {

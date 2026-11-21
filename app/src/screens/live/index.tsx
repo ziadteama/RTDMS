@@ -54,8 +54,7 @@ function State({ size }: { size: 'compact' | 'full' }) {
   const pattern = useLive((s) => s.alert?.pattern ?? null);
   const reasons = useLive(useShallow((s) => s.alert?.reasons ?? EMPTY));
   const calMessage = useLive((s) => (s.status?.drowsiness && !s.status.drowsiness.calibrated ? s.status.drowsiness.message : null));
-  const lang = useSettings((s) => s.language);
-  const detail = reasons.length ? reasons.map((r) => translateReason(lang, r)).join(' · ') : calMessage ? t('live.calibrate') : undefined;
+  const detail = reasons.length ? reasons.map((r) => translateReason(r)).join(' · ') : calMessage ? t('live.calibrate') : undefined;
   return <StateIndicator state={paused ? 'paused' : state} pattern={paused ? null : pattern} size={size} detail={detail} />;
 }
 

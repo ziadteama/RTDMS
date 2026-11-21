@@ -16,7 +16,6 @@ import { IncidentTimeline } from '@/screens/incident-timeline';
 import { pi } from '@/services/pi';
 import { db, useDbQuery } from '@/state/db';
 import { useLive } from '@/state/live';
-import { useSettings } from '@/state/settings';
 import { radius, spacing, useTheme } from '@/theme';
 import { formatDateTime } from '@/utils/format';
 
@@ -42,7 +41,6 @@ function Clip({ source, onTime, seekTo }: { source: string | number; onTime: (s:
 export default function IncidentScreen() {
   const t = useT();
   const { colors } = useTheme();
-  const lang = useSettings((s) => s.language);
   const online = useLive((s) => s.connection === 'online');
   const { id } = useLocalSearchParams<{ id: string }>();
   const local = useDbQuery(() => (id.startsWith('pi:') ? null : db.getIncident(Number(id))));
@@ -94,7 +92,7 @@ export default function IncidentScreen() {
   return (
     <Screen>
       <Section>
-        <Row label={t('incident.time')} value={tCrash ? formatDateTime(tCrash, lang) : '—'} />
+        <Row label={t('incident.time')} value={tCrash ? formatDateTime(tCrash) : '—'} />
         {gPeak !== null ? <Row label={t('incident.gPeak')} value={`${gPeak.toFixed(1)} g`} valueColor={colors.alert.max} /> : null}
         {local ? <Row label={t('incident.outcome')} value={t(`incident.outcome.${local.outcome}`)} /> : null}
         <Row

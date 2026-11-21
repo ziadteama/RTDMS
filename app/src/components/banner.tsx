@@ -33,8 +33,8 @@ export function Banner({
         overflow: 'hidden',
       }}
     >
-      {/* leading accent bar: a child view, so it mirrors with the row in RTL on every platform */}
-      <View style={{ alignSelf: 'stretch', width: 4, marginVertical: -spacing.md, marginStart: -spacing.md, backgroundColor: accent }} />
+      {/* Leading accent bar */}
+      <View style={{ alignSelf: 'stretch', width: 4, marginVertical: -spacing.md, marginLeft: -spacing.md, backgroundColor: accent }} />
       <Icon name={icon} size={22} color={accent} />
       <View style={{ flex: 1, gap: spacing.xxs }}>
         <Text variant="label">{title}</Text>

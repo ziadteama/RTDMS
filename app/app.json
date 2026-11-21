@@ -75,7 +75,7 @@
       [
         "expo-localization",
         {
-          "supportsRTL": true
+          "supportsRTL": false
         }
       ],
       "expo-sqlite",
