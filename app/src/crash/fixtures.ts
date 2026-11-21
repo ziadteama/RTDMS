@@ -82,3 +82,102 @@ export function injectCrash(
   );
   return { samples, speeds };
 }
+
+/** Stationary drop: stationary phone drops onto a surface, impact spike, then sits still. */
+export function droppedPhoneStationary(t0: number, gPeak = 6) {
+  const tImpact = t0 + 5_000;
+  const samples: MotionSample[] = [];
+  const speeds: SpeedSample[] = [];
+  for (let t = t0; t < tImpact + 8_000; t += 10) {
+    const dt = t - tImpact;
+    let az = G;
+    let ax = 0;
+    if (dt >= 0 && dt < 100) {
+      const k = Math.sin((Math.PI * dt) / 100);
+      az += gPeak * G * k;
+      ax += (gPeak / 2) * G * k;
+    }
+    samples.push({ t, ax, ay: 0, az, gx: 0, gy: 0, gz: 0 });
+  }
+  for (let t = t0; t <= tImpact + 8_000; t += 1_000) speeds.push({ t, kmh: 0 });
+  return { samples, speeds, tImpact };
+}
+
+/** Driving drop then picked up: dropped at speed, stops, but phone is picked up/handled. */
+export function droppedPhoneMovingThenPickedUp(t0: number, speedKmh = 40, gPeak = 6) {
+  const tImpact = t0 + 5_000;
+  const samples: MotionSample[] = [];
+  const speeds: SpeedSample[] = [];
+  for (let t = t0; t < tImpact + 8_000; t += 10) {
+    const dt = t - tImpact;
+    let ax = 0;
+    let ay = 0;
+    let az = G;
+    let gx = 0;
+    let gy = 0;
+    let gz = 0;
+    if (dt >= 0 && dt < 100) {
+      const k = Math.sin((Math.PI * dt) / 100);
+      ax += gPeak * G * k;
+    } else if (dt >= 100) {
+      // Driver picks up and moves the phone (continuous high gyro and accel variance)
+      ax = 0.6 * G * Math.sin(t / 80);
+      ay = 0.5 * G * Math.cos(t / 90);
+      az = G + 0.4 * G * Math.sin(t / 110);
+      gx = 0.8 * Math.sin(t / 100);
+      gy = 0.6 * Math.cos(t / 100);
+      gz = 0.9 * Math.sin(t / 120);
+    }
+    samples.push({ t, ax, ay, az, gx, gy, gz });
+  }
+  for (let t = t0; t <= tImpact + 8_000; t += 1_000)
+    speeds.push({ t, kmh: t <= tImpact ? speedKmh : 0 });
+  return { samples, speeds, tImpact };
+}
+
+/** Speed bump: 3.5–4.5 g spike at ~30 km/h, car continues moving with normal road vibration. */
+export function speedBump(t0: number, speedKmh = 30, gPeak = 4.0) {
+  const tBump = t0 + 5_000;
+  const samples: MotionSample[] = [];
+  const speeds: SpeedSample[] = [];
+  for (let t = t0; t < tBump + 8_000; t += 10) {
+    const dt = t - tBump;
+    const bumpG = dt >= 0 && dt < 150 ? (gPeak - 1) * Math.sin((Math.PI * dt) / 150) : 0;
+    samples.push({
+      t,
+      ax: 0.1 * Math.sin(t / 50),
+      ay: 0.1 * Math.cos(t / 60),
+      az: G * (1 + bumpG) + 0.1 * Math.sin(t / 40),
+      gx: 0.02,
+      gy: 0.02,
+      gz: 0.03,
+    });
+  }
+  for (let t = t0; t <= tBump + 8_000; t += 1_000) speeds.push({ t, kmh: speedKmh });
+  return { samples, speeds, tBump };
+}
+
+/** Roller-coaster: repeated 4–5 g spikes with sustained high-intensity motion. */
+export function rollerCoasterSpikes(t0: number, speedKmh = 60) {
+  const samples: MotionSample[] = [];
+  const speeds: SpeedSample[] = [];
+  const spikes = [t0 + 2_000, t0 + 4_000, t0 + 6_000];
+  for (let t = t0; t < t0 + 10_000; t += 10) {
+    let extraG = 0;
+    for (const ts of spikes) {
+      const dt = t - ts;
+      if (dt >= 0 && dt < 120) extraG += 3.8 * Math.sin((Math.PI * dt) / 120);
+    }
+    samples.push({
+      t,
+      ax: 1.5 * G * Math.sin(t / 70),
+      ay: 1.2 * G * Math.cos(t / 80),
+      az: G + extraG * G + 0.5 * G * Math.sin(t / 90),
+      gx: 1.2 * Math.sin(t / 100),
+      gy: 0.8 * Math.cos(t / 110),
+      gz: 1.5 * Math.sin(t / 90),
+    });
+  }
+  for (let t = t0; t <= t0 + 10_000; t += 1_000) speeds.push({ t, kmh: speedKmh });
+  return { samples, speeds };
+}

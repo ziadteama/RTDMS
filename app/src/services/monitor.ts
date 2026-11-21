@@ -9,6 +9,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
 import SahiNative from '@modules/sahi-native';
+import { armState, gpsLost } from '@/crash/arm-state';
 import { CrashMonitor, synthesizeCrash, unpackMotion, type CrashExtras } from '@/crash/detector';
 import { speedAt } from '@/demo/scenario';
 import { t } from '@/i18n';
@@ -19,10 +20,11 @@ import { useSettings } from '@/state/settings';
 import { triggerSos } from './emergency';
 import { pi } from './pi';
 
+export { gpsLost };
+
 export const LOCATION_TASK = 'sahi-location';
 export const MOTION_HZ = 100;
-const ARM_SPEED_KMH = 20;
-const GPS_STALE_MS = 10_000;
+let motionAt: number | null = null;
 
 const crash = new CrashMonitor();
 const faceLost: number[] = [];
@@ -57,14 +59,10 @@ if (Platform.OS !== 'web')
     for (const l of data.locations) onFix(l);
   });
 
-function isArmed(): boolean {
-  const live = useLive.getState();
-  const { crashDetection } = useSettings.getState();
-  return (
-    crashDetection &&
-    live.connection === 'online' &&
-    recentSpeeds.some((s) => s.kmh > ARM_SPEED_KMH && s.t > Date.now() - 10_000)
-  );
+function isArmed() {
+  const { crashDetection, paused } = useSettings.getState();
+  return armState({ enabled: crashDetection, paused, now: Date.now(),
+    gpsAt: useLive.getState().gpsAt, motionAt, speeds: recentSpeeds });
 }
 
 function extras(): CrashExtras {
@@ -74,11 +72,10 @@ function extras(): CrashExtras {
 
 function check(): void {
   const now = Date.now();
-  const armed = isArmed();
-  if (armed !== useLive.getState().armed) setLive({ armed });
-  // Detect only while connected to the Pi with crash detection on; the detector itself requires
-  // > 20 km/h before the impact.
-  if (!useSettings.getState().crashDetection || useLive.getState().connection !== 'online') return;
+  const { armed, reason } = isArmed();
+  setLive({ armed, armReason: reason });
+  // Let in-flight impacts finish confirmation even after speed falls below the arming floor.
+  if (!useSettings.getState().crashDetection || useSettings.getState().paused) return;
   const e = crash.check(now, extras());
   if (e) triggerSos('crash', e, crash.window(e.tImpact - 3000, e.tImpact + 5000));
 }
@@ -104,6 +101,8 @@ export function startMonitor(): () => void {
   let watch: Location.LocationSubscription | null = null;
   const timers: ReturnType<typeof setInterval>[] = [];
   crash.reset();
+  recentSpeeds.length = 0;
+  motionAt = null;
 
   // Pi-side optional evidence, kept for the last minute.
   const unsub = useLive.subscribe((s, prev) => {
@@ -137,7 +136,11 @@ export function startMonitor(): () => void {
     if (stopped) watch?.remove();
   })();
 
-  const motion = SahiNative?.addListener('onMotion', (e) => crash.addMotion(unpackMotion(e.samples)));
+  const motion = SahiNative?.addListener('onMotion', (e) => {
+    const batch = unpackMotion(e.samples);
+    if (batch.length) motionAt = batch[batch.length - 1]!.t;
+    crash.addMotion(batch);
+  });
   SahiNative?.startMotion(MOTION_HZ);
 
   if (demo) {
@@ -146,6 +149,7 @@ export function startMonitor(): () => void {
       setInterval(() => {
         const transport = pi();
         const kmh = transport instanceof DemoTransport ? speedAt(transport.now()) : 0;
+        motionAt = Date.now();
         recordSpeed(Date.now(), kmh);
         setLive({ speedKmh: kmh, gpsAt: Date.now() });
       }, 1000),
@@ -164,8 +168,7 @@ export function startMonitor(): () => void {
       void Location.hasStartedLocationUpdatesAsync(LOCATION_TASK)
         .then((on) => (on ? Location.stopLocationUpdatesAsync(LOCATION_TASK) : undefined))
         .catch(() => {});
-    setLive({ armed: false, speedKmh: null, gpsAt: null });
+    setLive({ armed: false, armReason: 'disabled', speedKmh: null, gpsAt: null });
   };
 }
 
-export const gpsLost = (gpsAt: number | null, now: number) => gpsAt === null || now - gpsAt > GPS_STALE_MS;

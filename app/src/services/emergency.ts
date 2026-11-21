@@ -1,6 +1,6 @@
 /**
  * Crash / SOS flow: log the incident, ask the Pi to save its clip, open the countdown, and when it
- * runs out send SMS with a Google Maps link to every contact, then call 123 or the first contact.
+ * runs out send SMS with a Google Maps link to every contact, then call the configured number or first contact.
  * Android sends and calls without a tap (sahi-native); elsewhere it falls back to the composer.
  */
 import * as Location from 'expo-location';
@@ -11,18 +11,17 @@ import SahiNative from '@modules/sahi-native';
 import { t } from '@/i18n';
 import type { CrashEvent, MotionSample } from '@/crash/detector';
 import { magnitudeG } from '@/crash/detector';
-import type { IncidentRequest } from '@/pi/types';
 import { db } from '@/state/db';
 import { useLive } from '@/state/live';
 import { useSecure } from '@/state/secure';
 import { useSettings } from '@/state/settings';
 
 import { speak } from './alerts';
-import { pi } from './pi';
+import { incidentClientId, incidentQueue } from './incident-delivery';
 import { currentTripId } from './trips';
 
 export const SOS_NOTIFICATION_ID = 2001;
-export const COUNTDOWN_S = { crash: 30, manual: 10 } as const;
+export const STAGE_TWO_DELAY_MS = 15_000;
 
 /** ~20 Hz |a| in g, enough to draw the impact. */
 function downsample(motion: MotionSample[]): [number, number][] {
@@ -61,17 +60,10 @@ export function triggerSos(kind: 'crash' | 'manual', e?: CrashEvent, motion: Mot
   if (tripId !== null)
     db.addEvent(tripId, at, kind === 'crash' ? 'crash' : 'sos', String(id), e ? String(e.gPeak) : null);
 
-  // Ask the Pi to keep its ring buffer (15 s before + 10 s after). Best effort: help comes first.
-  if (live.connection === 'online') {
-    const body: IncidentRequest = { t_crash: at, g_peak: e?.gPeak ?? 0, lat: live.location?.lat ?? null, lon: live.location?.lon ?? null };
-    pi()
-      .send('POST', '/incident', body)
-      .then((r) => {
-        const piId = (r as { id?: unknown }).id;
-        if (typeof piId === 'string') db.saveIncident(id, { piId });
-      })
-      .catch(() => {});
-  }
+  // Persist before delivery; the Pi link never blocks the countdown, SMS or call.
+  void incidentQueue.enqueue({ client_id: incidentClientId(), localId: id,
+    t_crash: at, g_peak: e?.gPeak ?? 0, lat: live.location?.lat ?? null,
+    lon: live.location?.lon ?? null }).then(() => incidentQueue.flush()).catch(() => {});
 
   if (kind === 'crash' && SahiNative)
     SahiNative.notify(SOS_NOTIFICATION_ID, 'sos', t('sos.notifTitle'), t('sos.notifBody'), `sahi://sos?incident=${id}`);
@@ -99,22 +91,43 @@ async function bestLocation(): Promise<{ lat: number; lon: number } | null> {
   return known;
 }
 
-export type SosProgress = (step: 'sms' | 'call' | 'done', info: { sent?: number; number?: string }) => void;
+export type SosProgress = (step: 'sms' | 'waiting' | 'call' | 'done', info: { sent?: number; number?: string }) => void;
 
 /** Countdown expired (or "Send now"): SMS to all contacts, then the call. */
 export async function runEmergency(id: number, onProgress: SosProgress): Promise<void> {
   const { contacts } = useSecure.getState();
-  const { callTarget, ambulanceNumber } = useSettings.getState();
+  const { callTarget, emergencyNumber } = useSettings.getState();
   const loc = await bestLocation();
+  if (db.getIncident(id)?.outcome === 'cancelled') return;
   const time = new Date().toLocaleTimeString();
   const text = loc
     ? t('sos.message', { link: `https://maps.google.com/?q=${loc.lat.toFixed(6)},${loc.lon.toFixed(6)}`, time })
     : t('sos.messageNoLoc', { time });
   if (loc) db.saveIncident(id, { lat: loc.lat, lon: loc.lon });
 
-  let sent = 0;
   const numbers = contacts.map((c) => c.phone);
   onProgress('sms', {});
+  const sent = await sendMessages(numbers, text);
+  db.saveIncident(id, { smsSent: sent });
+  onProgress('sms', { sent });
+
+  const number = callTarget === 'contact' && numbers[0] ? numbers[0] : emergencyNumber;
+  onProgress('waiting', { number });
+  await new Promise<void>((resolve) => setTimeout(resolve, STAGE_TWO_DELAY_MS));
+  if (db.getIncident(id)?.outcome === 'cancelled') return;
+  onProgress('call', { number });
+  const called = await dial(number);
+  db.saveIncident(id, { called: number, outcome: sent > 0 || called ? 'sent' : 'failed' });
+  SahiNative?.cancel(SOS_NOTIFICATION_ID);
+  onProgress('done', { sent, number });
+}
+
+export function announceCountdown(seconds: number): void {
+  speak('voice.sos', { s: seconds });
+}
+
+async function sendMessages(numbers: string[], text: string): Promise<number> {
+  let sent = 0;
   if (numbers.length) {
     if (SahiNative && Platform.OS === 'android') {
       try {
@@ -127,11 +140,10 @@ export async function runEmergency(id: number, onProgress: SosProgress): Promise
       await Linking.openURL(`sms:${numbers.join(',')}${Platform.OS === 'ios' ? '&' : '?'}body=${encodeURIComponent(text)}`).catch(() => {});
     }
   }
-  db.saveIncident(id, { smsSent: sent });
-  onProgress('sms', { sent });
+  return sent;
+}
 
-  const number = callTarget === 'contact' && numbers[0] ? numbers[0] : ambulanceNumber;
-  onProgress('call', { number });
+async function dial(number: string): Promise<boolean> {
   let called = false;
   if (SahiNative && Platform.OS === 'android') {
     try {
@@ -142,11 +154,5 @@ export async function runEmergency(id: number, onProgress: SosProgress): Promise
     }
   }
   if (!called) await Linking.openURL(`tel:${number}`).catch(() => {});
-  db.saveIncident(id, { called: number, outcome: sent > 0 || called ? 'sent' : 'failed' });
-  SahiNative?.cancel(SOS_NOTIFICATION_ID);
-  onProgress('done', { sent, number });
-}
-
-export function announceCountdown(seconds: number): void {
-  speak('voice.sos', { s: seconds });
+  return called;
 }

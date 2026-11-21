@@ -21,7 +21,10 @@ Read the output, not the exit code (Agent Guide §4).
 
 | Suite | Covers |
 |---|---|
+| `src/crash/arm-state.test.ts` | pure `armState` logic: armed on enabled + fresh GPS/motion + speed > 20 km/h; disarm reasons (`disabled`, `no_gps`, `no_motion`, `too_slow`); precedence and staleness boundaries |
+| `src/services/incident-queue.test.ts` | pure incident queue: retries with exponential backoff (2 s to 60 s cap), deduplication by `client_id`, persistence round-trip surviving restart, success removes entry and records receipt |
 | `src/crash/detector.test.ts` | spike + stop → event; spike, no speed drop → none; below 20 km/h → none; < 4 g → none; stop too late → none; stop that does not hold → none; waits for GPS; null speed never arms; optional checks; streaming wrapper fires once; native batch unpacking |
+| same, *replay: hardening cases* | dropped phone while stationary (no prior speed) → none; dropped phone while driving then picked up and moved → none (no stillness); speed bump at 30 km/h (3.5–4.5 g spike then continued motion) → none; roller-coaster repeated spikes with sustained motion → none; real-crash positive still passes; missing GPS with IMU stillness → none (requires speed gating & confirmation) |
 | same, *replay: normal driving* | 20 min synthetic city drive (bumps to 2.5 g, hard braking, stops at lights) → no event; same drive + injected 5, 6, 7, 8 g impact → detected at the impact |
 | same, *replay: real recorded driving* | driverBehaviorDataset trips 16, 17, 20, 21 (~51 min, mounted phone, aggressive braking / turns) under the worst case (always armed, stop after every candidate) → no event; trip 16 + injected 5–8 g → detected |
 | `src/pi/parse.test.ts` | `/status` exactly as `stream.py` serves it (initial, v1 levels, v2 drowsiness + hybrid) round-trips; garbage → null; bad fields dropped, never invented; every second of the mock scenario round-trips; `/alert`, `/physio`, `/health` (throttle bits), `/settings`, `/incidents`; pairing QR and typed address |

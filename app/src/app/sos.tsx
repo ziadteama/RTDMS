@@ -8,8 +8,9 @@ import { Button } from '@/components/button';
 import { ProgressBar } from '@/components/progress-bar';
 import { Text } from '@/components/text';
 import { useT } from '@/i18n';
-import { COUNTDOWN_S, announceCountdown, cancelSos, runEmergency } from '@/services/emergency';
+import { announceCountdown, cancelSos, runEmergency } from '@/services/emergency';
 import { db } from '@/state/db';
+import { useSettings } from '@/state/settings';
 import { useSecure } from '@/state/secure';
 import { spacing, useTheme } from '@/theme';
 
@@ -26,7 +27,8 @@ export default function Sos() {
   const { incident } = useLocalSearchParams<{ incident: string }>();
   const id = Number(incident);
   const kind = db.getIncident(id)?.kind ?? 'manual';
-  const total = COUNTDOWN_S[kind];
+  const countdown = useSettings((s) => s.sosCountdownSeconds);
+  const total = kind === 'manual' ? 10 : countdown;
   const [left, setLeft] = useState<number>(total);
   const [phase, setPhase] = useState<Phase>({ kind: 'countdown' });
   const fired = useRef(false);
@@ -49,6 +51,7 @@ export default function Sos() {
     setPhase({ kind: 'sending', line: t('sos.sending') });
     void runEmergency(id, (step, info) => {
       if (step === 'sms' && info.sent !== undefined) lines.push(hasContacts ? (info.sent ? t('sos.smsSent', { n: info.sent }) : t('sos.smsFailed')) : t('sos.noContacts'));
+      if (step === 'waiting') setPhase({ kind: 'sending', line: t('sos.callDelay', { n: info.number ?? '' }) });
       if (step === 'call') setPhase({ kind: 'sending', line: t('sos.calling', { n: info.number ?? '' }) });
       if (step === 'call' && info.number) lines.push(t('sos.calling', { n: info.number }));
       if (step === 'done') setPhase({ kind: 'done', lines });
@@ -96,14 +99,15 @@ export default function Sos() {
             <Text variant="countdown" color={fg} accessibilityLiveRegion="assertive" accessibilityLabel={`${left}`}>
               {left}
             </Text>
-            <ProgressBar durationMs={total * 1000} running color={fg} height={10} />
+            <ProgressBar durationMs={total * 1000} running color={fg} height={spacing.sm} />
           </View>
           <Button title={t('sos.ok')} size="xl" variant="primary" onPress={ok} />
           <Button title={t('sos.sendNow')} variant="ghost" onPress={send} />
         </>
       ) : null}
       {phase.kind === 'sending' ? (
-        <View style={{ flex: 1, justifyContent: 'center' }}>
+        <View style={{ flex: 1, justifyContent: 'center', gap: spacing.lg }}>
+          <Button title={t('sos.cancelCall')} onPress={ok} />
           <Text variant="title" color={fg} accessibilityLiveRegion="assertive">
             {phase.line}
           </Text>
