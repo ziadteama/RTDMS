@@ -52,8 +52,6 @@ The light-sensor notches assume the camera is upright, with the left IR board's 
 
 ## Hardware
 
-| Qty | Part | Use |
-|---|---|---|
 **One size for everything: M2.5 × 6 mm (10 screws).** Any "Raspberry Pi M2.5 screw kit" has them.
 Any length from 5–8 mm works. Countersunk heads sit flush in the lid; pan heads work too.
 
