@@ -17,7 +17,9 @@ Part of [Sahi UX redesign](../UX.md).
   - **User Configuration**: User-configurable in `Settings -> Emergency` with choices: **30 s / 45 s / 60 s**.
   - **Acoustic & Haptic Warning from Second 0**: From the instant of crash detection ($t = 0$), the phone rings an assertive alarm tone, speaks aloud via TTS (*"Crash detected. Sending help in 45 seconds. Tap I'm OK to cancel."*), and initiates haptic pulses (Medium impacts 45–11s, Heavy continuous impacts last 10s).
   - **Two-Stage Architecture**:
-    - **Stage 1 (45 s)**: Contacts-first. Upon countdown expiration, automated SMS containing Google Maps coordinates and timestamp is dispatched to registered emergency contacts.
+    - **Stage 1 (45 s)**: Contacts-first. Upon countdown expiration, parallel dispatch begins:
+      - **WhatsApp Relay**: Automated notification via Sahi WhatsApp service with map link.
+      - **Link-Free SMS**: Link-free SMS containing 5-decimal coordinates (`Location (paste in Maps): {lat},{lon}`) and timestamp dispatched to registered emergency contacts (ASCII-only GSM-7 to bypass carrier spam filters).
     - **Stage 2 (15 s Staging Window)**: "Calling 123 in 15 s" screen. Auto-dialing proceeds **only if the phone remained completely motionless** (confirming driver incapacity). If physical movement or screen touch is detected, auto-dialing pauses and converts to an explicit "Tap to Call" prompt.
   - **Configurable Emergency Number**: Defaults to 123 (Ambulance in Egypt), with settings option for 112 (Unified Emergency) or a custom number.
   - **Onboarding Consent**: Explicit consent check required during onboarding before auto-calling permissions are granted.
@@ -89,8 +91,9 @@ Part of [Sahi UX redesign](../UX.md).
   - Call Immediately: `"Call now"`
 - Emergency Completed:
   - Header: `"Help requested"`
-  - Status Line SMS: `"SMS sent to {n} emergency contacts with GPS link."`
-  - Status Line Call: `"Emergency dispatch connected: {number}."`
+  - Status Line SMS: `"SMS sent to 1 contact"` / `"SMS sent to {n} contacts"` (no URL in SMS; 5-decimal coordinates)
+  - Status Line Call: `"Starting call to {number}…"` -> `"Calling {number}"` / `"Could not start the call"`
+  - Per-Contact Channel Status: WhatsApp (`waiting` / `sent` / `delivered` / `read` / `failed` / `no data`), SMS (`sent` / `delivered` / `failed`)
   - Close: `"Close"`
 
 #### Motion & Touch Gating Mechanics

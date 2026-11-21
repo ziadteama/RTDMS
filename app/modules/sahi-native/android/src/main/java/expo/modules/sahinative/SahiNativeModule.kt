@@ -1,11 +1,14 @@
 package expo.modules.sahinative
 
 import android.Manifest
+import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -47,11 +50,13 @@ class SahiNativeModule : Module() {
   private var sensorThread: HandlerThread? = null
   private var motionListener: SensorEventListener? = null
   private var wifiCallback: ConnectivityManager.NetworkCallback? = null
+  private var smsReceiver: BroadcastReceiver? = null
+  private var smsRequestCode = 1000
 
   override fun definition() = ModuleDefinition {
     Name("SahiNative")
 
-    Events("onMotion")
+    Events("onMotion", "onSmsStatus")
 
     Function("hasTelephony") {
       context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)
@@ -59,16 +64,41 @@ class SahiNativeModule : Module() {
 
     AsyncFunction("sendSms") { numbers: List<String>, text: String ->
       require(Manifest.permission.SEND_SMS)
+      ensureSmsReceiver()
       val sms = if (Build.VERSION.SDK_INT >= 31) context.getSystemService(SmsManager::class.java)
       else @Suppress("DEPRECATION") SmsManager.getDefault()
       val parts = sms.divideMessage(text)
       var sent = 0
+      val flags = if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+      else PendingIntent.FLAG_UPDATE_CURRENT
       for (n in numbers) {
         try {
-          sms.sendMultipartTextMessage(n, null, parts, null, null)
+          val sentIntents = ArrayList<PendingIntent>(parts.size)
+          val deliveryIntents = ArrayList<PendingIntent>(parts.size)
+          for (i in parts.indices) {
+            val sIntent = PendingIntent.getBroadcast(
+              context, smsRequestCode++,
+              Intent(ACTION_SMS_SENT).apply {
+                setPackage(context.packageName)
+                putExtra("phone", n)
+              },
+              flags
+            )
+            val dIntent = PendingIntent.getBroadcast(
+              context, smsRequestCode++,
+              Intent(ACTION_SMS_DELIVERED).apply {
+                setPackage(context.packageName)
+                putExtra("phone", n)
+              },
+              flags
+            )
+            sentIntents.add(sIntent)
+            deliveryIntents.add(dIntent)
+          }
+          sms.sendMultipartTextMessage(n, null, parts, sentIntents, deliveryIntents)
           sent++
         } catch (_: Exception) {
-          // keep going: one bad number must not stop the others
+          sendEvent("onSmsStatus", mapOf("phone" to n, "status" to "failed"))
         }
       }
       sent
@@ -136,7 +166,38 @@ class SahiNativeModule : Module() {
 
     OnDestroy {
       stopMotion()
+      smsReceiver?.let { runCatching { context.unregisterReceiver(it) } }
+      smsReceiver = null
     }
+  }
+
+  private fun ensureSmsReceiver() {
+    if (smsReceiver != null) return
+    val receiver = object : BroadcastReceiver() {
+      override fun onReceive(c: Context?, intent: Intent?) {
+        val phone = intent?.getStringExtra("phone") ?: return
+        when (intent.action) {
+          ACTION_SMS_SENT -> {
+            val status = if (resultCode == Activity.RESULT_OK) "sent" else "failed"
+            sendEvent("onSmsStatus", mapOf("phone" to phone, "status" to status))
+          }
+          ACTION_SMS_DELIVERED -> {
+            val status = if (resultCode == Activity.RESULT_OK) "delivered" else "failed"
+            sendEvent("onSmsStatus", mapOf("phone" to phone, "status" to status))
+          }
+        }
+      }
+    }
+    val filter = IntentFilter().apply {
+      addAction(ACTION_SMS_SENT)
+      addAction(ACTION_SMS_DELIVERED)
+    }
+    if (Build.VERSION.SDK_INT >= 33) {
+      context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+    } else {
+      context.registerReceiver(receiver, filter)
+    }
+    smsReceiver = receiver
   }
 
   private fun require(permission: String) {
@@ -259,5 +320,7 @@ class SahiNativeModule : Module() {
   companion object {
     const val CHANNEL_ALERTS = "alerts"
     const val CHANNEL_SOS = "sos"
+    const val ACTION_SMS_SENT = "edu.aast.rtdms.sahi.SMS_SENT"
+    const val ACTION_SMS_DELIVERED = "edu.aast.rtdms.sahi.SMS_DELIVERED"
   }
 }

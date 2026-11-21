@@ -33,6 +33,7 @@ import type {
   PiStatus,
 } from '../src/pi/types.ts';
 import { ALERT_PATTERNS } from '../src/pi/types.ts';
+import { handleRelayRequest } from './relay-stub.ts';
 
 const { values: args } = parseArgs({
   options: {
@@ -133,12 +134,13 @@ function makeIncident(r: IncidentRequest): PiIncident & { frames: IncidentFrame[
 
 const server = createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*'); // the web build runs on another port
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Install-Id');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   const url = new URL(req.url ?? '/', 'http://mock');
   const path = url.pathname;
   try {
     if (req.method === 'OPTIONS') return void res.writeHead(204).end();
+    if (await handleRelayRequest(req, res, path)) return;
     if (req.method === 'GET') {
       if (path === '/status') return json(res, status());
       if (path === '/stream.mjpg') return stream(req, res);

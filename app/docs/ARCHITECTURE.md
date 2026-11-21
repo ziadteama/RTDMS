@@ -110,11 +110,15 @@ Pure-core queue with injected sender and clock:
 - Persisted via KV storage (`sahi.incident-queue`), surviving app restarts.
 - `emergency.ts` queues `POST /incident` after SOS decision; delivery failure never blocks SMS or call.
 
-## Emergency SOS & dispatch (`services/emergency.ts`, `app/sos.tsx`)
+## Emergency SOS & dispatch (`services/emergency.ts`, `services/sos-channels.ts`, `app/sos.tsx`)
 
 - Configurable countdown: `sosCountdownSeconds` setting (30 | 45 | 60 s, default 45 s per Flow 5; manual SOS uses 10 s).
 - Configurable number: `emergencyNumber` setting (default '123', presets '123' | '112' | custom 3–15 digits).
-- Two-stage flow: on expiry/send, SMS with Google Maps coordinates is dispatched to contacts first, then a 15 s delay window before dialing emergency dispatch unless cancelled.
+- Two-stage flow: on expiry/send, dispatches parallel channels without blocking:
+  - **WhatsApp relay**: `POST /v1/sos` (idempotent `client_id` UUID) via the dedicated relay service, authenticated by Bearer API key and `X-Install-Id` UUID v4 (persisted in Keystore). Polled via `GET /v1/sos/{client_id}` every 5 s up to 3 min for delivery receipts (`queued`, `sent`, `delivered`, `read`, `failed`, `opted_out`).
+  - **Link-free SMS**: ASCII-only GSM-7 text with 5-decimal coordinates (`Location (paste in Maps): {lat},{lon}`) without URLs, avoiding carrier filtering. Uses Android delivery reports (`sentIntent` + `deliveryIntent` in `sahi-native`), with a single automatic retry after ~60 s if no delivery report is received.
+- Real-time status model: per contact and per channel (`queued` | `sent` | `delivered` | `read` | `failed` | `opted_out` | `unknown`). "Delivered" is never shown unless explicitly confirmed by a delivery report.
+- Stage 2 emergency call: 15 s window before dialing; accurately reports "Starting call to X", "Calling X" (after dial returns), or "Could not start the call" if dialing fails.
 
 ## Foreground service and background sensing
 

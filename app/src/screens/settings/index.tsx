@@ -21,6 +21,7 @@ import { clearKv } from '@/state/storage';
 import { haptic, speak } from '@/services/alerts';
 import { simulateCrash } from '@/services/monitor';
 import { pi } from '@/services/pi';
+import { relay } from '@/services/relay/client';
 import { ALERT_PRESENTATION } from '@/pi/alert';
 import { radius, spacing, touch, type, useTheme } from '@/theme';
 
@@ -252,6 +253,7 @@ function Privacy() {
         text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
+          void relay.unregister().catch(() => {});
           db.wipe();
           useSecure.getState().wipe();
           useSettings.getState().reset();

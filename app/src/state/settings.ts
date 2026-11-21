@@ -27,6 +27,9 @@ export type Settings = {
   callTarget: CallTarget;
   emergencyNumber: string;
   sosCountdownSeconds: SosCountdownSeconds;
+  relayUrl?: string;
+  relayKey?: string;
+  driverName?: string;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -44,6 +47,9 @@ export const DEFAULT_SETTINGS: Settings = {
   callTarget: 'ambulance',
   emergencyNumber: '123',
   sosCountdownSeconds: 45,
+  relayUrl: undefined,
+  relayKey: undefined,
+  driverName: 'Driver',
 };
 
 type SettingsStore = Settings & {
