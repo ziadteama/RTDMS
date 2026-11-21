@@ -1,0 +1,14 @@
+name: rtdms-pi
+services:
+  verify:
+    build:
+      context: ..
+      dockerfile: pi/Dockerfile
+    command: sh -c "pytest && ruff check . && mypy src"
+  verify-py313:
+    build:
+      context: ..
+      dockerfile: pi/Dockerfile
+      args:
+        PYTHON_VERSION: "3.13"
+    command: sh -c "pytest && ruff check . && mypy src"
