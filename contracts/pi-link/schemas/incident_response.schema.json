@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "incident_response",
+  "type": "object",
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "id": {
+      "type": "string"
+    },
+    "error": {
+      "type": "string",
+      "maxLength": 64
+    }
+  }
+}

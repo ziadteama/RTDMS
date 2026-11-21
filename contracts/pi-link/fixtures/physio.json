@@ -1,0 +1,13 @@
+{
+  "watch_connected": true,
+  "hr_bpm": 71,
+  "rr_ms": [
+    845,
+    850
+  ],
+  "fatigue_probability": 0.31,
+  "hrv_state": "valid",
+  "rmssd_ms": 35.1,
+  "quality": "good",
+  "t": 1732117202.4
+}

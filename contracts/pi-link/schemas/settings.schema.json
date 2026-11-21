@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "settings",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "type": "string"
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sensitivity": {
+      "enum": [
+        "low",
+        "normal",
+        "high"
+      ]
+    },
+    "eye_closure_s": {
+      "type": "number",
+      "minimum": 0.5,
+      "maximum": 10
+    },
+    "offroad_gaze_s": {
+      "type": "number",
+      "minimum": 0.5,
+      "maximum": 10
+    },
+    "phone_s": {
+      "type": "number",
+      "minimum": 0.2,
+      "maximum": 10
+    },
+    "detectors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    }
+  }
+}

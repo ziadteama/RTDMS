@@ -1,0 +1,5 @@
+{
+  "cmd": "test_alert",
+  "pattern": "max",
+  "id": "c1"
+}

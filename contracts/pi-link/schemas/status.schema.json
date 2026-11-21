@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "status",
+  "type": "object",
+  "required": [
+    "fps",
+    "face",
+    "state"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "fps": {
+      "type": "number"
+    },
+    "face": {
+      "type": "boolean"
+    },
+    "state": {
+      "enum": [
+        "starting",
+        "unavailable",
+        "alert",
+        "distracted",
+        "warning",
+        "drowsy"
+      ]
+    },
+    "perclos": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "openness": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "blink_rate": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "closure_ms": {
+      "type": "number"
+    },
+    "calibrated": {
+      "type": "boolean"
+    },
+    "calibration": {
+      "enum": [
+        "ok",
+        "calibrating",
+        "failed",
+        "lost"
+      ]
+    },
+    "camera_covered": {
+      "type": "boolean"
+    },
+    "call": {
+      "type": "boolean"
+    },
+    "texting": {
+      "type": "boolean"
+    },
+    "phone_p": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "temp_c": {
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  }
+}
