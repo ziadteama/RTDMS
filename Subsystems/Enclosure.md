@@ -102,7 +102,7 @@ camera with its two IR boards**. It is the physical unit for [[5.2 Phase Two Pla
 | Shell | 1 | `out/shell.stl` / `.step` |
 | Lid | 1 | `out/lid.stl` / `.step` |
 | Camera clip | 2 (same part both sides) | `out/camera_clip.stl` / `.step` |
-| **M2.5 × 6 mm screws** (5–8 mm fine) | 11 | 4 Pi, 2 clips, 5 lid. Self-tapping into printed holes, no nuts or inserts |
+| **M2.5 × 6 mm screws** | 11 | 4 Pi (**5–6 mm only**: 8 mm would poke through the floor), 2 clips, 5 lid (6–8 mm fine). Self-tapping into printed holes, no nuts or inserts |
 
 ## Reference models
 
