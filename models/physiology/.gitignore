@@ -14,6 +14,7 @@ data/
 recordings/
 models/*.json
 !models/.gitkeep
+!models/fatigue_wesad_v1.json
 
 # mock_wearable latency sidecar output
 *.csv

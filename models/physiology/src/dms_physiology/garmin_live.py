@@ -52,6 +52,12 @@ class LiveState:
         with self._lock:
             self._hrv = snap.to_dict()
 
+    def on_hrv_dict(self, payload: dict[str, Any]) -> None:
+        """Publish an already-enriched HRV dict (e.g. with gated fatigue_probability)."""
+
+        with self._lock:
+            self._hrv = dict(payload)
+
     def latest(self) -> dict[str, Any]:
         """A copy of everything, stamped now. The one call other subsystems need."""
         now = time.monotonic()
