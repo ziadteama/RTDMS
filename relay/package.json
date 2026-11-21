@@ -5,7 +5,7 @@
   "type": "module",
   "engines": { "node": ">=22.13" },
   "scripts": {
-    "start": "node --experimental-strip-types src/main.ts",
+    "start": "node --experimental-transform-types src/main.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run"
