@@ -31,6 +31,11 @@ Read the output, not the exit code (Agent Guide §4).
 | `src/pi/alert.test.ts` | every `AlertPattern` mapped, in fusion order; output never gets quieter as severity rises; escalation; driver-state labels per scenario phase and for v1 levels; voice line per state |
 | `src/trips/score.test.ts` | safety score examples, monotonicity, short-trip floor; weekly trend |
 | `src/utils/format.test.ts` | duration labels |
+| `src/services/phone.test.ts` | E.164 phone normalization, Egypt local prefixes (010, 011, 012, 015) to +20, validation |
+| `src/services/sos-message.test.ts` | GSM-7 charset assertion, length <= 160 for worst-case coordinates/time, 5 decimals, no URL, crash and manual variants with/without location |
+| `src/services/relay/client.test.ts` | relay client against fake fetch: Bearer and X-Install-Id headers, 8 s timeout on /v1/sos (10 s default), 429 rate limit handling, bad JSON / schema invalid -> null |
+| `src/services/sos-channels.test.ts` | parallel WhatsApp relay + link-free SMS dispatch; relay failure never blocks SMS; SMS delivery reports, retry after 60 s without delivery report; never-delivered-unless-reported status invariant; 5 s polling of /v1/sos/{id} |
+| `src/state/secure-install-id.test.ts` | random UUID v4 install ID created on first run, persisted in Keystore, wiped on reset |
 
 ## 3. Device checks (a phone, a dev build or release build)
 
@@ -47,7 +52,7 @@ release build (`npx expo run:android --variant release`), not Expo Go, not the d
 | D7 | Pi offline / reconnect | stop the mock, wait 2 s, start it again | banner within ~1 s of the 3rd failed poll; recovers without a tap |
 | D8 | Alerts with the screen off | mock running, lock the phone | notification + voice + vibration on each escalation |
 | D9 | Background crash detection | demo mode, lock the phone, wait 2 min, unlock: "Monitoring this trip" notification present; `adb logcat` shows motion batches | the foreground service survived |
-| D10 | SOS end to end | demo → Settings → Simulate a crash; let it run out with a **test contact** and `ambulanceNumber` set to a test number in code | SMS with a working Maps link arrives; call starts; incident logged with outcome "Help requested" |
+| D10 | SOS end to end | demo → Settings → Simulate a crash; let it run out with a **test contact** and `emergencyNumber` set to a test number in code | parallel WhatsApp relay + link-free SMS dispatched; live status updates per contact; call starts; incident logged with outcome "Help requested" |
 | D11 | Calibration | mock Pi, Settings → Calibrate eyes | 10 s / 3 s steps, voice says "close your eyes", "Calibrated" at the end |
 | D12 | Delete all data | Settings → Delete all data | app restarts at consent; trips, contacts gone |
 

@@ -8,7 +8,7 @@ import { radius, spacing, useTheme } from '@/theme';
 const GROUPS: { title: StringKey; icon: IconName; items: StringKey[] }[] = [
   { title: 'onb.consent.processed', icon: 'eye', items: ['onb.consent.p1', 'onb.consent.p2'] },
   { title: 'onb.consent.stored', icon: 'phone', items: ['onb.consent.s1', 'onb.consent.s2', 'onb.consent.s3'] },
-  { title: 'onb.consent.incident', icon: 'crash', items: ['onb.consent.i1', 'onb.consent.i2'] },
+  { title: 'onb.consent.incident', icon: 'crash', items: ['onb.consent.i1', 'onb.consent.i2', 'onb.consent.i3'] },
   { title: 'onb.consent.never', icon: 'close', items: ['onb.consent.n1'] },
 ];
 

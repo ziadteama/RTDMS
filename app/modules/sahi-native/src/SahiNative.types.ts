@@ -3,8 +3,14 @@ export type MotionEvent = {
   samples: number[];
 };
 
+export type SmsStatusEvent = {
+  phone: string;
+  status: 'sent' | 'delivered' | 'failed';
+};
+
 export type SahiNativeModuleEvents = {
   onMotion: (e: MotionEvent) => void;
+  onSmsStatus: (e: SmsStatusEvent) => void;
 };
 
 export type NotifyChannel = 'alerts' | 'sos';

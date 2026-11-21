@@ -3,12 +3,14 @@ import { I18nManager } from 'react-native';
 
 import { seedDemoHistory } from '@/demo/seed';
 import { db } from '@/state/db';
+import { useSecure } from '@/state/secure';
 import { useSettings } from '@/state/settings';
 
 import { startAlertEngine } from './alerts';
 import { startIncidentDelivery } from './incident-delivery';
 import { startMonitor } from './monitor';
 import { startPoller } from './poller';
+import { syncRelayContacts } from './relay/contacts';
 import { startTripManager } from './trips';
 
 /**
@@ -37,6 +39,16 @@ export function useRuntime(): void {
   useEffect(() => {
     if (onboarded) return startIncidentDelivery();
   }, [onboarded]);
+
+  useEffect(() => {
+    const { contacts, setContacts } = useSecure.getState();
+    const driverName = useSettings.getState().driverName ?? 'Driver';
+    if (contacts.length > 0 && contacts.some((c) => c.relayStatus === 'failed' || !c.relayStatus)) {
+      void syncRelayContacts(driverName, contacts).then((synced) => {
+        setContacts(synced);
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (!onboarded || paused) return;
