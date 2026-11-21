@@ -138,7 +138,7 @@ Team decision: **PLA**. Its limits and how to live with them:
   70–90 °C on sunlit surfaces. **Don't leave the unit in a parked car in the sun**; use a sunshade or
   take it out. Driving with the AC on is fine.
 - **Light colour** if possible. Black heats up much more.
-- **5 walls, 30 % infill** so screw holes don't creep loose. Don't overtighten; PLA cracks.
+- **5 walls (at least 4), 15–20 % infill.** The walls make the screw holes strong; infill only fills the posts, so more adds time, not strength. Don't overtighten; PLA cracks.
 - A car-ready unit later can be reprinted from the same files in **PETG** (softens about 80 °C) or
   ASA (about 100 °C, UV-proof). Nothing in the design changes.
 

@@ -41,8 +41,9 @@ The light-sensor notches assume the camera is upright, with the left IR board's 
 
 ## Print
 
-- **PLA** (the team's choice). 0.2 mm layers, **5 walls, 30 % infill**: thicker walls resist creep
-  around the screw holes.
+- **PLA** (the team's choice). 0.2 mm layers, **5 walls (at least 4), 15–20 % infill**. The walls,
+  floor and lid print solid from the walls alone; infill only fills the screw posts and bosses, so
+  more of it adds time, not strength. Keep the walls: they hold the screws.
 - **Light colour (white or light grey) if you can.** Black PLA in sun heats up far more.
 - **Heat rule:** PLA softens at about 55–60 °C. **Don't leave the unit in a parked car in the sun.**
   Take it out, or at least use a windshield sunshade. Driving with the AC on is fine.
