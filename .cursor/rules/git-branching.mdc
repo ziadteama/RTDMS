@@ -28,7 +28,8 @@ Trunk-based development with **short-lived, zone-scoped** branches. Do not use l
 | `fusion/` | `fusion/**` | Joint |
 | `app/` | `app/**` (Sahi mobile app + its `app/mock-pi/`) | TBD |
 | `pi/` | `pi/**` (Pi runtime: fusion loop, buzzer, phone BLE/HTTP link, incidents, hotspot, systemd). Imports the models and `fusion/`; never edits them | TBD |
-| `contracts/` | `contracts/pi-link/**` (phone↔Pi link contract, schemas, fixtures). Changed only through the coordination board's CR process | Coordinator |
+| `relay/` | `relay/**` (SOS relay server: phone app -> WhatsApp via an unofficial library). Implements `contracts/sos-relay/` | TBD |
+| `contracts/` | `contracts/pi-link/**` and `contracts/sos-relay/**` (phone↔Pi link and phone↔relay contracts). Changed only through the coordination board's CR process | Coordinator |
 | `docs/` | shared status only: root `README.md`, `CLAUDE.md`, `Agent Guide.md`, `Home.md`, `models/README.md`, `Subsystems/Models Index.md`, `Subsystems/*` narrative | Anyone |
 | `meta/` | `.cursor/rules/**`, `.github/**`, `.claude/skills/**`, repo tooling | Anyone |
 
