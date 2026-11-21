@@ -1,18 +1,15 @@
 /**
  * Native controls from @expo/ui (Jetpack Compose on Android, SwiftUI on iOS). Each needs its own
- * Host; the Host gets the app theme (not the OS one), the text direction, and a neutral seed color
+ * Host; the Host gets the app theme (not the OS one), and a neutral seed color
  * so Material You does not tint them purple.
  */
 import { Host, Picker, Slider, Switch } from '@expo/ui';
-import { I18nManager } from 'react-native';
 
-import { useSettings } from '@/state/settings';
 import { useTheme } from '@/theme';
 
 function useHost() {
   const { scheme, colors } = useTheme();
-  const rtl = useSettings((s) => s.language === 'ar') || I18nManager.isRTL;
-  return { colorScheme: scheme, seedColor: colors.textSecondary, layoutDirection: rtl ? ('rightToLeft' as const) : ('leftToRight' as const) };
+  return { colorScheme: scheme, seedColor: colors.textSecondary, layoutDirection: 'leftToRight' as const };
 }
 
 export function Toggle({ value, onChange, label, disabled }: { value: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {

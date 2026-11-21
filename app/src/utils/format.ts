@@ -1,14 +1,9 @@
-import type { Language } from '@/state/settings';
-
-// Arabic with Western digits, like every number elsewhere in the app (and on the Pi's own page).
-const LOCALE: Record<Language, string> = { en: 'en-GB', ar: 'ar-EG-u-nu-latn' };
-
-export function formatDateTime(t: number, lang: Language): string {
-  return new Intl.DateTimeFormat(LOCALE[lang], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(t);
+export function formatDateTime(t: number): string {
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(t);
 }
 
-export function formatTime(t: number, lang: Language, seconds = false): string {
-  return new Intl.DateTimeFormat(LOCALE[lang], { hour: '2-digit', minute: '2-digit', second: seconds ? '2-digit' : undefined }).format(t);
+export function formatTime(t: number, seconds = false): string {
+  return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: seconds ? '2-digit' : undefined }).format(t);
 }
 
 /** Compact day/month for chart axes ("28/9"); fits eight columns on a narrow phone. */

@@ -11,7 +11,6 @@ import type { PiIncident } from '@/pi/types';
 import { pi } from '@/services/pi';
 import { db, useDbQuery } from '@/state/db';
 import { useLive } from '@/state/live';
-import { useSettings } from '@/state/settings';
 import { radius, spacing, touch, useTheme } from '@/theme';
 import type { Trip } from '@/trips/model';
 import { weeklyTrend } from '@/trips/score';
@@ -28,7 +27,6 @@ function alertCount(trip: Trip): number {
 function TripRow({ trip, first, last }: { trip: Trip; first: boolean; last: boolean }) {
   const t = useT();
   const { colors } = useTheme();
-  const lang = useSettings((s) => s.language);
   const units = { h: t('common.h'), min: t('common.min'), s: t('live.s') };
   return (
     <Pressable
@@ -49,7 +47,7 @@ function TripRow({ trip, first, last }: { trip: Trip; first: boolean; last: bool
       })}
     >
       <View style={{ flex: 1, gap: spacing.xxs }}>
-        <Text variant="body">{formatDateTime(trip.startedAt, lang)}</Text>
+        <Text variant="body">{formatDateTime(trip.startedAt)}</Text>
         <Text variant="caption" tone="secondary">
           {trip.endedAt === null ? t('trips.inProgress') : formatDuration(trip.endedAt - trip.startedAt, units)} · {(alertCount(trip) === 1 ? t('trips.alertsOne') : t('trips.alerts', { n: alertCount(trip) }))}
           {trip.demo ? ` · ${t('trips.demo')}` : ''}
@@ -65,7 +63,6 @@ function TripRow({ trip, first, last }: { trip: Trip; first: boolean; last: bool
 function Header({ trips }: { trips: Trip[] }) {
   const t = useT();
   const { colors } = useTheme();
-  const lang = useSettings((s) => s.language);
   const online = useLive((s) => s.connection === 'online');
   const incidents = useDbQuery(() => db.incidents());
   const [piClips, setPiClips] = useState<PiIncident[] | null>(null);
@@ -101,7 +98,7 @@ function Header({ trips }: { trips: Trip[] }) {
               icon={i.kind === 'crash' ? 'crash' : 'sos'}
               iconColor={colors.alert.continuous}
               label={i.kind === 'crash' ? t('event.crash', { g: i.gPeak ?? '—' }) : t('event.sos')}
-              detail={`${formatDateTime(i.t, lang)} · ${t(`incident.outcome.${i.outcome}`)}`}
+              detail={`${formatDateTime(i.t)} · ${t(`incident.outcome.${i.outcome}`)}`}
               chevron
               onPress={() => router.push({ pathname: '/incident/[id]', params: { id: String(i.id) } })}
             />
@@ -114,7 +111,7 @@ function Header({ trips }: { trips: Trip[] }) {
             <Row
               key={c.id}
               icon="play"
-              label={formatDateTime(c.t_crash, lang)}
+              label={formatDateTime(c.t_crash)}
               detail={`${c.g_peak.toFixed(1)} g · ${c.duration_s} s`}
               chevron
               onPress={() => router.push({ pathname: '/incident/[id]', params: { id: `pi:${c.id}` } })}

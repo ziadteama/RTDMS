@@ -11,7 +11,6 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 import * as Haptics from 'expo-haptics';
 
-import { isRTL } from '@/i18n';
 import { radius, spacing, touch, useTheme } from '@/theme';
 
 import { Icon } from './icon';
@@ -73,7 +72,7 @@ export function HoldButton({ label, hint, holdMs = 2000, onComplete }: { label: 
               start: 0,
               end: 0,
               backgroundColor: colors.alert.max,
-              transformOrigin: isRTL() ? 'right' : 'left',
+              transformOrigin: 'left',
             },
             fill,
           ]}

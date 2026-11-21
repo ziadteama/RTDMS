@@ -5,7 +5,6 @@ import { kv } from './storage';
 
 export const DEFAULT_BASE_URL = 'http://10.42.0.1:8080';
 
-export type Language = 'en' | 'ar';
 export type ThemeSetting = 'dark' | 'light' | 'system';
 export type Units = 'kmh' | 'mph';
 export type Vibration = 'off' | 'light' | 'strong';
@@ -15,7 +14,6 @@ export type CallTarget = 'ambulance' | 'contact';
 export type Settings = {
   consentedAt: number | null;
   onboarded: boolean;
-  language: Language;
   theme: ThemeSetting;
   units: Units;
   baseUrl: string;
@@ -32,7 +30,6 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Settings = {
   consentedAt: null,
   onboarded: false,
-  language: 'en',
   theme: 'dark',
   units: 'kmh',
   baseUrl: DEFAULT_BASE_URL,
@@ -58,6 +55,14 @@ export const useSettings = create<SettingsStore>()(
       set: (patch) => set(patch),
       reset: () => set(DEFAULT_SETTINGS),
     }),
-    { name: 'sahi.settings', version: 1, storage: createJSONStorage(() => kv) },
+    {
+      name: 'sahi.settings', version: 1, storage: createJSONStorage(() => kv),
+      // Load only current settings, ignoring obsolete persisted fields.
+      merge: (persisted, current) => ({
+        ...current,
+        ...Object.fromEntries(Object.entries((persisted ?? {}) as Record<string, unknown>)
+          .filter(([key]) => Object.hasOwn(DEFAULT_SETTINGS, key))),
+      }),
+    },
   ),
 );

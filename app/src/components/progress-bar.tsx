@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { isRTL } from '@/i18n';
 import { radius, useTheme } from '@/theme';
 
 /**
@@ -22,7 +21,7 @@ export function ProgressBar({ durationMs, running, color, height = 8 }: { durati
   const fill = useAnimatedStyle(() => ({ transform: [{ scaleX: p.get() }] }));
   return (
     <View style={{ height, borderRadius: radius.full, backgroundColor: colors.surfaceRaised, overflow: 'hidden' }}>
-      <Animated.View style={[{ flex: 1, backgroundColor: color ?? colors.text, transformOrigin: isRTL() ? 'right' : 'left' }, fill]} />
+      <Animated.View style={[{ flex: 1, backgroundColor: color ?? colors.text, transformOrigin: 'left' }, fill]} />
     </View>
   );
 }

@@ -19,7 +19,7 @@ app/
 │  ├─ screens/             screen bodies the routes render
 │  ├─ components/          design-system primitives (Text, Button, Section/Row, Banner, …)
 │  ├─ theme/               tokens: colors (neutral + AlertPattern scale), type, spacing, motion
-│  ├─ i18n/                en.ts (source of keys), ar.ts (type-checked against it), RTL switch
+│  ├─ i18n/                en.ts (English strings and keys), t / useT helpers
 │  ├─ pi/                  wire types, parsers, transport (HTTP / demo), alert presentation
 │  ├─ crash/               crash detector (pure TS) + test fixtures
 │  ├─ trips/               trip model, safety score
@@ -35,7 +35,7 @@ app/
 
 | Store | File | Holds | Persisted |
 |---|---|---|---|
-| `useSettings` | `state/settings.ts` | consent, onboarding, language, theme, units, base URL, demo, paused, voice/vibration, crash on/off, call target | SQLite key-value (`expo-sqlite/kv-store`), read synchronously at start |
+| `useSettings` | `state/settings.ts` | consent, onboarding, theme, units, base URL, demo, paused, voice/vibration, crash on/off, call target | SQLite key-value (`expo-sqlite/kv-store`), read synchronously at start |
 | `useSecure` | `state/secure.ts` | emergency contacts, Pi hotspot SSID + password | `expo-secure-store` (Android Keystore) |
 | `useLive` | `state/live.ts` | connection, last `/status`, `/alert`, `/physio`, GPS speed + fix, armed | memory only |
 | `useDbVersion` | `state/db-api.ts` | a counter bumped on every DB write | — |
@@ -78,7 +78,7 @@ flowchart LR
 ## Alerts (`services/alerts.ts`, `pi/alert.ts`)
 
 Input: `/alert` `pattern` only. On a rise in severity: haptics (per the vibration setting), a voice
-line in the app language (`expo-speech`, `ar-EG` / `en-US`), and a notification if the app is not
+line in English (`expo-speech`, `en-US`), and a notification if the app is not
 on screen. `repeated` / `continuous` / `max` repeat the voice every 8 / 5 / 4 s while active.
 The state-indicator label comes from the models' categorical states in `/status`
 (`drowsiness.state`, `hybrid.call` / `texting`); its color from the pattern. No model score is

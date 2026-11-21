@@ -92,7 +92,7 @@ src/app/        routes (expo-router)          src/services/  poller, trips, aler
 src/screens/    screen bodies                 src/crash/     crash detector (pure TS) + tests
 src/components/ design-system primitives      src/pi/        API types, parsers, transport
 src/theme/      tokens                        src/state/     stores, SQLite, secure storage
-src/i18n/       en / ar                       src/demo/      scripted drive (shared with mock-pi)
+src/i18n/       en only                       src/demo/      scripted drive (shared with mock-pi)
 modules/sahi-native/  Kotlin: SMS, call, notifications, background motion, Wi-Fi join
 mock-pi/        Node mock of the Pi           scripts/       icon renderer, screenshots
 ```
