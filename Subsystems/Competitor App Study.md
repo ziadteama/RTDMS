@@ -38,6 +38,12 @@ parts were not used).
 > 3. **The biggest trust risks are false alarms with no recourse, scores tied to discipline, and
 >    silent failure when Android kills the app.** Each has a cheap mitigation (below).
 
+> [!info] Update 2026-11-22: what we adopted
+> Adopted from this study: permission checklist with a reason per permission, the status pill,
+> "this alert was wrong", countdown 45 s, configurable emergency number, no score tied to pay (see
+> [[Mobile App End-User Scope]]). Dropped: Arabic/RTL. Then confirmed by testing: a link in the SOS SMS
+> was blocked while plain coordinates arrived ([[Project Log 2026-11]]).
+
 ## 1. Dashcam companion apps
 
 Garmin Drive, MyNextbase Connect, BlackVue, Viofo, 70mai, Thinkware Connected. Navigation
@@ -116,7 +122,7 @@ Sahi's current state is from [[Phone-Pi Link]] and the app docs (`app/docs/` on 
 | 11 | Subscriptions gate SOS | SMS goes through the phone, no subscription | Keep it; this is a selling point | Garmin LTE, Nextbase paid SOS |
 | 12 | Clip handling | Clip download in the incident screen | Protected pre/post capture (already planned), resumable downloads that survive backgrounding, and consent before sharing a clip off the phone | Thinkware, BlackVue |
 | 13 | Driver-first alerting | Alerts from fusion's `AlertPattern` only | Keep driver-first and local; do not escalate to a third party without the driver's consent | Nauto, Seeing Machines |
-| 14 | Arabic/RTL | Arabic and English built | No competitor evidence either way: a real differentiator. Verify RTL on the Live and SOS screens | Gap in all three groups |
+| 14 | ~~Arabic/RTL~~ | **Superseded 2026-11-22: the app is English only (user decision).** | Earlier: no competitor evidence either way. Kept for the record. Verify RTL on the Live and SOS screens | Gap in all three groups |
 
 ## 5. Gaps nobody fills (Sahi's opening)
 
@@ -124,7 +130,7 @@ Sahi's current state is from [[Phone-Pi Link]] and the app docs (`app/docs/` on 
 - **Watch heart-rate fusion**: none found.
 - **Phone crash SOS tied to a driver-monitoring unit**: none found.
 - **A transparent, driver-controlled score and sensitivity**: DriveWell and Zendrive do not publish weights.
-- **Arabic/RTL driver UI**: no confirmed localized driver app.
+- ~~Arabic/RTL driver UI~~: no confirmed localized driver app. **Out of scope: the app is English only (decision D8 in [[Project Log 2026-11]]).**
 - **Detecting that the OEM has killed the app**: not seen anywhere.
 - **Motorcycles, microbuses and other vehicle types**: Life360 says it is untested on motorcycles. Relevant for Egypt; a test case for Sahi's detector.
 

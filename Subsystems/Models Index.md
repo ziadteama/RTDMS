@@ -24,7 +24,9 @@ consume them. Code lives in `models/`; see `models/README.md` for on-disk conven
 | Distraction (IR camera) | [[Distraction Subsystem]] | `models/distraction/` | Phone call, texting, drinking, eating | **v2 live on Pi** for call + texting (action classifier + ear / lap phone checks, INT8 NCNN); drinking via the det_v2d detector (off on the Pi stream) |
 | Decision fusion | [[Pi Runtime]] | `fusion/` | Combines models → alert pattern | **`decide()` now runs per frame in `pi/`** (accepts call/texting flags); thresholds still fixed; not run on the Pi |
 | Alert subsystem | *(pending)* | *(pending)* | Buzzer + vibration patterns | Planned (Phase 4) |
-| Mobile app (Sahi) | [[Mobile App]] | `app/` | Live view, alerts, crash detection, incident clip | **MVP built** (Expo SDK 58): gates pass, mock Pi + demo mode; not yet run on a phone; Pi-side endpoints pending |
+| Mobile app (Sahi) | [[Mobile App]] · [[Mobile App End-User Scope]] | `app/` | Driver state, trips, SOS, crash detection (English only, end-user product) | **Runs on a real phone**; Bluetooth transport + UI polish pending |
+| Pi runtime | [[Pi Runtime]] | `pi/` | Per-frame fusion, buzzer, Bluetooth phone service, incidents | **Merged, Docker-verified only; not run on the Pi** |
+| SOS relay | [[WhatsApp SOS Relay]] | `relay/` | Crash SOS over WhatsApp (unofficial lib) + SMS backup | **Verified end to end** (script); app path pending |
 | Wearable firmware | *(pending)* | *(pending)* | ESP32-C3 + MAX30102, BLE only | Planned (Phase 1) |
 
 > [!note] Report listed two vision models

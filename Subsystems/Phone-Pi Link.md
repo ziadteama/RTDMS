@@ -11,7 +11,7 @@ aliases:
   - Phone-Pi Link
   - Sahi transport
   - phone Pi communication
-status: proposed
+status: proposed-not-measured
 researched: 2026-11-21
 ---
 
@@ -21,6 +21,12 @@ researched: 2026-11-21
 
 Research-backed decision on the link between the Sahi phone app (see **Mobile App**, branch
 `docs/mobile-app`; code on `app/*` branches) and the Raspberry Pi. Written **2026-11-21**.
+
+> [!info] Update 2026-11-22
+> The Pi side of this design is **built and merged** ([[Pi Runtime]]: one GATT service with the Garmin
+> characteristic plus ten phone ones, 154 Docker tests) but **nothing has run on the Pi**: the bench
+> spike below was never executed (its agent was stopped). What *was* verified: the app talks to the Pi
+> over HTTP through Tailscale. Open list: [[Open Items and Next Steps]].
 
 > [!abstract] Decision (proposed, pending the bench spike)
 > **Hybrid: BLE always on for alerts, heart data, settings and the crash trigger; the Pi's Wi-Fi
