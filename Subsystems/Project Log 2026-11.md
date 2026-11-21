@@ -47,6 +47,9 @@ archived in [[Coordination Board 2026-11]].
 | D13 | 22 Nov | **SOS goes WhatsApp first, SMS as backup**, through a team relay using an unofficial library (Baileys). Ban risk accepted by the user | User preference; SMS stays because WhatsApp needs data | [[WhatsApp SOS Relay]] |
 | D14 | 22 Nov | The relay runs on the dev machine for now; the phone reaches it over Tailscale | No public exposure needed for a prototype | [[Dev Environment and Test Devices]] |
 | D15 | 22 Nov | APK builds use Expo's cloud (EAS), not a local Android SDK | No JDK or SDK on the dev machine | [[Dev Environment and Test Devices]] |
+| D16 | 21 Nov | **Enclosure shape: concept B "Brick"**: Pi flat, fan up through the lid, camera on the front wall, power out the back. No AI HAT | Team pick from a 4-concept board (Slab, Brick, Wedge, Pod + Base) | [[Enclosure]] |
+| D17 | 21 Nov | Enclosure built in **CadQuery** (STEP + STL), from reference models (OpenPiCase Pi 5 STEP, night-vision camera mount) | Agent can build and verify it; STEP opens in Fusion/Onshape. Blender lacks dimensions; OpenSCAD lacks STEP | [[Enclosure]] |
+| D18 | 21 Nov | **Print in PLA**; lid on screws, one screw size (M2.5); camera clamped by spring clips, not screwed | Team choice of material; PLA snap clips crack; camera hole spacing unknown | [[Enclosure]] |
 
 ## Evidence collected
 
@@ -60,6 +63,7 @@ archived in [[Coordination Board 2026-11]].
 | App passes its gates | tsc, eslint, 398 jest tests, token grep (re-run by MAIN before each merge) | **verified on x86** |
 | Bluetooth phone↔Pi, hotspot, Garmin coexistence | Spike tooling written, never run | **not measured** |
 | Crash detector on real motion | Replay tests only | **not measured** |
+| Enclosure fits the Pi 5 | Exact solid intersection vs the OpenPiCase Pi 5 model: 0 mm³ after widening 2 mm (USB stack overhangs 0.9 mm past spec) | **verified in CAD only**, nothing printed |
 
 ## Bugs found by running on a device, and their fixes
 

@@ -33,6 +33,7 @@ Project 2 (the build phase this repo is for).
 - [[Mobile App End-User Scope]] — Sahi is an end-user product (not admin): audience, needs, audit, target tabs, open product questions · **decided**
 - [[Mobile App]] — **Sahi**, the React Native driver app (live view, alerts, crash detection, incident clip) · `app/` · **MVP built** (mock Pi + demo mode; not yet on a phone, Pi endpoints pending)
 - [[Raspberry Pi 5 Target]] — the deployment device, surveyed live over SSH
+- [[Enclosure]] — 3D-printed case for the Pi 5 + IR camera (concept B "Brick", CadQuery, PLA) · `hardware/enclosure/` · **designed, not printed**
 - [[Pi Setup Plan]] — researched optimal configuration + the blockers to resolve first
 - [[Competitor App Study]] — dashcam, fleet/driver-monitoring and crash-detection apps studied for Sahi: patterns to copy, mistakes to avoid, gaps · **research (web only, no hands-on teardown yet)**
 - [[WhatsApp SOS Relay]] — crash SOS over WhatsApp (unofficial lib) + link-free SMS backup · `relay/` · **verified end to end with real messages**

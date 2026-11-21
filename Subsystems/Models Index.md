@@ -27,6 +27,7 @@ consume them. Code lives in `models/`; see `models/README.md` for on-disk conven
 | Mobile app (Sahi) | [[Mobile App]] · [[Mobile App End-User Scope]] | `app/` | Driver state, trips, SOS, crash detection (English only, end-user product) | **Runs on a real phone**; Bluetooth transport + UI polish pending |
 | Pi runtime | [[Pi Runtime]] | `pi/` | Per-frame fusion, buzzer, Bluetooth phone service, incidents | **Merged, Docker-verified only; not run on the Pi** |
 | SOS relay | [[WhatsApp SOS Relay]] | `relay/` | Crash SOS over WhatsApp (unofficial lib) + SMS backup | **Verified end to end** (script); app path pending |
+| Enclosure | [[Enclosure]] | `hardware/enclosure/` | Printed case: Pi 5 + Active Cooler + IR camera | **Designed (Brick), files ready, not printed**; 0 mm³ clash vs a real Pi 5 model |
 | Wearable firmware | *(pending)* | *(pending)* | ESP32-C3 + MAX30102, BLE only | Planned (Phase 1) |
 
 > [!note] Report listed two vision models
