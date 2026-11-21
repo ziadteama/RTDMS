@@ -64,6 +64,15 @@ Branches: `app/scaffold` → `app/live-view` → `app/crash-sos-trips` (stacked 
 
 All 15 screens × dark / light × English / Arabic: `app/docs/screenshots/`.
 
+> [!important] Scope update (2026-11-21): end-user product, English only
+> Sahi is a **product for the driver**, not an admin tool: see [[Mobile App End-User Scope]] and the
+> rule `.cursor/rules/end-user-product.mdc`. In the MVP table below, feature 8 (Pi health), the
+> thresholds / detector switches / address entry in feature 7, the raw EAR / PERCLOS / HR numbers in
+> feature 1 and demo mode (9) **move to a hidden Diagnostics screen**; the main app keeps one driver
+> state, trips, plain settings and emergency. The app is also **English only**: no Arabic, no RTL,
+> no language switch (voice alerts in feature 2 are English only). The table is kept as the original
+> MVP record.
+
 ## Why a phone app
 
 | The Pi has | The phone adds |
