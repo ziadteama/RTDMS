@@ -6,6 +6,7 @@ import { db } from '@/state/db';
 import { useSettings } from '@/state/settings';
 
 import { startAlertEngine } from './alerts';
+import { startIncidentDelivery } from './incident-delivery';
 import { startMonitor } from './monitor';
 import { startPoller } from './poller';
 import { startTripManager } from './trips';
@@ -32,6 +33,10 @@ export function useRuntime(): void {
     if (demo) seedDemoHistory();
     else db.deleteDemo();
   }, [demo]);
+
+  useEffect(() => {
+    if (onboarded) return startIncidentDelivery();
+  }, [onboarded]);
 
   useEffect(() => {
     if (!onboarded || paused) return;

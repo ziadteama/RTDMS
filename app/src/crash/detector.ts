@@ -1,13 +1,16 @@
+import { postImpactStillness } from './stillness';
+
 /**
  * Phone-side crash detection: pure functions, no React Native imports, unit-tested in Node.
  *
  *   detectCrash(samples, speeds, config, extras?) → CrashEvent | null
  *
  * 1. Armed: GPS speed above `armSpeedKmh` some time in the `armWindowMs` before the impact.
- *    (The caller only feeds samples while the phone is connected to the Pi.)
+ *    Phone sensors operate independently of the Pi.
  * 2. Impact: accelerometer magnitude above `impactG`.
  * 3. Confirm: GPS speed at or below `stopSpeedKmh` within `confirmWithinMs` after the impact, and
  *    still there `holdMs` later. No decision until that much GPS data has arrived.
+ *    IMU stillness for 3 s within 6 s is also required.
  * 4. Optional checks are reported, never required (they would only delay help):
  *    phone flipped (gravity direction turned), Pi lost the face / saw a head jerk, HR spike.
  */
@@ -35,6 +38,11 @@ export type CrashConfig = {
   stopSpeedKmh: number;
   confirmWithinMs: number;
   holdMs: number;
+  stillWithinMs: number;
+  stillHoldMs: number;
+  stillAccelToleranceG: number;
+  stillGyroRadS: number;
+  motionMaxGapMs: number;
   flipDeg: number;
   hrSpikeBpm: number;
 };
@@ -46,6 +54,11 @@ export const DEFAULT_CRASH_CONFIG: CrashConfig = {
   stopSpeedKmh: 5,
   confirmWithinMs: 5_000,
   holdMs: 3_000,
+  stillWithinMs: 6_000,
+  stillHoldMs: 3_000,
+  stillAccelToleranceG: 0.25,
+  stillGyroRadS: 0.15,
+  motionMaxGapMs: 100,
   flipDeg: 60,
   hrSpikeBpm: 25,
 };
@@ -144,36 +157,38 @@ export function detectCrash(
     const stays = valid
       .filter((s) => s.t >= stop.t && s.t <= stop.t + config.holdMs)
       .every((s) => s.kmh <= config.stopSpeedKmh);
+    if (!postImpactStillness(samples, peak.t, config)) continue;
     if (!stays) continue; // hard braking at a light, then driving on
 
-    const pre = meanVector(samples, peak.t - 1500, peak.t - 200);
-    const post = meanVector(samples, peak.t + 1000, peak.t + 3000);
-    const flipped = pre && post ? angleDeg(pre, post) > config.flipDeg : null;
-
-    let hrSpike: boolean | null = null;
-    if (extras.hr) {
-      const b = extras.hr.filter((h) => h.t >= peak.t - 30_000 && h.t < peak.t);
-      const a = extras.hr.filter((h) => h.t > peak.t && h.t <= peak.t + 30_000);
-      if (b.length && a.length) {
-        const base = b.reduce((s, h) => s + h.bpm, 0) / b.length;
-        hrSpike = Math.max(...a.map((h) => h.bpm)) - base >= config.hrSpikeBpm;
-      }
-    }
 
     return {
       tImpact: peak.t,
       gPeak: Math.round(peak.g * 100) / 100,
       speedBeforeKmh: Math.round(speedBefore),
       tStopped: stop.t,
-      checks: {
-        flipped,
-        faceLost: anyWithin(extras.faceLost, peak.t - 1000, peak.t + 3000),
-        headJerk: anyWithin(extras.headJerk, peak.t - 1000, peak.t + 1000),
-        hrSpike,
-      },
+      checks: optionalChecks(samples, peak.t, config, extras),
     };
   }
   return null;
+}
+
+function optionalChecks(samples: MotionSample[], impact: number, config: CrashConfig, extras: CrashExtras): CrashChecks {
+    const pre = meanVector(samples, impact - 1500, impact - 200);
+    const post = meanVector(samples, impact + 1000, impact + 3000);
+    const flipped = pre && post ? angleDeg(pre, post) > config.flipDeg : null;
+
+    let hrSpike: boolean | null = null;
+    if (extras.hr) {
+      const b = extras.hr.filter((h) => h.t >= impact - 30_000 && h.t < impact);
+      const a = extras.hr.filter((h) => h.t > impact && h.t <= impact + 30_000);
+      if (b.length && a.length) {
+        const base = b.reduce((s, h) => s + h.bpm, 0) / b.length;
+        hrSpike = Math.max(...a.map((h) => h.bpm)) - base >= config.hrSpikeBpm;
+      }
+    }
+
+    return { flipped, faceLost: anyWithin(extras.faceLost, impact - 1000, impact + 3000),
+      headJerk: anyWithin(extras.headJerk, impact - 1000, impact + 1000), hrSpike };
 }
 
 /**

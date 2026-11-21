@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { emergencySettings, type SosCountdownSeconds } from './emergency-settings';
 import { kv } from './storage';
 
 export const DEFAULT_BASE_URL = 'http://10.42.0.1:8080';
@@ -24,7 +25,8 @@ export type Settings = {
   vibration: Vibration;
   crashDetection: boolean;
   callTarget: CallTarget;
-  ambulanceNumber: string;
+  emergencyNumber: string;
+  sosCountdownSeconds: SosCountdownSeconds;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -40,7 +42,8 @@ export const DEFAULT_SETTINGS: Settings = {
   vibration: 'strong',
   crashDetection: true,
   callTarget: 'ambulance',
-  ambulanceNumber: '123',
+  emergencyNumber: '123',
+  sosCountdownSeconds: 45,
 };
 
 type SettingsStore = Settings & {
@@ -52,7 +55,10 @@ export const useSettings = create<SettingsStore>()(
   persist(
     (set) => ({
       ...DEFAULT_SETTINGS,
-      set: (patch) => set(patch),
+      set: (patch) => {
+        const { emergencyNumber: _number, sosCountdownSeconds: _seconds, ...rest } = patch;
+        set({ ...rest, ...emergencySettings(patch) });
+      },
       reset: () => set(DEFAULT_SETTINGS),
     }),
     {
@@ -61,7 +67,8 @@ export const useSettings = create<SettingsStore>()(
       merge: (persisted, current) => ({
         ...current,
         ...Object.fromEntries(Object.entries((persisted ?? {}) as Record<string, unknown>)
-          .filter(([key]) => Object.hasOwn(DEFAULT_SETTINGS, key))),
+          .filter(([key]) => Object.hasOwn(DEFAULT_SETTINGS, key) && !['emergencyNumber', 'sosCountdownSeconds'].includes(key))),
+        ...emergencySettings((persisted ?? {}) as Record<string, unknown>),
       }),
     },
   ),

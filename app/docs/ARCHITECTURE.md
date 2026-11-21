@@ -35,9 +35,9 @@ app/
 
 | Store | File | Holds | Persisted |
 |---|---|---|---|
-| `useSettings` | `state/settings.ts` | consent, onboarding, theme, units, base URL, demo, paused, voice/vibration, crash on/off, call target | SQLite key-value (`expo-sqlite/kv-store`), read synchronously at start |
+| `useSettings` | `state/settings.ts` | consent, onboarding, theme, units, base URL, demo, paused, voice/vibration, crash on/off, call target, emergency number, SOS countdown | SQLite key-value (`expo-sqlite/kv-store`), read synchronously at start |
 | `useSecure` | `state/secure.ts` | emergency contacts, Pi hotspot SSID + password | `expo-secure-store` (Android Keystore) |
-| `useLive` | `state/live.ts` | connection, last `/status`, `/alert`, `/physio`, GPS speed + fix, armed | memory only |
+| `useLive` | `state/live.ts` | connection, last `/status`, `/alert`, `/physio`, GPS speed + fix, armed, armReason | memory only |
 | `useDbVersion` | `state/db-api.ts` | a counter bumped on every DB write | — |
 | SQLite `sahi.db` | `state/db.ts` | trips, events, HR samples, incidents | yes; `db.web.ts` keeps the same API in memory for the web build |
 
@@ -54,13 +54,13 @@ flowchart LR
   P -->|1 Hz| POLL
   GPS[expo-location<br/>foreground service] --> MON[monitor]
   IMU[sahi-native<br/>accel + gyro 100 Hz] --> MON
-  MON -->|speed, location, armed| LIVE
+  MON -->|speed, location, armed, armReason| LIVE
   MON -->|CrashMonitor| CRASH{crash?}
-  CRASH -->|yes| SOS[emergency: incident,<br/>POST /incident, countdown]
+  CRASH -->|yes| SOS[emergency: incident,<br/>retry queue POST /incident, countdown]
   LIVE --> UI[screens<br/>narrow selectors]
   LIVE --> ALERT[alert engine<br/>notify · voice · haptics]
   LIVE --> TRIPS[trip recorder] --> DB[(SQLite)]
-  SOS -->|30 s, no "I'm OK"| SMS[SMS to contacts<br/>then call 123]
+  SOS -->|45 s (configurable), no "I'm OK"| SMS[SMS to contacts<br/>then call emergency number]
 ```
 
 ## The polling loop (`services/poller.ts`)
@@ -88,15 +88,33 @@ compared with a threshold anywhere in the app (`grep` for the scores: they are o
 
 `detectCrash(samples, gpsSpeeds, config, extras) → CrashEvent | null`, a pure function:
 
-1. armed: GPS speed > 20 km/h in the 10 s before the impact (the monitor only runs it while
-   connected to the Pi and with crash detection on);
+1. armed: phone-only readiness evaluated via pure `armState(inputs)` (`crash/arm-state.ts`):
+   enabled, monitoring not paused, fresh GPS fix (≤ 10 s), fresh IMU motion (≤ 1 s), and GPS
+   speed > 20 km/h in the 10 s before impact. Independent of Pi connectivity (`live.connection`).
 2. impact: |a| > 4 g (gravity included), strongest local peak first;
-3. confirm: GPS speed ≤ 5 km/h within 5 s, still ≤ 5 km/h 3 s later (it waits for that GPS data);
+3. confirm: GPS speed ≤ 5 km/h within 5 s, still ≤ 5 km/h 3 s later (it waits for that GPS data).
+   Additionally requires IMU post-impact stillness (`crash/stillness.ts`): low motion (accel
+   within 1 g ± 0.25 g and gyro ≤ 0.15 rad/s) for ≥ 3 s within the 6 s following impact.
 4. optional checks reported, never required: phone flipped (> 60° gravity rotation), Pi face lost
    (−1…+3 s), head jerk (not in `stream.py` yet → `null`), HR rise ≥ 25 bpm within 30 s.
 
 `CrashMonitor` keeps ~20 s of samples and runs it every 500 ms; one event per impact (60 s
 refractory). Tests: `crash/detector.test.ts` (unit, synthetic replay, real-recording replay).
+
+## Incident retry queue (`services/incident-queue.ts`)
+
+Pure-core queue with injected sender and clock:
+- State machine: `pending` → `sent` | `failed`.
+- Exponential backoff on send failure: 2 s, 4 s, 8 s, 16 s, 32 s, capped at 60 s.
+- Idempotent deduplication by `client_id` UUID v4.
+- Persisted via KV storage (`sahi.incident-queue`), surviving app restarts.
+- `emergency.ts` queues `POST /incident` after SOS decision; delivery failure never blocks SMS or call.
+
+## Emergency SOS & dispatch (`services/emergency.ts`, `app/sos.tsx`)
+
+- Configurable countdown: `sosCountdownSeconds` setting (30 | 45 | 60 s, default 45 s per Flow 5; manual SOS uses 10 s).
+- Configurable number: `emergencyNumber` setting (default '123', presets '123' | '112' | custom 3–15 digits).
+- Two-stage flow: on expiry/send, SMS with Google Maps coordinates is dispatched to contacts first, then a 15 s delay window before dialing emergency dispatch unless cancelled.
 
 ## Foreground service and background sensing
 
@@ -125,14 +143,14 @@ web the module is `null` and callers fall back (open the SMS composer / dialer, 
 
 | Situation | What the app does |
 |---|---|
-| Pi offline | banner + reconnect loop; state shows "Pi offline" in neutral grey; no phone alerts (the Pi's buzzer does not depend on the phone); trip ends after 60 s offline; crash detection disarms |
+| Pi offline | banner + reconnect loop; state shows "Pi offline" in neutral grey; no phone alerts (the Pi's buzzer does not depend on the phone); trip ends after 60 s offline; crash detection remains armed on phone (phone-only IMU + GPS, independent of Pi) |
 | Pi without a proposed endpoint | that feature hides or shows a banner; nothing is guessed |
 | Bad JSON / missing fields | parser returns `null` (or a `null` field); UI shows "—", never 0 |
 | GPS lost (no fix 10 s) | banner "No GPS: crash detection is off"; the detector cannot arm or confirm; manual SOS still works |
 | Location permission denied | as GPS lost; SOS SMS says "location unknown" |
 | SMS / phone permission denied | SOS opens the SMS composer and the dialer (needs a tap) |
 | Notifications denied | voice + haptics still work while the app is open |
-| No emergency contacts | SOS skips SMS and calls 123 |
+| No emergency contacts | SOS skips SMS and calls the configured emergency number (default 123) |
 | Crash while the app is in the background | `sos` notification with a full-screen intent opens the countdown |
 | App killed mid-trip | the open trip is closed at its last recorded moment on next start |
 | Monitoring paused | poller, trips, alerts and crash detection all stop; the Pi keeps buzzing |

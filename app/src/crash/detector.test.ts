@@ -12,7 +12,14 @@ import {
   type MotionSample,
   type SpeedSample,
 } from './detector';
-import { injectCrash, normalDrive } from './fixtures';
+import {
+  droppedPhoneMovingThenPickedUp,
+  droppedPhoneStationary,
+  injectCrash,
+  normalDrive,
+  rollerCoasterSpikes,
+  speedBump,
+} from './fixtures';
 
 const T0 = 1_700_000_000_000;
 
@@ -119,6 +126,51 @@ describe('CrashMonitor (streaming)', () => {
     expect(s).toHaveLength(2);
     expect(magnitudeG(s[0]!)).toBeCloseTo(1);
     expect(s[1]).toEqual({ t: 2, ax: 1, ay: 2, az: 3, gx: 4, gy: 5, gz: 6 });
+  });
+});
+
+describe('replay: hardening cases (dropped phone, speed bump, roller-coaster, missing GPS)', () => {
+  it('dropped phone while stationary (no prior speed) → no event', () => {
+    const { samples, speeds } = droppedPhoneStationary(T0, 6);
+    expect(detectCrash(samples, speeds)).toBeNull();
+  });
+
+  it('dropped phone while driving then picked up and moved → no event (no stillness)', () => {
+    const { samples, speeds } = droppedPhoneMovingThenPickedUp(T0, 40, 6);
+    expect(detectCrash(samples, speeds)).toBeNull();
+  });
+
+  it('speed bump at 30 km/h (3.5–4.5 g spike then continued motion) → no event', () => {
+    const { samples, speeds } = speedBump(T0, 30, 4.0);
+    expect(detectCrash(samples, speeds)).toBeNull();
+  });
+
+  it('roller-coaster-like repeated 4–5 g spikes with sustained motion → no event', () => {
+    const { samples, speeds } = rollerCoasterSpikes(T0, 60);
+    expect(detectCrash(samples, speeds)).toBeNull();
+  });
+
+  it('real-crash positive still passes detection', () => {
+    const c = synthesizeCrash(T0, 6.5, 50);
+    const e = detectCrash(c.samples, c.speeds);
+    expect(e).not.toBeNull();
+    expect(e!.tImpact - c.tImpact).toBeLessThan(120); // peak of the 120 ms half-sine pulse
+    expect(e!.gPeak).toBeGreaterThan(6);
+    expect(e!.speedBeforeKmh).toBe(50);
+  });
+
+  /**
+   * Phone-only crash detection intentionally requires prior GPS speed (> 20 km/h) to arm
+   * and GPS speed drop (<= 5 km/h) to confirm. Even when IMU indicates post-impact stillness,
+   * missing GPS data means the detector cannot distinguish between a vehicle collision and a
+   * phone dropped on a floor while stationary. Therefore, it refuses to trigger automatically.
+   * Manual SOS remains available to the driver.
+   */
+  it('crash where GPS is missing but IMU shows stillness → no event (requires speed gating & confirmation)', () => {
+    const c = synthesizeCrash(T0, 6.5, 50);
+    expect(detectCrash(c.samples, [])).toBeNull();
+    const nullGps: SpeedSample[] = c.speeds.map((s) => ({ t: s.t, kmh: null }));
+    expect(detectCrash(c.samples, nullGps)).toBeNull();
   });
 });
 

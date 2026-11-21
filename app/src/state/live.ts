@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import type { ArmReason } from '@/crash/arm-state';
 import type { PiAlert, PiPhysio, PiStatus } from '@/pi/types';
 
 export type Connection = 'connecting' | 'online' | 'offline';
@@ -21,8 +22,9 @@ export type LiveState = {
   speedKmh: number | null;
   gpsAt: number | null;
   location: { lat: number; lon: number; at: number } | null;
-  /** Crash detection currently armed (connected, moving fast enough). */
+  /** Phone-only readiness: enabled, fresh GPS and IMU, recent speed above the arming floor. */
   armed: boolean;
+  armReason: ArmReason;
 };
 
 export const INITIAL_LIVE: LiveState = {
@@ -37,6 +39,7 @@ export const INITIAL_LIVE: LiveState = {
   gpsAt: null,
   location: null,
   armed: false,
+  armReason: 'no_gps',
 };
 
 export const useLive = create<LiveState>(() => INITIAL_LIVE);

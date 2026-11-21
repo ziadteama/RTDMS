@@ -24,6 +24,7 @@ import { pi } from '@/services/pi';
 import { ALERT_PRESENTATION } from '@/pi/alert';
 import { radius, spacing, touch, type, useTheme } from '@/theme';
 
+import { EmergencyNumber } from './emergency-number';
 import { usePiSettings } from './use-pi-settings';
 
 function SliderRow({ label, value, unit, min, max, step, onChange, disabled }: { label: string; value: number; unit: string; min: number; max: number; step: number; onChange: (v: number) => void; disabled?: boolean }) {
@@ -157,7 +158,7 @@ function PhoneAlerts() {
 
 function Emergency() {
   const t = useT();
-  const s = useSettings(useShallow((x) => ({ crash: x.crashDetection, callTarget: x.callTarget, ambulance: x.ambulanceNumber })));
+  const s = useSettings(useShallow((x) => ({ crash: x.crashDetection, callTarget: x.callTarget, ambulance: x.emergencyNumber })));
   const set = useSettings((x) => x.set);
   const contacts = useSecure((x) => x.contacts.length);
   return (
@@ -166,18 +167,9 @@ function Emergency() {
       <Row
         label={t('settings.callTarget')}
         icon="call"
-        right={
-          <Choice<CallTarget>
-            label={t('settings.callTarget')}
-            value={s.callTarget}
-            options={[
-              { value: 'ambulance', label: t('settings.call.ambulance', { n: s.ambulance }) },
-              { value: 'contact', label: t('settings.call.contact') },
-            ]}
-            onChange={(v) => set({ callTarget: v })}
-          />
-        }
+        right={<Choice<CallTarget> label={t('settings.callTarget')} value={s.callTarget} options={[{ value: 'ambulance', label: t('settings.call.ambulance', { n: s.ambulance }) }, { value: 'contact', label: t('settings.call.contact') }]} onChange={(v) => set({ callTarget: v })} />}
       />
+      <EmergencyNumber />
       <Row label={t('settings.crash')} icon="crash" right={<Toggle label={t('settings.crash')} value={s.crash} onChange={(v) => set({ crashDetection: v })} />} />
     </Section>
   );
