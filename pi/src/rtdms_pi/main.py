@@ -9,11 +9,17 @@ import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+
     from .config import RuntimeConfig
     from .runtime import Runtime
 
 
-def build_runtime(config: RuntimeConfig, ble: bool) -> Runtime:
+def build_runtime(
+    config: RuntimeConfig,
+    ble: bool,
+    settings_provider: Callable[[], Mapping[str, Any]] | None = None,
+) -> Runtime:
     from .buzzer import (
         BuzzerBackend,
         ConsoleBuzzer,
@@ -51,13 +57,21 @@ def build_runtime(config: RuntimeConfig, ble: bool) -> Runtime:
         if config.physiology or ble
         else NullPhysioSource()
     )
-    return Runtime(source, physio, player, state, tick_rate=config.tick_rate)
+    return Runtime(
+        source,
+        physio,
+        player,
+        state,
+        tick_rate=config.tick_rate,
+        settings_provider=settings_provider,
+    )
 
 
 def main() -> None:
     os.environ["OPENBLAS_NUM_THREADS"] = "1"
     os.environ["OMP_NUM_THREADS"] = "1"
     from .config import RuntimeConfig
+    from .health import HealthProbe
     from .http_debug import DebugServer
     from .incidents.http_server import serve as serve_incidents
     from .incidents.ring import Entry, FrameRing
@@ -65,6 +79,7 @@ def main() -> None:
     from .incidents.store import IncidentStore
     from .pairing import load_or_create_token
     from .payloads import alert_payload, status_payload
+    from .settings import SettingsStore
 
     config = RuntimeConfig.from_args()
     ble = (
@@ -73,7 +88,8 @@ def main() -> None:
         else (not config.no_camera and importlib.util.find_spec("bless") is not None)
     )
     ble = ble or config.fake_ble
-    runtime = build_runtime(config, ble)
+    settings_store = SettingsStore(config.state_dir / "settings.json")
+    runtime = build_runtime(config, ble, settings_provider=settings_store.read)
 
     token = load_or_create_token(config.state_dir / "token")
     store = IncidentStore(config.state_dir / "incidents")
@@ -109,13 +125,30 @@ def main() -> None:
     debug_server: DebugServer | None = None
     incident_server = None
     try:
-        debug_server = DebugServer(runtime.state, runtime.player, config)
+        health_probe = HealthProbe(
+            state=runtime.state,
+            settings_provider=settings_store.read,
+            physio_source=runtime.physio_source,
+            config=config,
+            state_dir=config.state_dir,
+        )
+        debug_server = DebugServer(
+            runtime.state,
+            runtime.player,
+            config,
+            settings_provider=settings_store.read,
+            health_probe=health_probe,
+        )
         debug_server.start()
         incident_server = serve_incidents(config.host, config.incident_port, store, sink, token)
         if ble:
             from .ble.server import run_runtime_ble
 
-            asyncio.run(run_runtime_ble(config, runtime, incidents=sink))
+            asyncio.run(
+                run_runtime_ble(
+                    config, runtime, incidents=sink, settings=settings_store
+                )
+            )
         else:
             runtime.run_forever()
     finally:

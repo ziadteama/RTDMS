@@ -47,7 +47,7 @@ class PhoneService:
         self.settings, self.incidents, self.clock = settings, incidents, clock
         self.auth, self.health_fn, self.on_command = auth, health_fn, on_command
         self.stats = ServiceStats()
-        self.notifier = Notifier(runtime_state, clock, self._emit)
+        self.notifier = Notifier(runtime_state, clock, self._emit, settings.read)
         self.loss = GarminLossMonitor(self.set_throttle)
         self.garmin = garmin if garmin is not None else GarminPhysioSource()
         port.set_disconnect_handler(self.on_disconnect)
@@ -94,7 +94,7 @@ class PhoneService:
         snapshot = self.state.snapshot()
         builders: dict[Char, Callable[[], dict[str, Any]]] = {
             Char.ALERT: lambda: alert_payload(snapshot.decision, self.clock()),
-            Char.STATUS: lambda: status_payload(snapshot),
+            Char.STATUS: lambda: status_payload(snapshot, self.settings.read()),
             Char.PHYSIO: lambda: physio_payload(snapshot),
             Char.SETTINGS: self.settings.read,
             Char.HEALTH: self.health_fn,

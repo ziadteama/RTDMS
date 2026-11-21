@@ -2,7 +2,7 @@
 
 import asyncio
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from queue import Empty, SimpleQueue
 
 from ..payloads import alert_payload, physio_payload, status_payload
@@ -16,8 +16,10 @@ class Notifier:
         state: RuntimeState,
         clock: Callable[[], float],
         emit: Callable[[Char, str, dict[str, object]], None],
+        settings_provider: Callable[[], Mapping[str, object]] | None = None,
     ) -> None:
         self.state, self.clock, self.emit = state, clock, emit
+        self.settings_provider = settings_provider
         self.factor = 1.0
         self._last = {char: float("-inf") for char in (Char.ALERT, Char.STATUS, Char.PHYSIO)}
         self._pattern: str | None = None
@@ -50,13 +52,13 @@ class Notifier:
         if not changed and (self._pattern is None or now - self._last[Char.ALERT] >= 0.2 - 1e-9):
             self.emit(Char.ALERT, "alert", alert_payload(snapshot.decision, now))
             self._last[Char.ALERT], self._pattern = now, pattern
-        for char, period, builder in (
-            (Char.STATUS, 0.5, status_payload),
-            (Char.PHYSIO, 1.0, physio_payload),
-        ):
-            if now - self._last[char] >= period / self.factor - 1e-9:
-                self.emit(char, char.name.lower(), builder(snapshot))
-                self._last[char] = now
+        if now - self._last[Char.STATUS] >= 0.5 / self.factor - 1e-9:
+            st = self.settings_provider() if self.settings_provider else None
+            self.emit(Char.STATUS, "status", status_payload(snapshot, st))
+            self._last[Char.STATUS] = now
+        if now - self._last[Char.PHYSIO] >= 1.0 / self.factor - 1e-9:
+            self.emit(Char.PHYSIO, "physio", physio_payload(snapshot))
+            self._last[Char.PHYSIO] = now
 
     async def run(self, stop: asyncio.Event) -> None:
         while not stop.is_set():
