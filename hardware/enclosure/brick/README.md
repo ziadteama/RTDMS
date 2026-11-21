@@ -39,8 +39,14 @@ The light-sensor notches assume the camera is upright, with the left IR board's 
 
 ## Print
 
-- **PETG or ASA**, not PLA (a parked car gets too hot for PLA). 0.2 mm layers, 4 walls, 20 % infill.
+- **PLA** (the team's choice). 0.2 mm layers, **5 walls, 30 % infill**: thicker walls resist creep
+  around the screw holes.
+- **Light colour (white or light grey) if you can.** Black PLA in sun heats up far more.
+- **Heat rule:** PLA softens at about 55–60 °C. **Don't leave the unit in a parked car in the sun.**
+  Take it out, or at least use a windshield sunshade. Driving with the AC on is fine.
+- Don't overtighten the screws. PLA cracks instead of stretching.
 - Shell: open side up, no supports. Lid: outer face down. Clips: flat.
+- For a car-ready unit later, reprint the same files in PETG or ASA.
 
 ## Hardware
 
