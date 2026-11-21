@@ -35,10 +35,10 @@ To detect ungraceful terminations locally without any cloud or push service (and
 4. User Notification and Resumption:
    - Calculate gap window: from $t_{\text{heartbeat}}$ to $t_{\text{current}}$.
    - Format timestamps into local time ($HH:MM$).
-   - Display persistent UI Banner on Live and Trips screens:
-     `"Monitoring was paused from HH:MM to HH:MM (closed by phone battery manager)"`
+   - Display persistent UI Banner on Drive and Trips screens:
+     `"Sahi stopped monitoring at 14:32 because your phone closed it. Tap to fix."`
    - Post local notification via `SahiNative.notify` (channel `alerts`):
-     `"Monitoring was interrupted: Sahi was stopped by battery manager. Check auto-launch and background activity settings."`
+     `"Sahi stopped monitoring at 14:32 because your phone closed it. Tap to fix."`
    - Retroactively close the stale trip in SQLite:
      $$\text{endedAt} = \text{stale.startedAt} + (\text{stale.summary.onlineS} \times 1000)$$
 
@@ -61,7 +61,9 @@ To detect ungraceful terminations locally without any cloud or push service (and
 
 ### 4.2 Independent Phone-Only Crash Detection and Arming State
 
-#### 4.2.1 Removal of Pi-Online Dependency
+> [!NOTE] Engineering note: Decoupling phone-only sensing from unit connectivity.
+
+#### 4.2.1 Removal of Unit-Online Dependency
 In the current codebase (`app/src/services/monitor.ts` lines 60-68):
 ```typescript
 function isArmed(): boolean {
@@ -78,7 +80,7 @@ And line 81:
 ```typescript
 if (!useSettings.getState().crashDetection || useLive.getState().connection !== 'online') return;
 ```
-This couples crash detection to the Pi connection. If the Pi Wi-Fi or BLE link drops, crash detection disarms silently.
+This couples crash detection to the unit connection. If the unit Wi-Fi or BLE link drops, crash detection disarms silently.
 
 [Proposed] Architectural Modification:
 Decouple crash detection from `live.connection`. The phone possesses its own calibrated IMU (100 Hz) and GPS receiver. Crash detection must run independently on the phone:
@@ -93,16 +95,16 @@ function isArmed(): boolean {
   return crashDetection && !paused && hasGpsFix && movingFastEnough;
 }
 ```
-Pi data (face lost, heart rate spike) remains optional supporting evidence (`extras()` in `app/src/services/monitor.ts` line 70), but is never a prerequisite for arming or impact detection.
+Unit data (face lost, heart rate spike) remains optional supporting evidence (`extras()` in `app/src/services/monitor.ts` line 70), but is never a prerequisite for arming or impact detection.
 
 #### 4.2.2 Visible Arming Status Model
-The driver must always know why crash detection is or is not armed. A dedicated status element is exposed on the Live screen:
+The driver must always know why crash detection is or is not armed. A dedicated status element is exposed on the Drive screen:
 
 | Arming State | Visual Presentation | Exact Condition |
 |---|---|---|
 | **Armed** | Green badge / pill (`#3FB97A`): "Crash detection armed" | Speed was > 20 km/h in last 10 s, GPS fix fresh (< 10 s stale), motion sampling active at 100 Hz, crash detection toggle ON. |
 | **Not Armed: Speed** | Amber badge (`#E3C14B`): "Not armed: speed under 20 km/h" | GPS fix valid, but speed has not exceeded 20 km/h in past 10 s (e.g. stationary or slow city traffic). |
-| **Not Armed: GPS** | Amber badge (`#E3C14B`): "Not armed: no GPS fix" | GPS fix stale (> 10 s) or location permission denied (`gpsLost(gpsAt, now) === true`). |
+| **Not Armed: GPS** | Amber badge (`#E3C14B`): "Not armed: no GPS" | GPS fix stale (> 10 s) or location permission denied (`gpsLost(gpsAt, now) === true`). |
 | **Not Armed: Sensors**| Red badge (`#EF5148`): "Not armed: motion sensors unavailable" | Device lacks accelerometer/gyroscope or `sahi-native` motion thread failed. |
 | **Not Armed: Paused** | Neutral grey badge (`#6F7881`): "Not armed: monitoring paused" | Driver explicitly enabled "Pause monitoring" in Settings. |
 | **Not Armed: Disabled**| Neutral grey badge (`#6F7881`): "Not armed: disabled in settings"| `crashDetection` toggle set to `false` in Settings. |
@@ -164,8 +166,8 @@ Android OS updates or APK reinstalls frequently reset runtime permissions or bat
 2. Battery Exemption Check:
    - Call native `PowerManager.isIgnoringBatteryOptimizations(packageName)` to verify exemption from standard Doze mode and ColorOS background restrictions.
 3. Resolution UX:
-   If any previously granted permission or battery optimization has been revoked, Sahi displays a persistent, non-dismissible banner on the Live tab:
-   `"Permissions were reset by system update. Tap to re-enable crash SOS protection."`
+   If any previously granted permission or battery optimization has been revoked, Sahi displays a persistent, non-dismissible banner on the Drive tab:
+   `"Safety permissions were reset by system update. Tap to re-enable crash SOS protection."`
 
 #### 4.4.3 SQLite Schema Migrations
 Database migrations are handled via SQLite's built-in `user_version` pragma:
@@ -182,7 +184,7 @@ If `user_version < 2`:
 ### 4.5 Data Deletion, Privacy Boundaries, and Unpairing
 
 #### 4.5.1 Local Storage Erasure Scope
-When the driver selects "Delete all data" (`app/src/screens/settings/index.tsx` line 270):
+When the driver selects "Delete all data" in Settings -> Privacy and my data (`app/src/screens/settings/index.tsx` line 270):
 1. SQLite Database: `db.wipe()` executes:
    ```sql
    DELETE FROM events;
@@ -192,25 +194,28 @@ When the driver selects "Delete all data" (`app/src/screens/settings/index.tsx` 
    ```
 2. SecureStore (Android Keystore): `useSecure.getState().wipe()` executes:
    - Erases `sahi.contacts` (all emergency contact names and phone numbers).
-   - Erases `sahi.wifi` (stored Pi Wi-Fi SSID and WPA2 passphrase).
+   - Erases `sahi.wifi` (stored unit Wi-Fi SSID and WPA2 passphrase).
    - [Proposed] Erases `sahi.ble` (stored BLE auth token `K` and peripheral identity).
 3. KV-Store: `clearKv()` purges all settings, resetting `consentedAt = null` and `onboarded = false`.
 4. Process Reload: Invokes `reloadAppAsync('all data deleted')` to restart app into a pristine, unconsented state.
 
-#### 4.5.2 Pi Pairing Token Invalidation and Uninstall Footprint
+#### 4.5.2 Unit Pairing Token Invalidation and Uninstall Footprint
+
+> [!NOTE] Engineering note: Token rotation and storage residue.
+
 - Uninstall Footprint: When the driver uninstalls Sahi via the Android OS, the OS purges `/data/data/edu.aast.rtdms.sahi`. All local databases, encryption keys, and tokens on the phone are destroyed.
-- Pi Residue: The Pi has NO user account records and stores no driver personal details. However, the static pairing token `K` remains in the Pi's local configuration file (`contracts/pi-link/CONTRACT.md` line 69), and any incident video clips recorded during trips remain on the Pi's internal storage (`incidents/`).
+- Unit Residue: The unit has NO user account records and stores no driver personal details. However, the static pairing token `K` remains in the unit configuration file (`contracts/pi-link/CONTRACT.md` line 69), and any incident video clips recorded during trips remain on the unit's internal storage (`incidents/`).
 - Token Invalidation Procedure:
-  To revoke access from an uninstalled phone, the driver must rotate the pairing token on the Pi:
-  - Through the Pi local setup web page, or
-  - Via the Pi command-line interface: `rtdms-admin rotate-token`.
-  Rotating the token on the Pi invalidates all previously paired phones instantly (`contracts/pi-link/CONTRACT.md` line 71).
+  To revoke access from an uninstalled phone, the driver must rotate the pairing token on the unit:
+  - Through the unit local setup web page, or
+  - Via the unit command-line interface: `rtdms-admin rotate-token`.
+  Rotating the token on the unit invalidates all previously paired phones instantly (`contracts/pi-link/CONTRACT.md` line 71).
 
 #### 4.5.3 Zero-Cloud Verification
 Sahi contains no network communication code directed outside the vehicle. Even when operating on devices with Google Play services present (such as the realme GT 6T), the application never assumes GMS in code and makes zero network calls to Google or cloud infrastructure:
 - Grep validation gate (`app/docs/VALIDATION.md` §1):
   `grep -rnE "fetch\(|https://" src` matches only:
-  - `pi/transport.ts` (calls to local Pi `10.42.0.1:8080`).
+  - `pi/transport.ts` (calls to local unit `10.42.0.1:8080`).
   - Google Maps URL template text generated for the outgoing SMS (`emergency.ts`).
   - Maps linking intent when user taps "Open in Maps".
 - Zero telemetry, zero analytics, zero crash reporting SDKs, zero remote push services.
@@ -231,25 +236,27 @@ Sahi contains no network communication code directed outside the vehicle. Even w
 - Disconnected > 60 s: Trip Manager finalizes the trip, records `endedAt`, and computes the safety score. Subsequent connection begins a new trip.
 
 #### 4.6.2 Wi-Fi Hotspot Demand Scoping
-The Pi's Wi-Fi hotspot has NO internet connectivity. If an Android device remains bound to a no-internet Wi-Fi network, Android routing policies may drop cellular data or fail to route emergency SMS/calls.
+
+> [!NOTE] Engineering note: Scoped Wi-Fi connection handling.
+
+The unit's Wi-Fi hotspot has NO internet connectivity. If an Android device remains bound to a no-internet Wi-Fi network, Android routing policies may drop cellular data or fail to route emergency SMS/calls.
 - Binding Policy:
-  Sahi joins and binds to the Pi Wi-Fi network (`sahi-native` `joinWifi`) EXCLUSIVELY during active video streaming sessions:
-  1. When viewing the Live tab with camera feed visible and vehicle stationary.
-  2. When actively running the Calibrate screen (`app/src/app/calibrate.tsx`).
-  3. When downloading an incident MP4 clip (`app/src/app/incident/[id].tsx`).
+  Sahi joins and binds to the unit Wi-Fi network (`sahi-native` `joinWifi`) EXCLUSIVELY during active video sessions:
+  1. When actively running setup or the Calibrate screen (`app/src/app/calibrate.tsx`) while parked (live camera video is never streamed on the Drive tab while driving).
+  2. When downloading an incident MP4 clip (`app/src/app/incident/[id].tsx`).
 - Immediate Unbinding:
-  As soon as the driver leaves the Live tab, locks the screen, or vehicle speed exceeds 10 km/h (driving lock engaged), the application immediately invokes:
+  As soon as the driver leaves setup/calibration, locks the screen, or vehicle speed exceeds 10 km/h (driving lock engaged), the application immediately invokes:
   ```kotlin
   // SahiNativeModule.kt line 130
   cm.bindProcessToNetwork(null)
   ```
   This returns standard network routing to the cellular interface immediately, ensuring cellular SMS and emergency calling are uninhibited.
 
-#### 4.6.3 Pi Contract Version Mismatch Handling
+#### 4.6.3 Unit Contract Version Mismatch Handling
 When connecting via BLE, Sahi reads the `health` characteristic `0x0a` or parses the pairing QR field `V:<version>`:
 - If `health.contract !== APP_CONTRACT_VERSION`:
   1. The app displays a non-blocking warning banner:
-     `"Pi software mismatch (Pi vX, App vY). Basic monitoring active; advanced features disabled."`
+     `"Unit software mismatch (Unit vX, App vY). Basic monitoring active; advanced features disabled."`
   2. The app DOES NOT guess, interpolate, or synthesize changed payloads.
   3. Compatible GATT characteristics (`alert` on `0x01`, `incident` on `0x07`) continue to operate.
   4. Features depending on altered or unsupported characteristics are disabled in the UI (showing "—").

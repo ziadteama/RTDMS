@@ -36,7 +36,7 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
   - Poller / Transport: Inactive.
   - Wi-Fi Station: Inactive.
 - User Experience:
-  - Screen: English-only `ConsentStatement` (`app/src/screens/consent.tsx`) detailing: what is processed (IR video on Pi, motion/GPS on phone), what is stored locally (events, incidents), what is sent on crash (SMS with Maps link), and what is never done (no cloud, no remote streaming).
+  - Screen: English-only `ConsentStatement` (`app/src/screens/consent.tsx`) detailing: what is processed (camera on your Sahi unit, motion/GPS on phone), what is stored locally (events, incidents), what is sent on crash (SMS with Maps link), and what is never done (no cloud, no remote streaming).
   - Notification: None.
   - Status Pill: None.
 - Failure Handling: Navigation is blocked until "Agree" is pressed. Exiting the app leaves `consentedAt === null`; subsequent launches return to `/consent`.
@@ -56,7 +56,7 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
   - Wi-Fi Station: Inactive.
 - User Experience:
   - Screen: Permission audit list (`app/src/app/(onboarding)/permissions.tsx`), aligned with Android 12+ and Android 16 (SDK 36) rules:
-    - Bluetooth (`BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`): Required on Android 12+ (SDK 31+) for scanning and connecting to the Pi GATT peripheral without needing location permissions for BLE.
+    - Bluetooth (`BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`): Required on Android 12+ (SDK 31+) for scanning and connecting to your Sahi unit without needing location permissions for BLE.
     - Notifications (`POST_NOTIFICATIONS`): Mandatory runtime permission on Android 13+ (SDK 33+) for alerts and ongoing foreground service notifications.
     - Location (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`): Used for vehicle speed gating and emergency SOS coordinates. *Foreground Service Constraint*: Under Android 14+ and Android 16 (SDK 36), starting a foreground service of type `location` strictly requires while-in-use location permissions to be granted *prior* to starting the service (Android 16 enforcement: unverified, test on device).
     - SMS & Phone (`SEND_SMS`, `CALL_PHONE`): Used for automated emergency escalation without tapping.
@@ -85,29 +85,30 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
   - Status Pill: Phase indicator ("Busy", "Error", "OK").
 - Failure Handling:
   - Invalid QR: Displays "Invalid QR code" (`app/src/screens/pair.tsx` line 59).
-  - ATT Authentication Failure: Pi rejects write with insufficient authentication; UI prompts user that the token in the QR was refused.
-  - Timeout: Prompts user to verify Pi power and Bluetooth status.
+  - ATT Authentication Failure: Sahi unit rejects write with insufficient authentication; UI prompts user that the pairing token was refused.
+  - Timeout: Prompts user to verify that your Sahi unit is plugged in and Bluetooth is enabled.
 - Persistence:
   - SecureStore (`app/src/state/secure.ts`): Writes `sahi.wifi` (`ssid`, `password`), and [Proposed] `sahi.ble` (`token`, peripheral address/UUID).
   - KV-Store: Saves `baseUrl` (`app/src/state/settings.ts`).
 
 ### State 5: `calibration`
-- Entry Trigger: Driver selects "Calibrate eyes" from Settings or taps calibration prompt on Live screen (`app/src/app/calibrate.tsx`).
-- Exit Trigger: Pi reports calibration success (`result === 'done'`), failure (`result === 'failed'`), or user cancels.
+- Entry Trigger: Driver selects "Set up driving position" from Settings -> Your Sahi unit or taps calibration prompt on Drive screen (`app/src/app/calibrate.tsx`).
+- Exit Trigger: Calibration finishes (`result === 'done'`), reports failure (`result === 'failed'`), or user cancels.
 - Execution Matrix:
   - Foreground Service: Inactive (unless entered during an active trip while stationary).
   - BLE Connection: Writes calibration command via GATT `command` characteristic `0x05` (or HTTP `POST /calibrate`). Subscribes to `status` notifications to observe `drowsiness.message`.
+    > [!NOTE] Engineering note: BLE GATT command characteristic `0x05` triggers calibration on the unit runtime; status notifications deliver intermediate states.
   - GPS: Monitored to confirm vehicle is stationary (speed < 5 km/h).
   - IMU 100 Hz: Running if monitor is active.
   - Poller / Transport: 5 Hz status updates active to monitor calibration progress.
-  - Wi-Fi Station: ACTIVE for live video preview (`/stream.mjpg`) to ensure face is framed within the IR camera field of view. Unbound upon exit.
+  - Wi-Fi Station: ACTIVE for live camera preview (`/stream.mjpg`) to ensure face is framed within the camera field of view during setup and calibration. Unbound upon exit.
 - User Experience:
-  - Screen: `Calibrate` screen (`app/src/app/calibrate.tsx`): Live video preview (`LiveView`), progress bar, Step 1 prompt (10 s eyes open looking ahead), Step 2 prompt (3 s eyes closed), spoken voice lines (`cal.step2`, `cal.done`).
+  - Screen: `Calibrate` screen (`app/src/app/calibrate.tsx`): Camera video preview (`LiveView`), progress bar, Step 1 prompt (10 s eyes open looking ahead), Step 2 prompt (3 s eyes closed), spoken voice lines (`cal.step2`, `cal.done`).
   - Notification: None.
   - Status Pill: "Calibrating", "Calibrated", or failure error message.
-- Failure Handling: If face is lost or lighting is insufficient, Pi reports `calibration failed: <reason>` in `drowsiness.message`. App speaks failure cue, displays the exact Pi reason, and presents a "Retry" button.
+- Failure Handling: If face is lost or lighting is insufficient, unit reports `calibration failed: <reason>` in `drowsiness.message`. App speaks failure cue, displays plain-language reason, and presents a "Retry" button.
 - Persistence:
-  - Pi: Persists baseline face mesh thresholds to profile directory on the Pi.
+  - Unit: Persists baseline face mesh profile in local unit storage.
   - App: Live state updates `drowsiness.calibrated = true`. No local database records created.
 
 ### State 6: `idle` (Paired, Not Driving)
@@ -115,15 +116,15 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
 - Exit Trigger: Conjunction of BLE connection established AND vehicle speed > 10 km/h (transitions to `trip auto-start`).
 - Execution Matrix:
   - Foreground Service: [Proposed] Low-power background standby receiver or dormant until movement detected.
-  - BLE Connection: Reconnection loop active; scans for paired Pi peripheral. If connected while parked, receives 5 Hz alert keep-alives and 2 Hz status.
+  - BLE Connection: Reconnection loop active; scans for paired unit peripheral. If connected while parked, receives 5 Hz alert keep-alives and 2 Hz status.
   - GPS: Active in foreground (or low-frequency geofence in background).
   - IMU 100 Hz: Paused or running in low-power mode.
   - Poller / Transport: Listening for BLE notifications if in range.
   - Wi-Fi Station: Disconnected / unbound (`unbindNetwork()` in `SahiNativeModule.kt`).
 - User Experience:
-  - Screen: Live tab (`app/src/screens/live/index.tsx`) displaying neutral grey "Pi offline" (if out of car) or green "Alert" / "Ready" (if sitting in parked car with Pi on). Metric cards visible; speed shows 0 km/h.
+  - Screen: Drive tab displaying neutral grey "Unit not connected" (if out of car) or green "Ready" (if sitting in parked car with unit on). Speed shows 0 km/h.
   - Notification: None (or persistent background status if foreground service kept alive).
-  - Status Pill: "Offline" or "Connected / Ready"; Crash detection indicator displays "Not armed: speed under 20 km/h".
+  - Status Pill: "Unit not connected" or "Ready"; Crash detection indicator displays "Not armed: speed under 20 km/h".
 - Failure Handling: Out-of-range BLE advertisements do not generate audible alarms or error banners; the app silently waits.
 - Persistence:
   - Memory-only state in `useLive`. No trip rows created.
@@ -134,15 +135,15 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
 - Exit Trigger: Insertion of new trip record into SQLite; transitions to `driving`.
 - Execution Matrix:
   - Foreground Service: Started via `Location.startLocationUpdatesAsync(LOCATION_TASK)` with notification "Sahi is monitoring this trip" (`app/src/services/monitor.ts` lines 121-130). Must satisfy Android 14+ / Android 16 foreground service type location prerequisites: while-in-use location (`ACCESS_FINE_LOCATION` or `ACCESS_COARSE_LOCATION`) must already be granted (Android 16 foreground service launch behavior: unverified, test on device).
-  - BLE Connection: Connected; writes current wall-clock time (`Date.now()`) to GATT `clock` characteristic `0x08` for Pi ring-buffer synchronization (`contracts/pi-link/CONTRACT.md` line 45).
+  - BLE Connection: Connected; writes current wall-clock time (`Date.now()`) to GATT `clock` characteristic `0x08` for ring-buffer synchronization (`contracts/pi-link/CONTRACT.md` line 45).
   - GPS: Best accuracy for navigation, 1 Hz interval.
   - IMU 100 Hz: Started via `SahiNative.startMotion(100)` (`app/src/services/monitor.ts` line 141).
   - Poller / Transport: Subscribed to BLE `alert` (5 Hz), `status` (2 Hz), and `physio` (1 Hz).
   - Wi-Fi Station: Unbound.
 - User Experience:
-  - Screen: Live tab updates with active speed and trip timer.
+  - Screen: Drive tab updates with active speed and trip timer.
   - Notification: Ongoing notification posted: "Sahi is monitoring this trip" (`t('service.title')`).
-  - Status Pill: Connection pill changes to "Online". Crash indicator updates as speed rises.
+  - Status Pill: Connection pill changes to "Armed". Crash indicator updates as speed rises.
 - Failure Handling: If SQLite insertion fails, trip sequence is maintained in memory and retried. If BLE drops before speed confirms, trip initialization is aborted.
 - Persistence:
   - SQLite: `db.startTrip(now, demo)` executes, generating a new `tripId` (`app/src/state/db.ts` line 67).
@@ -159,7 +160,7 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
   - GPS: Continuous 1 Hz fixes delivered to `TaskManager` task `sahi-location` (`app/src/services/monitor.ts` line 55).
   - IMU 100 Hz: 100 Hz accelerometer and gyroscope sampling on background `HandlerThread("sahi-motion")`. Flushed to JS in 200 ms batches (`SahiNativeModule.kt` line 206). `CrashMonitor` evaluates every 500 ms.
   - Poller / Transport: BLE notification stream active.
-  - Wi-Fi Station: STRICTLY UNBOUND. Live MJPEG video stream component is unmounted (`LiveView`).
+  - Wi-Fi Station: STRICTLY UNBOUND. Live camera video is never rendered while driving (component unmounted).
 - User Experience:
   - Screen: Driving Lock interface active (`app/src/screens/live/index.tsx` lines 185-197):
     - All tab navigation bars and secondary metrics hidden.
@@ -171,7 +172,7 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
   - Notification: Ongoing service notification. Escalated alerts trigger heads-up notifications (channel `alerts`) accompanied by voice lines in English and haptic vibration (`app/src/services/alerts.ts`).
   - Status Pill: Displays driver state ("Alert", "Drowsy", "Distracted", "Phone").
 - Failure Handling:
-  - Loss of BLE: UI shows neutral grey "Pi offline"; cab buzzer handles driver alerts; phone continues tracking GPS trip and keeps crash detection armed.
+  - Loss of BLE: UI shows neutral grey "Unit not connected"; unit buzzer handles driver alerts; phone continues tracking GPS trip and keeps crash detection armed.
   - Loss of GPS: Crash detection disarms; UI displays banner "No GPS: crash detection is off".
 - Persistence:
   - SQLite: Periodic trip summary flush every 10 s (`app/src/services/trips.ts` line 16). Driver state changes written to `events` table; heart rate written to `hr` table every 30 s.

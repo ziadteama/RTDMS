@@ -1,7 +1,6 @@
 import type { Contact } from '@/state/secure';
 import { useSettings } from '@/state/settings';
 import { normalizeE164 } from '../phone';
-import { fakeRelayClient } from './fake-client';
 import { relay, type RelayClient } from './client';
 
 /**
@@ -14,8 +13,9 @@ export async function syncRelayContacts(
   contacts: Contact[],
   relayClient?: RelayClient,
 ): Promise<Contact[]> {
-  const isDemo = useSettings.getState().demo;
-  const client = relayClient ?? (isDemo ? fakeRelayClient : relay);
+  // Demo mode never fabricates a registration result: contacts stay as saved.
+  if (!relayClient && useSettings.getState().demo) return contacts;
+  const client = relayClient ?? relay;
 
   if (contacts.length === 0) {
     try {

@@ -5,10 +5,10 @@ Part of [Sahi UX redesign](../UX.md).
 ### Flow 2: Monitoring Status & System Tray Notification
 
 #### Goal
-Provide immediate, unambiguous status of system arming, Pi connection, and background health across all app screens and in the Android system tray. Ensure silent OEM kills or user pauses are instantly caught and can be resumed with a single tap.
+Provide immediate, unambiguous status of system arming, unit connection, and background health across all app screens and in the Android system tray. Ensure silent OEM kills or user pauses are instantly caught and can be resumed with a single tap.
 
 #### Trigger
-- Persistent in top navigation bar across all tabs (`Live`, `Trips`, `Pi`, `Settings`).
+- Persistent in top navigation bar across all tabs (`Drive`, `Trips`, `Settings`).
 - System-wide foreground service notification.
 - "Monitoring paused" push notification posted when sensor stream stalls or app is resumed from an OEM background freeze.
 
@@ -29,7 +29,7 @@ Provide immediate, unambiguous status of system arming, Pi connection, and backg
 
 [ State: NOT ARMED (NO GPS) ]
 +---------------------------------------+
-|  (!) NOT ARMED: NO GPS FIX            | bg: alert.short_beep (#E3C14B)
+|  (!) NOT ARMED: NO GPS                | bg: alert.short_beep (#E3C14B)
 +---------------------------------------+ text: onAlert.short_beep (#1A1402)
                                           type: label (15/20 600)
 
@@ -39,14 +39,14 @@ Provide immediate, unambiguous status of system arming, Pi connection, and backg
 +---------------------------------------+ text: textSecondary (#A5ADB5)
                                           type: label (15/20 600)
 
-[ State: PI OFFLINE ]
+[ State: UNIT NOT CONNECTED ]
 +---------------------------------------+
-|  (x) PI OFFLINE                       | bg: surfaceRaised (#1C2024)
+|  (x) UNIT NOT CONNECTED               | bg: surfaceRaised (#1C2024)
 +---------------------------------------+ text: unknown (#6F7881)
                                           type: label (15/20 600)
 ```
 
-#### Screen Wireframe: Live Dashboard Header with Integrated Pill (360dp Wide)
+#### Screen Wireframe: Drive Dashboard Header with Integrated Pill (360dp Wide)
 
 ```
 +------------------------------------+ 360dp
@@ -61,18 +61,34 @@ Provide immediate, unambiguous status of system arming, Pi connection, and backg
 | |                                | |
 | +--------------------------------+ |
 |                                    |
-| [2] CAMERA VIEW                    | LiveView container
+| [2] TRIP CONTEXT                   | Context line
 | +--------------------------------+ | surface: #14171A
-| | [      CABIN VIDEO FEED      ] | | aspect: 4:3
-| |                                | |
+| | Speed: 45 km/h   Trip: 32 min   | | type: metricSmall (20/26 tabular)
 | +--------------------------------+ |
 |                                    |
-| [3] TELEMETRY                      | Grouped Metrics
+| [3] [      HOLD FOR SOS (2s)     ] | HoldButton: touch.large (64dp)
++------------------------------------+
+```
+
+#### Screen Wireframe: Status Explanation Sheet (Tapping the Status Pill)
+
+Tapping the status pill opens a plain-language explanation sheet. It does NOT open a diagnostics screen. Diagnostics live strictly in the hidden Diagnostics screen (Settings -> About -> tap version 7 times).
+
+```
++------------------------------------+ 360dp
+| [1] ============================== | Sheet handle
+| [2] Monitoring Status              | type: title (28/34 700)
+|     Current safety protection      | type: caption (13/18 400), textSec
++------------------------------------+
+| [3] STATUS EXPLANATION             | Section
 | +--------------------------------+ | surface: #14171A
-| | Speed: 45 km/h   HR: 72 bpm    | | type: metricSmall (20/26 tabular)
+| | Sahi stopped monitoring at     | | type: body (17/24 400)
+| | 14:32 because your phone       | |
+| | closed it. Tap to fix.         | |
 | +--------------------------------+ |
 |                                    |
-| [4] [      HOLD FOR SOS (2s)     ] | HoldButton: touch.large (64dp)
+| [4] [      RESUME MONITORING       ] | Button: primary, action (48dp)
+| [5] [             DISMISS          ] | Button: ghost (48dp)
 +------------------------------------+
 ```
 
@@ -82,7 +98,7 @@ Provide immediate, unambiguous status of system arming, Pi connection, and backg
 +-------------------------------------------------------------+
 | (Eye Icon) Sahi · Monitoring Active · now                    |
 | Sahi is monitoring this trip                                |
-| Armed · Connected to Pi · Speed 45 km/h · Crash detection ON|
+| Armed · Unit connected · Speed 45 km/h · Crash detection on |
 +-------------------------------------------------------------+
 ```
 
@@ -92,7 +108,8 @@ Provide immediate, unambiguous status of system arming, Pi connection, and backg
 +-------------------------------------------------------------+
 | (!) Sahi · System Alert · now                               |
 | Monitoring paused                                           |
-| Background service was stopped by Android. Protection is OFF|
+| Sahi stopped monitoring at 14:32 because your phone closed   |
+| it. Tap to fix.                                             |
 | [ RESUME MONITORING ]                                       |
 +-------------------------------------------------------------+
 ```
@@ -101,34 +118,47 @@ Provide immediate, unambiguous status of system arming, Pi connection, and backg
 - Pill States:
   - Armed: `"Armed"` or `"Armed · {speed} {unit}"`
   - Low speed: `"Not armed: Speed < 20 km/h"`
-  - No GPS: `"Not armed: No GPS fix"`
-  - Missing permission: `"Not armed: Missing permission"`
+  - No GPS: `"Not armed: No GPS"`
+  - Missing permission: `"Not armed: Setup needed"`
   - Paused: `"Monitoring paused"`
-  - Pi offline: `"Pi offline"`
+  - Unit not connected: `"Unit not connected"`
+- Status Explanation Sheet:
+  - Title: `"Monitoring status"`
+  - Subtitle: `"Current safety protection"`
+  - State Explanations:
+    - Armed: `"Sahi is actively monitoring. Your Sahi unit is connected and crash detection is on."`
+    - Low speed: `"Crash detection arms automatically once driving above 20 km/h."`
+    - No GPS: `"Waiting for GPS fix. Crash detection is disarmed until GPS signal is acquired."`
+    - Setup needed: `"Safety permissions need to be completed before monitoring can arm."`
+    - Paused: `"Sahi stopped monitoring at {time} because your phone closed it. Tap to fix."`
+    - Unit not connected: `"Unit not connected. Check it is powered on."`
+  - Action Resume: `"Resume monitoring"`
+  - Action Dismiss: `"Dismiss"`
 - Persistent Notification:
   - Channel: `service` (NotificationManager.IMPORTANCE_LOW, ongoing).
   - Title: `"Sahi is monitoring this trip"`
-  - Body Armed: `"Armed · Pi connected · {speed} {unit} · Crash detection on"`
-  - Body Not Armed: `"Connected to Pi · Crash detection disarmed ({reason})"`
+  - Body Armed: `"Armed · Unit connected · {speed} {unit} · Crash detection on"`
+  - Body Not Armed: `"Unit connected · Crash detection disarmed ({reason})"`
 - Paused Notification:
   - Channel: `alerts` (NotificationManager.IMPORTANCE_HIGH).
   - Title: `"Monitoring paused"`
-  - Body: `"Background tracking was stopped. Driver alerts and crash detection are offline."`
+  - Body: `"Sahi stopped monitoring at {time} because your phone closed it. Tap to fix."`
   - Action Label: `"Resume"`
 
 #### State & Token Mapping Table
 
 | Logical State | Trigger / Conditions | Pill Background Token | Text Color Token | Left Icon |
 |---|---|---|---|---|
-| **Armed** | Pi online, BLE/Wi-Fi active, GPS fix valid, Speed > 20 km/h (or forced armed) | `colors.alert.none` (`#3FB97A` / `#1C8A52`) | `colors.onAlert.none` (`#06140C` / `#FFFFFF`) | `check` / `dot` |
-| **Not Armed: Speed** | Pi online, Speed <= 20 km/h (crash detector speed floor) | `colors.alert.short_beep` (`#E3C14B` / `#8C6F00`) | `colors.onAlert.short_beep` (`#1A1402` / `#FFFFFF`) | `info` |
-| **Not Armed: GPS** | Pi online, no GPS lock for > 10 s | `colors.alert.short_beep` (`#E3C14B` / `#8C6F00`) | `colors.onAlert.short_beep` (`#1A1402` / `#FFFFFF`) | `gps` |
-| **Paused** | `useSettings.paused === true` or OEM kill detected | `colors.surfaceRaised` (`#1C2024` / `#ECEEF0`) | `colors.textSecondary` (`#A5ADB5` / `#4D555D`) | `pause` |
-| **Pi Offline** | 3 consecutive HTTP/BLE timeouts | `colors.surfaceRaised` (`#1C2024` / `#ECEEF0`) | `colors.unknown` (`#6F7881` / `#79828B`) | `wifiOff` |
+| **Armed** | Unit online, Bluetooth active, GPS fix valid, Speed > 20 km/h (or forced armed) | `colors.alert.none` (`#3FB97A` / `#1C8A52`) | `colors.onAlert.none` (`#06140C` / `#FFFFFF`) | `check` / `dot` |
+| **Not Armed: Speed** | Unit online, Speed <= 20 km/h (crash detector speed floor) | `colors.alert.short_beep` (`#E3C14B` / `#8C6F00`) | `colors.onAlert.short_beep` (`#1A1402` / `#FFFFFF`) | `info` |
+| **Not Armed: GPS** | Unit online, no GPS lock for > 10 s | `colors.alert.short_beep` (`#E3C14B` / `#8C6F00`) | `colors.onAlert.short_beep` (`#1A1402` / `#FFFFFF`) | `gps` |
+| **Paused** | `useSettings.paused === true` or phone closed background service | `colors.surfaceRaised` (`#1C2024` / `#ECEEF0`) | `colors.textSecondary` (`#A5ADB5` / `#4D555D`) | `pause` |
+| **Unit Not Connected** | 3 consecutive connection timeouts | `colors.surfaceRaised` (`#1C2024` / `#ECEEF0`) | `colors.unknown` (`#6F7881` / `#79828B`) | `wifiOff` |
 
 #### Accessibility
-- **Touch Target**: The status pill serves as an interactive inspection touchpoint. Tapping it opens an diagnostic dialog showing detailed subsystem statuses. Minimum touch bounding box: 48dp x 48dp via `hitSlop: 12`.
-- **TalkBack**: Role `"status"`. Live region `"polite"`. Label: `"Monitoring status: Armed, driving at 45 kilometers per hour. Double tap for system diagnostics."`
+- **Touch Target**: The status pill serves as an interactive inspection touchpoint. Tapping it opens a plain-language explanation sheet describing the current state. Minimum touch bounding box: 48dp x 48dp via `hitSlop: 12`.
+- **TalkBack**: Role `"status"`. Live region `"polite"`. Label: `"Monitoring status: Armed, driving at 45 kilometers per hour. Double tap for status details."`
+- **Engineering Diagnostics Isolation**: System diagnostics are strictly located in the hidden Diagnostics screen (Settings -> About -> tap version 7 times), never accessed from the status pill.
 - **Reduce Motion**: Color transitions respect `motion.base` (250ms ease-out) without bouncy scale springs. Pulses are disabled.
 
 #### i18n Keys (en.ts additions)
@@ -139,16 +169,21 @@ Provide immediate, unambiguous status of system arming, Pi connection, and backg
 'status.pill.notArmedGps': 'Not armed: No GPS',
 'status.pill.notArmedPerm': 'Not armed: Setup needed',
 'status.pill.paused': 'Monitoring paused',
-'status.pill.offline': 'Pi offline',
-'status.dialog.title': 'System Diagnostics',
-'status.dialog.pi': 'Pi link: {state}',
-'status.dialog.gps': 'GPS accuracy: {acc} m',
-'status.dialog.speed': 'Current speed: {speed} {unit}',
-'status.dialog.crash': 'Crash detection: {state}',
-'service.notif.armed': 'Armed · Pi connected · {speed} {unit}',
-'service.notif.disarmed': 'Connected · Disarmed ({reason})',
+'status.pill.offline': 'Unit not connected',
+'status.sheet.title': 'Monitoring status',
+'status.sheet.subtitle': 'Current safety protection',
+'status.sheet.armed': 'Sahi is actively monitoring. Your Sahi unit is connected and crash detection is on.',
+'status.sheet.notArmedSpeed': 'Crash detection arms automatically once driving above 20 km/h.',
+'status.sheet.notArmedGps': 'Waiting for GPS fix. Crash detection is disarmed until GPS signal is acquired.',
+'status.sheet.notArmedPerm': 'Safety permissions need to be completed before monitoring can arm.',
+'status.sheet.paused': 'Sahi stopped monitoring at {time} because your phone closed it. Tap to fix.',
+'status.sheet.offline': 'Unit not connected. Check it is powered on.',
+'status.sheet.resume': 'Resume monitoring',
+'status.sheet.dismiss': 'Dismiss',
+'service.notif.armed': 'Armed · Unit connected · {speed} {unit}',
+'service.notif.disarmed': 'Unit connected · Disarmed ({reason})',
 'service.notif.pausedTitle': 'Monitoring paused',
-'service.notif.pausedBody': 'Driver monitoring stopped. Tap Resume to protect this drive.',
+'service.notif.pausedBody': 'Sahi stopped monitoring at {time} because your phone closed it. Tap to fix.',
 'service.notif.resume': 'Resume',
 ```
 

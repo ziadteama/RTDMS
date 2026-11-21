@@ -2,7 +2,15 @@
 
 ## 1. Overview & System Principles
 
-Sahi is an Android driver-monitoring companion app for a Raspberry Pi unit mounted in the vehicle. The app acts as an instrument panel: it displays real-time driver state from camera-based fusion on the Pi, records trip telemetry, provides configurable alert feedback, and executes a two-stage crash detection and emergency SOS workflow.
+Sahi is an Android driver-monitoring companion app for your Sahi unit mounted in the vehicle. The app acts as a calm, distraction-free instrument panel: it displays real-time driver state from the camera and sensors on your Sahi unit, records trip history, provides configurable alert feedback, and executes a two-stage crash detection and emergency SOS workflow.
+
+### Audience & Product Principles
+- **Driver-First Product**: The sole audience is the driver of a personal car (see `.cursor/rules/end-user-product.mdc` and `Subsystems/Mobile App End-User Scope.md`). Fleet managers, OEM engineers, and the team are not the audience of the main app.
+- **Three Tabs**: **Drive**, **Trips**, **Settings**. Driving lock hides secondary details while moving.
+- **Hidden Diagnostics**: Engineering diagnostics (hardware health, CPU/throttle/memory/disk, per-model switches, numeric thresholds, address entry, demo mode, relay override, raw sensor metrics) live in a hidden Diagnostics screen opened by tapping the app version 7 times in Settings > About.
+- **No In-Drive Video**: Live camera video is strictly confined to setup and calibration, never on the Drive tab while driving.
+- **Defaults Over Settings**: Sensible defaults, followed by simple 3-way choices (Low / Normal / High sensitivity), then Diagnostics. No numeric thresholds in Settings.
+- **No Metric Without Meaning**: Plain state words and sentences; raw numbers (EAR, PERCLOS, RR, fps, FOV) never appear in the driver-facing UI.
 
 ### Target Environment & Test Device
 - **Hardware Reference**: realme GT 6T (Qualcomm Snapdragon 7+ Gen 3).

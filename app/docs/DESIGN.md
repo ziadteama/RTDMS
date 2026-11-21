@@ -4,6 +4,15 @@ Read at a glance, in a car, often at night. One token system in [`src/theme/`](.
 screens use components, components use tokens. No hex value, font size or spacing number appears
 in a screen file (check: the grep in [VALIDATION.md](VALIDATION.md)).
 
+## Audience
+
+The audience is the driver of a personal car. Fleet managers, OEM engineers, and the team are
+not the audience of the main app. See [.cursor/rules/end-user-product.mdc](../../.cursor/rules/end-user-product.mdc).
+Anything only engineers or the team need lives in the hidden **Diagnostics** screen (tap version
+number 7 times in About, labeled "for the Sahi team") or in team tooling, never in the tabs,
+onboarding, or notifications. Every driver-facing screen must pass the audience test: "Would a driver
+who has never seen the code know what this is and why they would touch it?"
+
 ## Color
 
 Fixed light/dark pairs, not Material You dynamic colors: the theme is an in-app setting (dark by
@@ -36,8 +45,8 @@ wallpaper: decorative color, which is out.
 | `max` | behavioural + physiological risk | `#FF2E3A` bright red, pulses | `#B0001A` | white |
 
 The same scale is reused, with the same meaning, for: score bands (≥ 80 green, ≥ 60 amber,
-below red), HR signal quality (good / degraded / bad), detected phone use, model errors on the Pi
-tab, the destructive button, and the SOS screen (`max`). Nothing else is colored.
+below red), HR signal quality (good / degraded / bad), detected phone use, model errors in
+Diagnostics, the destructive button, and the SOS screen (`max`). Nothing else is colored.
 
 ## Type
 
@@ -85,8 +94,9 @@ No entrance animations, no bounce, no staggered lists, no animated tab switches.
 ## Icons
 
 One set: SF Symbols on iOS and Material Symbols on Android/web through `expo-symbols`
-(`src/components/icon.tsx`, bundled font, works offline). Tabs: `videocam`, `route`, `memory`,
-`settings`. No emoji anywhere.
+(`src/components/icon.tsx`, bundled font, works offline). Tabs: `directions_car` (Drive),
+`route` (Trips), `settings` (Settings). The former Pi tab (`memory`) is removed from the tab bar;
+diagnostics are consolidated in the hidden Diagnostics screen. No emoji anywhere.
 
 ## Native controls
 
@@ -94,15 +104,26 @@ Switches, sliders and pickers are `@expo/ui` (Jetpack Compose on Android). Each 
 that gets the app's theme (not the OS one), the text direction, and a neutral seed color so
 Material 3 does not tint them purple. Tabs are `NativeTabs` (the Material 3 navigation bar);
 headers are native stack headers. Confirmations for irreversible actions (delete all data,
-shut down the Pi) use the native alert dialog.
+shut down the unit in Diagnostics) use the native alert dialog.
 
 ## Layout rules
 
+- Drive tab contents, top to bottom: banners → state indicator (what) → context line
+  ("{speed} {unit} · {duration}") → hold-to-SOS.
+- No video while driving: live camera video is for setup and calibration only, never on the Drive tab
+  while driving.
+- Driving lock: above ~10 km/h (unlock below 7, hysteresis) only the state indicator, the speed
+  and hold-to-SOS remain.
 - Grouped lists (`Section` + `Row`): one surface per group, hairline separators, no card per row,
   no borders.
-- Live tab, top to bottom: banners → state indicator (what) → live view → eyes → heart → phone →
-  hold-to-SOS. Above ~10 km/h (unlock below 7, hysteresis) only the state indicator, the speed
-  and hold-to-SOS remain: the driving lock.
+- Settings sections:
+  1. Your Sahi unit (status, Set up driving position, Forget this unit)
+  2. Alerts (sound, volume, vibration, Low-Normal-High sensitivity, test alert)
+  3. Emergency (contacts, countdown 30/45/60, who to call, number, crash detection)
+  4. Privacy and my data
+  5. App
+  6. About (version tap 7x opens Diagnostics)
+  No numeric thresholds anywhere in Settings.
 - English only (user decision 2026-11-21): no RTL, no locale switch.
 
 ## Banned (from the brief and `expo-design-system` → native slop)
@@ -218,7 +239,7 @@ Two distinct emergency countdown surfaces separating initial driver cancellation
 
 ### 5. Warning banner variant (Camera covered / Calibration lost)
 
-A high-visibility, non-dismissible warning banner positioned on the Live screen when camera
+A high-visibility, non-dismissible warning banner positioned on the Drive screen when camera
 tracking is occluded or lost.
 
 - **Structure & Container**:

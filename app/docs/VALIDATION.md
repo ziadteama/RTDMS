@@ -14,6 +14,7 @@ What *has* passed, with dates and environments: [EVIDENCE.md](EVIDENCE.md).
 | No hardcoded styles in screens | `grep -rnE "#[0-9a-fA-F]{3,8}\b\|fontSize\|fontWeight" src --include=*.tsx \| grep -v src/theme/` | only the comment in `text.tsx` |
 | No thresholds on model scores | `grep -rnE "perclos\|openness\|blink_rate\|fatigue_probability\|\.p\b" src --include=*.ts* \| grep -v test \| grep -E "[<>]=?"` | hits only in `pi/parse.ts` (a probability outside 0–1 is rejected as bad input) and `demo/scenario.ts` (generates mock data); none decides an alert |
 | No network beyond the Pi | `grep -rnE "fetch\(\|https://" src --include=*.ts*` | only `pi/transport.ts` (the Pi), the Maps link text inside the SOS SMS, and the incident screen's "Open in Maps" (the driver's tap hands it to the Maps app) |
+| Audience check | Every screen touched passes the audience test (`.cursor/rules/end-user-product.mdc`) | PR confirms: driver-facing screens contain no engineering/admin controls; CPU/throttle/memory/disk, per-model switches, numeric thresholds, address entry, demo mode, restart/shutdown, raw EAR/PERCLOS/HR/RR moved to Diagnostics |
 
 Read the output, not the exit code (Agent Guide §4).
 
@@ -44,17 +45,18 @@ release build (`npx expo run:android --variant release`), not Expo Go, not the d
 
 | # | Check | How | Pass |
 |---|---|---|---|
-| D1 | Frame rate on Live while polling | Developer options → *Profile HWUI rendering* (bars) or `adb shell dumpsys gfxinfo edu.aast.rtdms.sahi framestats`, 60 s on Live with the mock Pi running | ≤ 5 % janky frames; no bar above the 16 ms line during state changes |
+| D1 | Frame rate on Drive while polling | Developer options → *Profile HWUI rendering* (bars) or `adb shell dumpsys gfxinfo edu.aast.rtdms.sahi framestats`, 60 s on Drive with the mock unit running | ≤ 5 % janky frames; no bar above the 16 ms line during state changes |
 | D2 | Re-renders per poll | `scripts/render-count.mjs` (web) or React DevTools profiler (dev build) with `npm run mock -- --freeze 92` | metric groups render 0× while values do not change |
-| D3 | Reduce motion | Settings → Accessibility → *Remove animations* | no press scale, no `max` pulse; color changes and progress bars remain |
+| D3 | Reduce motion | Settings → App → Accessibility → *Remove animations* | no press scale, no `max` pulse; color changes and progress bars remain |
 | D4 | Driving lock | demo mode, wait for the scenario speed > 10 km/h | only state, speed, hold-to-SOS visible; unlocks below 7 km/h |
-| D6 | Pairing | scan the Pi QR (or a test QR `WIFI:T:WPA;S:test;P:pw;U:http://<laptop>:8080;;`) | system "connect to device" prompt, then Live shows data; mobile data still works |
-| D7 | Pi offline / reconnect | stop the mock, wait 2 s, start it again | banner within ~1 s of the 3rd failed poll; recovers without a tap |
+| D5 | Diagnostics access | Settings → About → tap version 7 times | Diagnostics opens with "for the Sahi team" banner; displays unit status, CPU/throttle/memory/disk, per-model switches, numeric thresholds, address entry, demo mode, relay override, restart/shutdown, raw sensor metrics; not accessible in main tabs or standard Settings |
+| D6 | Pairing | scan the unit QR (or a test QR `WIFI:T:WPA;S:test;P:pw;U:http://<laptop>:8080;;`) | system "connect to device" prompt, then Drive shows data; mobile data still works |
+| D7 | Unit offline / reconnect | stop the mock, wait 2 s, start it again | banner within ~1 s of the 3rd failed poll; recovers without a tap |
 | D8 | Alerts with the screen off | mock running, lock the phone | notification + voice + vibration on each escalation |
 | D9 | Background crash detection | demo mode, lock the phone, wait 2 min, unlock: "Monitoring this trip" notification present; `adb logcat` shows motion batches | the foreground service survived |
-| D10 | SOS end to end | demo → Settings → Simulate a crash; let it run out with a **test contact** and `emergencyNumber` set to a test number in code | parallel WhatsApp relay + link-free SMS dispatched; live status updates per contact; call starts; incident logged with outcome "Help requested" |
-| D11 | Calibration | mock Pi, Settings → Calibrate eyes | 10 s / 3 s steps, voice says "close your eyes", "Calibrated" at the end |
-| D12 | Delete all data | Settings → Delete all data | app restarts at consent; trips, contacts gone |
+| D10 | SOS end to end | Diagnostics → Demo mode → Simulate a crash; let it run out with a **test contact** and `emergencyNumber` set to a test number in code | parallel WhatsApp relay + link-free SMS dispatched; live status updates per contact; call starts; incident logged with outcome "Help requested" |
+| D11 | Calibration | mock unit, Settings → Your Sahi unit → Set up driving position | 10 s / 3 s steps, voice says "close your eyes", "Calibrated" at the end |
+| D12 | Delete all data | Settings → Privacy and my data → Delete all data | app restarts at consent; trips, contacts gone |
 
 ## 4. Manual crash tests still to do (cannot be automated)
 

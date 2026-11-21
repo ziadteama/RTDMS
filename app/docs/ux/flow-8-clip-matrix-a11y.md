@@ -89,16 +89,16 @@ Prevent inadvertent sharing or leaking of sensitive in-cabin driver video and te
 
 Every screen and component in Sahi strictly accounts for empty, error, and offline conditions:
 
-| Flow / Component | Empty State | Error State | Offline State (No Pi / No Network) |
+| Flow / Component | Empty State | Error State | Offline State (No Unit / No Network) |
 |---|---|---|---|
 | **1. Permissions** | All items undetermined: shows "Needed" with secondary Fix buttons. | System intent fails to launch: displays modal guidance instructions. | N/A (local Android OS permissions). |
-| **2. Status Pill** | No trip started / Standby: shows "Not armed: Speed 0 km/h". | Sensor error / GPS lost: shows amber "Not armed: No GPS fix". | Pi disconnected: shows neutral "Pi offline" (`surfaceRaised` + `unknown`). |
+| **2. Status Pill** | No trip started / Standby: shows "Not armed: Speed 0 km/h". | Sensor error / GPS lost: shows amber "Not armed: No GPS". | Unit disconnected: shows neutral "Unit not connected" (`surfaceRaised` + `unknown`). |
 | **3. False Alert Feedback** | No recent alert: feedback chips hidden from view. | SQLite save failure: gracefully dismisses, logs error to internal console. | Fully operational offline. Feedback saved to local SQLite DB. |
-| **4. Per-Alert Why** | No fusion alert reasons present: displays `"live.noReasons"`. | Malformed `/alert` payload: shows raw fallback code or "—". | Displays cached reasons from SQLite trip log for historical review. |
-| **5. Emergency SOS** | No emergency contacts registered: skips SMS and routes directly to Stage 2 call. | SMS transmit failure: logs failure and immediately escalates to dialing. | SOS functions without Pi or Wi-Fi (uses phone cellular and GPS). |
-| **6. Camera Warning** | Camera clear: warning banner completely hidden. | Camera covered / misaligned: displays high-priority warning banner. | Pi offline: displays "Pi offline" banner rather than false obstruction alert. |
+| **4. Per-Alert Why** | No alert reasons present: displays `"live.noReasons"`. | Malformed `/alert` payload: shows raw fallback code or "—". | Displays cached reasons from SQLite trip log for historical review. |
+| **5. Emergency SOS** | No emergency contacts registered: skips SMS and routes directly to Stage 2 call. | SMS transmit failure: logs failure and immediately escalates to dialing. | SOS functions without unit or Wi-Fi (uses phone cellular and GPS). |
+| **6. Camera Warning** | Camera clear: warning banner completely hidden. | Camera covered / misaligned: displays high-priority warning banner. | Unit offline: displays "Unit not connected" banner rather than false obstruction alert. |
 | **7. Score & Streaks** | Trip < 30 s: displays "—" (not enough driving to calculate score). | Corrupted trip telemetry: displays uncalculated state, excludes from weekly average. | Fully calculated and rendered offline on the phone. |
-| **8. Clip Consent** | Incident has no video on Pi: shows `"incident.notOnPi"` banner. | Clip download failure: shows error badge with "Retry download" option. | Clip sharing operates locally if clip was previously saved on phone. |
+| **8. Clip Consent** | Incident has no video on unit: shows `"incident.notOnUnit"` banner. | Clip download failure: shows error badge with "Retry download" option. | Clip sharing operates locally if clip was previously saved on phone. |
 
 ---
 
@@ -112,7 +112,8 @@ Every screen and component in Sahi strictly accounts for empty, error, and offli
 - **TalkBack & Screen Readers**:
   - All icons provide `accessibilityElementsHidden={true}` and rely on parent container labels.
   - Interactive rows declare `accessibilityRole="button"` and `accessibilityState={{ disabled: boolean }}`.
-  - SOS countdown uses `accessibilityLiveRegion="assertive"`. Status pill uses `accessibilityLiveRegion="polite"`.
+  - SOS countdown uses `accessibilityLiveRegion="assertive"`. Status pill uses `accessibilityLiveRegion="polite"` and announces status details on double tap.
+  - Engineering diagnostics are isolated strictly to the hidden Diagnostics screen (Settings -> About -> tap version 7 times), never exposed to screen reader navigation on standard driver screens.
 - **System Reduced Motion**:
   - In-app animations respect the Android OS `useReducedMotion()` setting.
   - Pulsing indicators (`alert.max`) disable opacity oscillation.
