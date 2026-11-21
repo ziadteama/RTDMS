@@ -180,7 +180,13 @@ new model must follow (including **ownership zones for parallel work**).
   texting alerts. Notes:
   [Subsystems/Distraction Subsystem.md](Subsystems/Distraction%20Subsystem.md).
 - `fusion/` — decision stub (`decide()` → alert patterns). GPIO wiring still pending.
-- Wearable firmware and the app: not yet created.
+- `app/` — **Sahi**, the driver's Android app (Expo SDK 58, React Native, TypeScript strict, dev
+  build + a local Kotlin module for SMS / call / background sensors). **MVP built** against a mock
+  Pi (`app/mock-pi/`) and an in-app demo mode; not yet run on a phone; the Pi-side endpoints it
+  proposes (`/alert`, `/physio`, `/health`, incident ring buffer, …) are not built. Gates:
+  `cd app && npx tsc --noEmit && npx eslint . && npm test`. Notes:
+  [Subsystems/Mobile App.md](Subsystems/Mobile%20App.md), code docs in `app/docs/`.
+- Wearable firmware: not yet created.
 
 Verify physiology with `cd models/physiology && docker compose run --rm verify` (Docker is
 canonical — no Python 3.11 on this machine).
@@ -195,8 +201,16 @@ running concurrently on the Pi.
 
 ## Repo skills available
 
-Copied from `Z:\Plegmo\.agents\skills\` into `.claude/skills/`:
+All in `.claude/skills/` (sources and commits: `.claude/skills/SOURCES.md`).
+
+Copied from `Z:\Plegmo\.agents\skills\`:
 - `obsidian-bases`, `obsidian-cli`, `obsidian-markdown` — Obsidian vault/notes tooling
 - `faithful-brief` — lossless delegation-brief writing/verification against source plans
 - `find-skills` — discover/install more skills via the Skills CLI
 - `ponytail` — minimal/YAGNI-biased coding discipline (default "full" intensity)
+
+For the mobile app (`app/`), from `expo/skills`, `emilkowalski/skills`, `callstackincubator/agent-skills`:
+- `expo-design-system`, `expo-native-ui`, `expo-ui` — tokens and components, platform styling, `@expo/ui` native controls (load first for UI work)
+- `expo-animation`, `gestures` — motion and gestures (every animation); `review-animations`, `improve-animations` — motion review / audit; `apple-design` — motion and feedback principles
+- `expo-router`, `expo-project-structure`, `expo-data-fetching`, `expo-dev-client`, `expo-module` — navigation, layout, data loading, dev builds, native modules
+- `react-native-best-practices` — FPS, re-renders, bundle size (before finishing app work)

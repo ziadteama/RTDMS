@@ -26,6 +26,7 @@ Project 2 (the build phase this repo is for).
   - [[Physiology Fusion Approach]] — Garmin confirm role + training tiers for fusion
   - [[Face Subsystem]] — EAR/PERCLOS/gaze/head-pose · `models/face/` · **implemented (core)** · live on the Pi via LiteRT, 2026-10-10 ([[Face Subsystem#Running on the Pi|status]])
   - [[Phone Subsystem]] — phone/eating distraction · `models/phone/` · **ONNX wired**
+- [[Mobile App]] — **Sahi**, the React Native driver app (live view, alerts, crash detection, incident clip) · `app/` · **MVP built** (mock Pi + demo mode; not yet on a phone, Pi endpoints pending)
 - [[Raspberry Pi 5 Target]] — the deployment device, surveyed live over SSH
 - [[Pi Setup Plan]] — researched optimal configuration + the blockers to resolve first
 
