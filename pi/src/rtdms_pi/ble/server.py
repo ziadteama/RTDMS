@@ -7,9 +7,9 @@ from collections.abc import Callable
 from typing import Any
 
 from ..config import RuntimeConfig
+from ..health import HealthProbe
 from ..incidents_api import IncidentSink, MemoryIncidentSink
 from ..pairing import load_or_create_token
-from ..payloads import health_payload
 from ..runtime import Runtime
 from ..settings import SettingsStore
 from ..sources import GarminPhysioSource
@@ -20,26 +20,19 @@ from .gatt import GattPort
 from .phone_service import PhoneService
 
 
-def health_reader(runtime: Runtime, config: RuntimeConfig) -> Callable[[], dict[str, Any]]:
-    started, cpu_started = time.monotonic(), time.process_time()
-
-    def read() -> dict[str, Any]:
-        s, elapsed = runtime.state.snapshot(), time.monotonic() - started
-        return health_payload(
-            cpu_pct=100 * (time.process_time() - cpu_started) / max(elapsed, 1e-9),
-            fps=s.fps,
-            uptime_s=elapsed,
-            camera=s.camera_ok,
-            temp_c=s.temp_c,
-            models={
-                "fusion": "running",
-                "face": "off" if config.no_camera else "running" if s.face else "error",
-                "distraction": "off" if config.no_camera else "running" if s.phone else "error",
-                "physiology": "running" if s.physio else "error" if config.physiology else "off",
-            },
-        )
-
-    return read
+def health_reader(
+    runtime: Runtime,
+    config: RuntimeConfig,
+    settings: SettingsStore | None = None,
+) -> Callable[[], dict[str, Any]]:
+    probe = HealthProbe(
+        state=runtime.state,
+        settings_provider=settings.read if settings else runtime.settings_provider,
+        physio_source=runtime.physio_source,
+        config=config,
+        state_dir=config.state_dir,
+    )
+    return probe
 
 
 async def run_ble(
@@ -50,20 +43,26 @@ async def run_ble(
     fake: bool = False,
     port: GattPort | None = None,
     incidents: IncidentSink | None = None,
+    settings: SettingsStore | None = None,
 ) -> None:
     port = port if port is not None else FakeGatt() if fake else BlessGatt()
     stop = stop if stop is not None else asyncio.Event()
     garmin = runtime.physio_source
     incident_sink = incidents if incidents is not None else MemoryIncidentSink()
+    settings_store = (
+        settings
+        if settings is not None
+        else SettingsStore(config.state_dir / "settings.json")
+    )
     service = PhoneService(
         port,
         runtime.state,
         runtime.player,
-        SettingsStore(),
+        settings_store,
         incident_sink,
         time.time,
         AuthGate(load_or_create_token(config.state_dir / "token")),
-        health_reader(runtime, config),
+        health_reader(runtime, config, settings_store),
         garmin=garmin if isinstance(garmin, GarminPhysioSource) else None,
     )
     try:
@@ -80,6 +79,7 @@ async def run_runtime_ble(
     runtime: Runtime,
     *,
     incidents: IncidentSink | None = None,
+    settings: SettingsStore | None = None,
 ) -> None:
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -88,7 +88,14 @@ async def run_runtime_ble(
         loop.add_signal_handler(sig, stop.set)
     try:
         runtime.start()
-        await run_ble(config, runtime, stop, fake=config.fake_ble, incidents=incidents)
+        await run_ble(
+            config,
+            runtime,
+            stop,
+            fake=config.fake_ble,
+            incidents=incidents,
+            settings=settings,
+        )
     finally:
         runtime.stop()
         for sig, handler in previous.items():

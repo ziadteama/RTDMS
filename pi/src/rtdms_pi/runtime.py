@@ -5,8 +5,9 @@ from __future__ import annotations
 import signal
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from types import FrameType
+from typing import Any
 
 from dms_fusion import decide
 
@@ -24,9 +25,11 @@ class Runtime:
         state: RuntimeState,
         clock: Callable[[], float] = time.monotonic,
         tick_rate: float = 1.0,
+        settings_provider: Callable[[], Mapping[str, Any]] | None = None,
     ) -> None:
         self.frame_source, self.physio_source = frame_source, physio_source
         self.player, self.state, self.clock = player, state, clock
+        self.settings_provider = settings_provider
         self._period = 1.0 / tick_rate
         self._lock = threading.RLock()
         self._stop = threading.Event()
@@ -56,9 +59,12 @@ class Runtime:
             if s.phone
             else None
         )
-        decision = decide(
-            face=face, phone=phone, physiology=dict(s.physio.raw) if s.physio else None
-        )
+        physio: dict[str, object] | None = dict(s.physio.raw) if s.physio else None
+        settings = self.settings_provider() if self.settings_provider is not None else None
+        from .detector_gate import apply_settings
+
+        face, phone, physio = apply_settings(settings, face, phone, physio)
+        decision = decide(face=face, phone=phone, physiology=physio)
         self.state.set_decision(decision)
         self.player.set_pattern(decision.pattern)
 

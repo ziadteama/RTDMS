@@ -109,3 +109,48 @@ sends clock sync, subscribes to telemetry/results, and reports write-to-result p
 Its default probe sends `test_alert` with pattern `none` (a two-second silent override).
 `--test-alert` uses `max`; `--incident` reports a synthetic incident. Use on a test
 setup. No shutdown/restart command is sent. P3 captures metadata only, not video clips.
+
+
+## Settings and Thresholds (P6)
+
+Settings are persisted to `$STATE_DIRECTORY/settings.json` (mode 0600, atomic write via temporary file).
+Detector toggles (`detectors.drowsiness`, `detectors.distraction`, `detectors.phone`, `detectors.physiology`)
+are gated via pure function `apply_settings()` in `rtdms_pi.detector_gate`. Disabling a detector blanks (sets to `None`)
+its input before calling `dms_fusion.decide()`, and is reflected as `"unavailable"` in `/status` and `"off"` in the
+`health` payload's `models` capability map.
+
+### Settings not yet applied
+
+Threshold parameters defined in the mobile-Pi contract (`settings.schema.json`) are stored, persisted, and exposed
+via BLE/HTTP, but cannot yet be applied by the Pi runtime because underlying detection models and the fusion engine
+use hard-coded threshold constants. To prevent divergent logic, `pi/` does not invent thresholds locally.
+
+| Setting | Type / Range | Default | Owning Subsystem | Reason not yet applied |
+|---|---|---|---|---|
+| `eye_closure_s` | float (0.5 – 10.0 s) | `2.0` | Vision / drowsiness model | Fixed internal temporal closure window in upstream eye state analyzer; not exposed for dynamic parameterization. |
+| `offroad_gaze_s` | float (0.5 – 10.0 s) | `2.0` | Vision / distraction model | Fixed threshold in upstream gaze vector classifier. |
+| `phone_s` | float (0.2 – 10.0 s) | `1.0` | Fusion (`dms_fusion`) | Fixed internal threshold evaluating `sustained_phone_ms` in `dms_fusion.decide()`. |
+| `sensitivity` | enum (`low`, `normal`, `high`) | `normal` | Fusion (`dms_fusion`) | Requires fusion-level sensitivity scaling over multimodal fusion matrices and alert escalation curves. |
+
+### Proposal to Fusion Owner (Need)
+
+**Feature Request: Parameterized Thresholds in `dms_fusion.decide()`**
+
+To allow user-configured driver profiles and runtime sensitivity adjustments from the Sahi mobile app to take effect in real time, `dms_fusion.decide()` should accept threshold arguments:
+
+```python
+def decide(
+    face: Mapping[str, object] | None,
+    phone: Mapping[str, object] | None,
+    physiology: Mapping[str, object] | None,
+    *,
+    phone_s: float = 1.0,
+    sensitivity: str = "normal",  # "low" | "normal" | "high"
+) -> FusionDecision:
+    ...
+```
+
+- **`phone_s`**: Replaces the hard-coded phone duration threshold for triggering distraction alerts.
+- **`sensitivity`**: Scales confidence cutoffs and escalation latencies (e.g., faster alert escalation for `"high"`, higher tolerance for `"low"`).
+
+The Pi runtime already validates, stores, and serves these values in `rtdms_pi.settings.SettingsStore`. Once `dms_fusion` exposes these parameters, `rtdms_pi.runtime.Runtime` can forward them directly on each evaluation frame.

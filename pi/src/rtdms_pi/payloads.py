@@ -37,8 +37,14 @@ def alert_payload(decision: FusionDecision | DecisionSnapshot, t: float) -> dict
     return _budget(d, [])
 
 
-def status_payload(snapshot: Snapshot) -> dict[str, object]:
+def status_payload(
+    snapshot: Snapshot, settings: Mapping[str, object] | None = None
+) -> dict[str, object]:
     s, f, p = snapshot, snapshot.face, snapshot.phone
+    if settings is not None:
+        from .detector_gate import apply_settings
+
+        f, p, _ = apply_settings(settings, f, p, None)
     state = f.state if f and f.face and s.camera_ok else "unavailable"
     if state not in {"starting", "unavailable", "alert", "distracted", "warning", "drowsy"}:
         state = "unavailable"
@@ -108,9 +114,12 @@ def health_payload(
     camera: bool,
     models: Mapping[str, str],
     temp_c: float | None = None,
+    throttled: int | None = None,
+    volts_5v: float | None = None,
     mem_used_mb: int | None = None,
     mem_total_mb: int | None = None,
     disk_free_mb: int | None = None,
+    wifi: str | None = None,
 ) -> dict[str, object]:
     d: dict[str, object] = {
         "cpu_pct": cpu_pct,
@@ -122,9 +131,12 @@ def health_payload(
     }
     for key, value in (
         ("temp_c", temp_c),
+        ("throttled", throttled),
+        ("volts_5v", volts_5v),
         ("mem_used_mb", mem_used_mb),
         ("mem_total_mb", mem_total_mb),
         ("disk_free_mb", disk_free_mb),
+        ("wifi", wifi),
     ):
         if value is not None:
             d[key] = value
