@@ -1,0 +1,23 @@
+[Unit]
+Description=RTDMS Pi runtime
+After=network.target
+
+[Service]
+# Create this dedicated account and grant video/GPIO access during provisioning.
+User=rtdms
+WorkingDirectory=/opt/rtdms
+# Defaults are hardware-free. Add --camera --buzzer gpio after hardware bring-up.
+ExecStart=/opt/rtdms/venv/bin/rtdms-pi
+Restart=on-failure
+Nice=-5
+MemoryMax=3G
+Environment=OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
+StateDirectory=rtdms
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+# Pi vision dependencies/model assets must be provisioned separately.
+
+[Install]
+WantedBy=multi-user.target
