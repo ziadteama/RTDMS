@@ -11,7 +11,7 @@ Ensure 100% of required runtime permissions, foreground-service authorizations, 
 - Initial app setup (Onboarding step 2).
 - Application cold start if any permission or OEM exemption was revoked.
 - Post-app-update (detected via stored `versionCode` bump in SQLite kv-store).
-- User navigation via `Settings -> Permissions & Background`.
+- User navigation via `Settings -> App -> Permissions & background`.
 
 #### Screen Wireframe: Permission Checklist (360dp Wide, Dark Theme)
 
@@ -34,12 +34,12 @@ Ensure 100% of required runtime permissions, foreground-service authorizations, 
 | |     Automated crash SOS        | |
 | |     [ NEEDED ]         [ FIX ] | | Button: secondary (48dp)
 | |--------------------------------| | status: alert.short_beep
-| | [6] Nearby Devices (BLE)       | |
-| |     Pi telemetry & link        | |
+| | [6] Nearby Devices             | |
+| |     Connect to your Sahi unit  | |
 | |     [ GRANTED ]                | |
 | |--------------------------------| |
-| | [7] Wi-Fi Direct Join          | |
-| |     Video clip download        | |
+| | [7] Wi-Fi Connection           | |
+| |     Transfer incident clips    | |
 | |     [ GRANTED ]                | |
 | |--------------------------------| |
 | | [8] Physical Motion            | |
@@ -82,7 +82,7 @@ Ensure 100% of required runtime permissions, foreground-service authorizations, 
 | | Step 3: Auto-launch            | |
 | | Enable 'Allow auto-launch' so  | |
 | | Sahi stays armed when phone    | |
-| | connects to the Pi in car.     | |
+| | connects to your unit in car.  | |
 | +--------------------------------+ |
 |                                    |
 | [3] [      OPEN APP SETTINGS       ] | Button: primary (48dp)
@@ -98,9 +98,9 @@ Ensure 100% of required runtime permissions, foreground-service authorizations, 
   - Notifications: `"Notifications"` / `"High-priority driver alerts and SOS countdown when screen is off."`
   - SMS: `"SMS messaging"` / `"Dispatches emergency text with coordinates to your contacts after a crash."`
   - Phone: `"Phone calls"` / `"Places automated emergency call to dispatch after crash confirmation."`
-  - Bluetooth: `"Nearby devices (BLE)"` / `"Connects to RTDMS unit to receive real-time driver state and heart rate."`
-  - Wi-Fi: `"Wi-Fi join"` / `"Connects to Pi hotspot to transfer incident video clips and sensor logs."`
-  - Motion: `"Physical motion"` / `"100 Hz accelerometer sampling for instant crash impact detection."`
+  - Bluetooth: `"Nearby devices"` / `"Connects to your Sahi unit to receive real-time driver state and heart rate."`
+  - Wi-Fi: `"Wi-Fi connection"` / `"Connects to your Sahi unit to transfer incident video clips and sensor logs."`
+  - Motion: `"Physical motion"` / `"Motion sensor sampling for instant crash impact detection."`
   - Battery Exemption: `"Battery optimization exemption"` / `"Prevents Android from killing Sahi during long drives."`
   - Autostart: `"Autostart & background launch"` / `"Ensures monitoring resumes automatically when paired."`
 - Status Indicators: `"Granted"`, `"Needed"`, `"Blocked"`
@@ -149,12 +149,12 @@ Ensure 100% of required runtime permissions, foreground-service authorizations, 
 'perm.sms.why': 'Dispatches emergency text with coordinates to your contacts after a crash.',
 'perm.phone.title': 'Phone calls',
 'perm.phone.why': 'Places automated emergency call to dispatch after crash confirmation.',
-'perm.ble.title': 'Nearby devices (BLE)',
-'perm.ble.why': 'Connects to RTDMS unit to receive real-time driver state and heart rate.',
-'perm.wifi.title': 'Wi-Fi join',
-'perm.wifi.why': 'Connects to Pi hotspot to transfer incident video clips and sensor logs.',
+'perm.ble.title': 'Nearby devices',
+'perm.ble.why': 'Connects to your Sahi unit to receive real-time driver state and heart rate.',
+'perm.wifi.title': 'Wi-Fi connection',
+'perm.wifi.why': 'Connects to your Sahi unit to transfer incident video clips and sensor logs.',
 'perm.motion.title': 'Physical motion',
-'perm.motion.why': '100 Hz accelerometer sampling for instant crash impact detection.',
+'perm.motion.why': 'Motion sensor sampling for instant crash impact detection.',
 'perm.battery.title': 'Battery optimization exemption',
 'perm.battery.why': 'Prevents Android from killing Sahi during long drives.',
 'perm.autostart.title': 'Autostart & background launch',

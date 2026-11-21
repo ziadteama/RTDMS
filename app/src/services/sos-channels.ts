@@ -1,8 +1,6 @@
 import { Linking, Platform } from 'react-native';
 import SahiNative from '@modules/sahi-native';
 import type { Contact } from '@/state/secure';
-import { useSettings } from '@/state/settings';
-import { fakeRelayClient } from './relay/fake-client';
 import { relay, type RelayClient } from './relay/client';
 import type { ChannelStatus, SosRequestPayload } from './relay/types';
 import { buildSosSms, type SosMessageKind } from './sos-message';
@@ -70,8 +68,7 @@ export function startSosChannels(
     setInterval: globalThis.setInterval,
     clearInterval: globalThis.clearInterval,
   };
-  const isDemo = useSettings.getState().demo;
-  const relayClient = deps.relayClient ?? (isDemo ? fakeRelayClient : relay);
+  const relayClient = deps.relayClient ?? relay;
   const smsSender = deps.sendSms ?? (async (numbers, text) => {
     if (SahiNative && Platform.OS === 'android') {
       try {

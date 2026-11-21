@@ -13,7 +13,7 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
   - Poller / Transport: Suspended.
   - Wi-Fi Station: Unbound.
 - User Experience:
-  - Screen: Driving lock disengages; Live tab returns to unlocked idle view; Trips tab shows newly completed trip card with safety score (0–100), alert breakdown, and duration.
+  - Screen: Driving lock disengages; Drive tab returns to unlocked idle view; Trips tab shows newly completed trip card with safety score (0–100), alert breakdown, and duration.
   - Notification: Ongoing foreground service notification is dismissed.
   - Status Pill: Shows "Offline" or "Paused".
 - Failure Handling: If trip ends abruptly with 0 duration, short-trip safety score floor applies (`app/src/trips/score.ts`).
@@ -53,10 +53,10 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
   - Poller / Transport: TERMINATED.
   - Wi-Fi Station: TERMINATED.
 - User Experience:
-  - While Killed: Phone is inert. IN-CAB MONITORING CONTINUES ON PI (camera, fusion, and buzzer run independently).
+  - While Killed: Phone is inert. In-vehicle monitoring continues on your Sahi unit (camera, detection, and buzzer run independently).
   - On Next App Launch:
-    - Screen: Banner appears at the top of Live and Trips screens: "Monitoring was paused from HH:MM to HH:MM (closed by phone battery manager)".
-    - Notification: Local notification posted: "Monitoring was interrupted: Sahi was stopped by battery manager. Check auto-launch and background activity settings."
+    - Screen: Banner appears at the top of Drive and Trips screens: "Sahi stopped monitoring at 14:32 because your phone closed it. Tap to fix."
+    - Notification: Local notification posted: "Sahi stopped monitoring at 14:32 because your phone closed it. Tap to fix."
     - Status Pill: Warning banner active.
 - Failure Handling:
   - Detection: [Proposed] Heartbeat inspection. On startup, app reads `last_heartbeat` timestamp from KV-store/SQLite. If `currentTime - last_heartbeat > 30 s` and an unclosed trip exists, app detects ungraceful OEM kill.
@@ -107,9 +107,9 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
   - SQLite KV-Store: Updates `last_version_code` to new package `versionCode`.
   - SQLite: Updates `PRAGMA user_version`.
 
-### State 14: `Pi contract version mismatch`
+### State 14: `unit contract version mismatch`
 - Entry Trigger: BLE connection established and `health.contract` (from GATT characteristic `0x0a` or pairing QR) does not equal the app's contract version (`contracts/pi-link/CONTRACT.md` line 73).
-- Exit Trigger: Pi firmware updated, app updated, or unit unpaired.
+- Exit Trigger: Unit firmware updated, app updated, or unit forgotten.
 - Execution Matrix:
   - Foreground Service: Active if trip running.
   - BLE Connection: Active. Connects to compatible characteristics only.
@@ -118,15 +118,15 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
   - Poller / Transport: Active for compatible endpoints; drops unknown/mismatched payloads.
   - Wi-Fi Station: Inactive unless supported video requested.
 - User Experience:
-  - Screen: Persistent banner at the top of Live and Pi tabs: "Pi software mismatch: basic monitoring active; advanced features disabled."
+  - Screen: Persistent banner at the top of Drive tab: "Unit software mismatch: basic monitoring active; advanced features disabled."
   - Notification: None.
   - Status Pill: Amber warning pill. Missing data fields display "—", never 0 or fake values (`app/docs/API.md` line 130).
 - Failure Handling: App keeps compatible parts; never guesses missing or changed payload shapes. Safety monitoring on the phone (crash SOS) remains fully functional.
 - Persistence:
   - Memory: Mismatch flag set in `useLive`. No corrupt schemas written to SQLite.
 
-### State 15: `unpair`
-- Entry Trigger: Driver taps "Unpair Pi" in Settings (`app/src/screens/settings/index.tsx`).
+### State 15: `unpair` ("Forget this unit")
+- Entry Trigger: Driver taps "Forget this unit" in Settings -> Your Sahi unit (`app/src/screens/settings/index.tsx`).
 - Exit Trigger: Stored credentials purged; app returns to unpaired state.
 - Execution Matrix:
   - Foreground Service: Stopped if active.
@@ -136,10 +136,10 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
   - Poller / Transport: Terminated.
   - Wi-Fi Station: Unbound and forgotten.
 - User Experience:
-  - Screen: Confirmation dialog, then routes to Settings/Home. Modal informs driver: "Phone unpaired. To invalidate this phone on the Pi, rotate the pairing token on the Pi setup page."
+  - Screen: Confirmation dialog, then routes to Settings. Modal informs driver: "Unit forgotten. To pair again, scan the unit's QR code."
   - Notification: None.
-  - Status Pill: "Unpaired".
-- Failure Handling: If Pi is offline when unpair is selected, phone removes local credentials immediately; driver is advised to rotate the token on the Pi manually.
+  - Status Pill: "Unit not connected".
+- Failure Handling: If unit is offline when "Forget this unit" is selected, phone removes local credentials immediately.
 - Persistence:
   - SecureStore (`app/src/state/secure.ts`): `wifi` credentials set to `null`; [Proposed] `sahi.ble` token set to `null`.
   - KV-Store: `baseUrl` reset to `http://10.42.0.1:8080`.
@@ -147,7 +147,7 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
 
 ### State 16: `uninstall and data deletion`
 - Entry Trigger:
-  - Data Deletion: User taps "Delete all data" in Settings -> Privacy (`app/src/screens/settings/index.tsx` line 270).
+  - Data Deletion: User taps "Delete all data" in Settings -> Privacy and my data (`app/src/screens/settings/index.tsx` line 270).
   - Uninstall: User uninstalls package via Android OS settings or launcher.
 - Exit Trigger:
   - Data Deletion: Storage wiped; app restarts into Consent flow via `reloadAppAsync`.
@@ -170,7 +170,7 @@ Part of [Sahi lifecycle](../LIFECYCLE.md).
     - `useSecure.getState().wipe()`: Clears `contacts` and `wifi` from Android Keystore (`app/src/state/secure.ts` line 52).
     - `useSettings.getState().reset()`: Resets settings store.
     - `clearKv()`: Purges SQLite KV-store (`app/src/state/storage.ts` line 11).
-  - Pi-Side Residue: No user data exists on the Pi except its static auth token `K` and any video clips stored on the Pi's local storage (`incidents/`). Uninstalling leaves nothing on the Pi except that token. Token rotation on the Pi severs all future access.
+  - Unit-Side Residue: No user data exists on your Sahi unit except its static pairing token and any video clips stored on the unit's local storage (`incidents/`).
   - Cloud: Zero data in cloud (no cloud infrastructure exists).
 
 ---

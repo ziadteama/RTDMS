@@ -1,8 +1,11 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationTheme } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { Text } from '@/components/text';
 import { useT } from '@/i18n';
+import { dx } from '@/i18n/diagnostics';
 import { useRuntime } from '@/services/runtime';
 import { useSettings } from '@/state/settings';
 import { ThemeProvider, useTheme } from '@/theme';
@@ -40,6 +43,20 @@ function Navigator() {
           <Stack.Screen name="contacts" options={{ title: t('contacts.title') }} />
           <Stack.Screen name="pair" options={{ title: t('onb.pair.title'), presentation: 'modal' }} />
           <Stack.Screen name="privacy" options={{ title: t('settings.whatStored') }} />
+          <Stack.Screen
+            name="diagnostics"
+            options={{
+              title: dx('diag.title'),
+              headerTitle: () => (
+                <View>
+                  <Text variant="headline">{dx('diag.title')}</Text>
+                  <Text variant="caption" tone="secondary">
+                    {dx('diag.subtitle')}
+                  </Text>
+                </View>
+              ),
+            }}
+          />
           <Stack.Screen
             name="sos"
             options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false, headerShown: false }}

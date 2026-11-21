@@ -48,6 +48,7 @@ export default function Sos() {
   const [callNumber, setCallNumber] = useState('');
   const [smsSent, setSmsSent] = useState<number>(0);
   const [channels, setChannels] = useState<ContactChannelState[]>([]);
+  const [demoRun, setDemoRun] = useState(false);
   const fired = useRef(false);
   const hasContacts = useSecure((s) => s.contacts.length > 0);
 
@@ -65,6 +66,7 @@ export default function Sos() {
     fired.current = true;
     setPhase({ kind: 'active' });
     void runEmergency(id, (_step, info) => {
+      if (info.demo) setDemoRun(true);
       if (info.contacts) setChannels(info.contacts);
       if (info.sent !== undefined) setSmsSent(info.sent);
       if (info.number) setCallNumber(info.number);
@@ -130,8 +132,9 @@ export default function Sos() {
       ) : null}
       {phase.kind === 'active' ? (
         <ScrollView contentContainerStyle={{ gap: spacing.xl, paddingBottom: spacing.lg }} showsVerticalScrollIndicator={false}>
-          <Text variant="headline">{t('sos.done')}</Text>
-          <View style={{ gap: spacing.xs }}>
+          <Text variant="headline">{demoRun ? t('sos.demoDone') : t('sos.done')}</Text>
+          {demoRun ? <Text tone="secondary">{t('sos.demoNote')}</Text> : null}
+          {demoRun ? null : <View style={{ gap: spacing.xs }}>
             <Text tone="secondary">
               {!hasContacts
                 ? t('sos.noContacts')
@@ -160,7 +163,7 @@ export default function Sos() {
                 {t('sos.callFailed')}
               </Text>
             ) : null}
-          </View>
+          </View>}
           {channels.length > 0 ? (
             <Section title={t('settings.contacts')}>
               {channels.map((c) => (

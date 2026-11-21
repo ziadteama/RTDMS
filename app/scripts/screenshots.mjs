@@ -32,17 +32,23 @@ const SHOTS = [
   ['02-permissions', '/permissions', { onboarded: false }],
   ['03-pair', '/connect', { onboarded: false }],
   ['04-emergency-contacts', '/emergency-contacts', { onboarded: false }],
-  ['05-live', '/live', {}],
-  ['06-live-driving-lock', '/live', { demo: true }, async (p) => p.waitForTimeout(23_000)], // demo speed > 10 km/h after 20 s
+  ['05-drive', '/live', {}],
+  ['06-drive-driving-lock', '/live', { demo: true }, async (p) => p.waitForTimeout(23_000)], // demo speed > 10 km/h after 20 s
   ['07-trips', '/trips', { demo: true }],
   ['08-trip', '/trips', { demo: true }, async (p) => { await p.getByRole('button').filter({ hasText: /\d+ min/ }).nth(1).click(); await p.waitForTimeout(2500); }],
-  ['09-health', '/health', {}],
-  ['10-settings', '/settings', {}],
-  ['11-calibrate', '/calibrate', {}],
-  ['12-contacts', '/contacts', {}],
-  ['13-privacy', '/privacy', {}],
-  ['14-sos', '/settings', { demo: true }, async (p, t) => { await p.getByText(t.fake).click(); await p.waitForTimeout(3500); }],
-  ['15-incident', '/settings', { demo: true }, async (p, t) => {
+  ['09-settings', '/settings', {}],
+  ['10-calibrate', '/calibrate', {}],
+  ['11-contacts', '/contacts', {}],
+  ['12-privacy', '/privacy', {}],
+  ['13-sos', '/settings', { demo: true }, async (p, t) => {
+    for (let i = 0; i < 7; i++) await p.getByText(t.version).click();
+    await p.waitForTimeout(1000);
+    await p.getByText(t.fake).click();
+    await p.waitForTimeout(3500);
+  }],
+  ['14-incident', '/settings', { demo: true }, async (p, t) => {
+    for (let i = 0; i < 7; i++) await p.getByText(t.version).click();
+    await p.waitForTimeout(1000);
     await p.getByText(t.fake).click();
     await p.waitForTimeout(1500);
     await p.getByText(t.ok).click();
@@ -54,7 +60,7 @@ const SHOTS = [
   }],
 ];
 
-const TEXT = { fake: 'Simulate a crash', ok: "I'm OK", trips: 'Trips', crash: /Crash detected/ };
+const TEXT = { version: '1.0.0', fake: 'Simulate crash', ok: "I'm OK", trips: 'Trips', crash: /Crash detected/ };
 
 const only = process.argv[2];
 const browser = await chromium.launch();

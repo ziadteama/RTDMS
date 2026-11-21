@@ -5,14 +5,14 @@ Part of [Sahi UX redesign](../UX.md).
 ### Flow 6: Calibration Lost / Camera Covered Warning
 
 #### Goal
-Detect and warn the driver immediately when the Pi's camera is obstructed, smudged, or knocked out of alignment with the driver's face. Prevent false confidence in driver-monitoring when the system is actually blind.
+Detect and warn the driver immediately when the camera on your Sahi unit is obstructed, smudged, or knocked out of alignment with the driver's face. Prevent false confidence in driver monitoring when the system is actually blind.
 
 #### Trigger
-- The Pi detects loss of eye/face tracking while the vehicle is in motion ($v > 10\text{ km/h}$) due to lens obstruction or physical misalignment.
-- Contract Change Proposal: Pi status payload includes `tracking_status` flag.
+- Your Sahi unit detects loss of eye/face tracking while the vehicle is in motion ($v > 10\text{ km/h}$) due to lens obstruction or physical misalignment.
+- Contract Change Proposal: Status payload includes `tracking_status` flag.
 
 #### Proposed Contract Change Request (Candidate for contracts/pi-link/CONTRACT.md)
-> [!NOTE] Proposed CR Candidate (Do not edit contracts/ directly)
+> [!NOTE] Engineering note: Proposed Contract Change Request (Candidate for contracts/pi-link/CONTRACT.md)
 > Propose augmenting the `status` notification schema (`schemas/status.schema.json` and `PiDrowsiness`):
 > ```json
 > {
@@ -25,7 +25,7 @@ Detect and warn the driver immediately when the Pi's camera is obstructed, smudg
 > ```
 > *Field values*: `obstruction_level: "clear" | "smudged" | "blocked" | "misaligned"`.
 
-#### Screen Wireframe: Live Screen with Warning Banner (360dp Wide)
+#### Screen Wireframe: Drive Screen with Warning Banner (360dp Wide)
 
 ```
 +------------------------------------+ 360dp
@@ -45,11 +45,9 @@ Detect and warn the driver immediately when the Pi's camera is obstructed, smudg
 | |        Camera obstructed       | | type: headline (20/26 600)
 | +--------------------------------+ |
 |                                    |
-| [3] CAMERA VIEW FRAME              | LiveView container
+| [3] TRIP CONTEXT                   | Context line
 | +--------------------------------+ | surface: #14171A
-| |                                | |
-| |    [ BLOCKED / BLACK FEED ]    | |
-| |                                | |
+| | Speed: 45 km/h   Trip: 32 min   | | type: metricSmall (20/26 tabular)
 | +--------------------------------+ |
 |                                    |
 | [4] [      HOLD FOR SOS (2s)     ] | HoldButton (64dp)
@@ -74,18 +72,18 @@ Detect and warn the driver immediately when the Pi's camera is obstructed, smudg
 | |    Ensure windshield mount is  | |
 | |    aimed directly at face.     | |
 | |--------------------------------| |
-| | 3. Verify Live Preview         | | Row
-| |    Check that face is centered | |
-| |    in the box below.           | |
+| | 3. Set Up Driving Position     | | Row
+| |    Position face with preview  | |
+| |    then calibrate while parked.| |
 | +--------------------------------+ |
 |                                    |
-| [4] [      RE-CALIBRATE EYES       ] | Button: primary, action (48dp)
+| [4] [   SET UP DRIVING POSITION    ] | Button: primary, action (48dp)
 | [5] [             DISMISS            ] | Button: ghost (48dp)
 +------------------------------------+
 ```
 
 #### Exact Copy Strings (English Only)
-- Banner Title: `"Camera obstructed"` or `"Calibration lost"`
+- Banner Title: `"Camera obstructed"` or `"Driving position lost"`
 - Banner Detail: `"Clear lens or adjust angle to resume driver monitoring."`
 - Banner Action: `"Fix camera"`
 - System Notification (when backgrounded):
@@ -95,8 +93,8 @@ Detect and warn the driver immediately when the Pi's camera is obstructed, smudg
 - Recovery Steps:
   - `"1. Inspect lens: Clean dust, smudges, or hanging mirror obstructions."`
   - `"2. Adjust angle: Ensure the camera mount points squarely at driver eye level."`
-  - `"3. Re-calibrate: Run the 13-second eye calibration while safely parked."`
-- Action Buttons: `"Re-calibrate eyes"`, `"Dismiss"`
+  - `"3. Set up driving position: Run the 13-second eye calibration while safely parked."`
+- Action Buttons: `"Set up driving position"`, `"Dismiss"`
 
 #### Accessibility
 - **Touch Target**: The banner Fix button has `minHeight: touch.min` (48dp).
@@ -107,8 +105,8 @@ Detect and warn the driver immediately when the Pi's camera is obstructed, smudg
 ```typescript
 'warning.camera.coveredTitle': 'Camera obstructed',
 'warning.camera.coveredDetail': 'Lens is covered or blocked. Monitoring is suspended.',
-'warning.camera.calLostTitle': 'Calibration lost',
-'warning.camera.calLostDetail': 'Driver position has shifted. Re-calibrate eyes to restore accuracy.',
+'warning.camera.calLostTitle': 'Driving position lost',
+'warning.camera.calLostDetail': 'Driver position has shifted. Set up driving position to restore accuracy.',
 'warning.camera.btnFix': 'Fix camera',
 'warning.camera.sheetTitle': 'Restore Camera Monitoring',
 'warning.camera.sheetSubtitle': 'Perform these recovery steps while safely parked.',
@@ -116,9 +114,9 @@ Detect and warn the driver immediately when the Pi's camera is obstructed, smudg
 'warning.camera.step1Detail': 'Wipe off dust, smudges, or items hanging from your rearview mirror.',
 'warning.camera.step2Title': 'Adjust camera angle',
 'warning.camera.step2Detail': 'Aim the mount directly at your normal driving head position.',
-'warning.camera.step3Title': 'Re-run calibration',
-'warning.camera.step3Detail': 'Takes 13 seconds parked. Establishes fresh eye openness baselines.',
-'warning.camera.btnCalibrate': 'Re-calibrate eyes',
+'warning.camera.step3Title': 'Set up driving position',
+'warning.camera.step3Detail': 'Takes 13 seconds parked. Establishes fresh eye baselines.',
+'warning.camera.btnCalibrate': 'Set up driving position',
 ```
 
 ---

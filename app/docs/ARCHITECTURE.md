@@ -11,7 +11,8 @@ app/
 ├─ src/
 │  ├─ app/                 routes only (expo-router)
 │  │  ├─ (onboarding)/     consent, permissions, connect (QR), emergency-contacts
-│  │  ├─ (tabs)/           live, trips, health ("Pi"), settings — each a native Stack
+│  │  ├─ (tabs)/           drive, trips, settings — each a native Stack
+│  │  ├─ diagnostics       hidden screen (tap version 7x, for the Sahi team: hardware health, thresholds, switches, raw metrics)
 │  │  ├─ trip/[id]         trip summary + event timeline
 │  │  ├─ incident/[id]     clip + sensor timeline (local id, or "pi:<id>" for a Pi-only clip)
 │  │  ├─ sos               full-screen countdown (fullScreenModal, no back gesture)
@@ -72,8 +73,9 @@ flowchart LR
   second; if the phone was paired by QR, re-joins the hotspot every 10 s (auto reconnect).
 - A 404 on `/alert` or `/physio` marks the endpoint unsupported for 30 s (older `stream.py`).
 - Re-renders: screens subscribe with selectors that return primitives or `useShallow` objects, so a
-  poll that does not change a value does not re-render its component; the WebView live view never
-  re-renders on a poll. See [VALIDATION.md](VALIDATION.md) → performance.
+  poll that does not change a value does not re-render its component; the camera view (in setup /
+  calibration) never re-renders on a poll, and live video is never rendered while driving. See
+  [VALIDATION.md](VALIDATION.md) → performance.
 
 ## Alerts (`services/alerts.ts`, `pi/alert.ts`)
 
@@ -147,8 +149,8 @@ web the module is `null` and callers fall back (open the SMS composer / dialer, 
 
 | Situation | What the app does |
 |---|---|
-| Pi offline | banner + reconnect loop; state shows "Pi offline" in neutral grey; no phone alerts (the Pi's buzzer does not depend on the phone); trip ends after 60 s offline; crash detection remains armed on phone (phone-only IMU + GPS, independent of Pi) |
-| Pi without a proposed endpoint | that feature hides or shows a banner; nothing is guessed |
+| Unit not connected | banner ("Unit not connected. Check it is powered on.") + reconnect loop; state shows "Unit not connected" in neutral grey; no phone alerts (the unit's buzzer does not depend on the phone); trip ends after 60 s offline; crash detection remains armed on phone (phone-only IMU + GPS, independent of unit link) |
+| Unit without a proposed endpoint | that feature hides or shows a banner; nothing is guessed |
 | Bad JSON / missing fields | parser returns `null` (or a `null` field); UI shows "—", never 0 |
 | GPS lost (no fix 10 s) | banner "No GPS: crash detection is off"; the detector cannot arm or confirm; manual SOS still works |
 | Location permission denied | as GPS lost; SOS SMS says "location unknown" |
@@ -157,4 +159,4 @@ web the module is `null` and callers fall back (open the SMS composer / dialer, 
 | No emergency contacts | SOS skips SMS and calls the configured emergency number (default 123) |
 | Crash while the app is in the background | `sos` notification with a full-screen intent opens the countdown |
 | App killed mid-trip | the open trip is closed at its last recorded moment on next start |
-| Monitoring paused | poller, trips, alerts and crash detection all stop; the Pi keeps buzzing |
+| Monitoring paused | poller, trips, alerts and crash detection all stop; the unit keeps buzzing |

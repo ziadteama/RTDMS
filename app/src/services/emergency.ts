@@ -99,6 +99,8 @@ export type SosProgressInfo = {
   number?: string;
   callState?: CallProgressState;
   contacts?: ContactChannelState[];
+  /** Demo mode: nothing real was sent or dialed. */
+  demo?: boolean;
 };
 
 export type SosProgress = (step: 'sms' | 'waiting' | 'call' | 'done', info: SosProgressInfo) => void;
@@ -109,6 +111,11 @@ export async function runEmergency(id: number, onProgress: SosProgress): Promise
   const { callTarget, emergencyNumber } = useSettings.getState();
   const incident = db.getIncident(id);
   if (incident?.outcome === 'cancelled') return;
+  if (useSettings.getState().demo) {
+    // Demo never sends real messages or places real calls, and never fabricates results.
+    onProgress('done', { demo: true });
+    return;
+  }
   const kind = incident?.kind ?? 'manual';
   const loc = await bestLocation();
   if (db.getIncident(id)?.outcome === 'cancelled') return;

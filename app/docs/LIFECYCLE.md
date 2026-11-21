@@ -27,13 +27,14 @@ The secondary/returning reference test target is a Huawei Y9a (model `FRL-L22`):
 - Generic No-GMS Column: Pure AOSP and de-Googled devices operate under standard Linux Low Memory Killer (LMK) and platform Doze without push fallbacks. Because the Huawei device may return and Sahi targets generic de-Googled environments, code must never assume GMS.
 
 ### 1.2 Core Architectural Principles
-1. Local-Only Boundary: Zero cloud dependencies, zero external analytics, zero remote push services. All telemetry, contacts, and tokens remain strictly between the phone and the Pi. Never assume Google Mobile Services (GMS) in code, even when running on devices with Google Play services present.
-2. English-Only Application: The application interface, consent statement, voice prompt cues, system notifications, and documentation are strictly English only.
-3. Hybrid Link Split (`contracts/pi-link/CONTRACT.md`, `Subsystems/Phone-Pi Link.md`):
-   - Bluetooth Low Energy (BLE): Always-on control, safety, and telemetry plane. Pi acts as GATT peripheral (service `0000fff0-0000-1000-8000-00805f9b34fb`); phone acts as central. Carries alerts (5 Hz notify), status (2 Hz notify), physiology (1 Hz notify), clock synchronization, settings, and crash incident trigger writes.
-   - Wi-Fi Hotspot: High-bandwidth bulk data plane only. Pi runs a 5 GHz access point (`RTDMS-Pi`, `10.42.0.1:8080`, plain HTTP). Sahi connects to this network solely for live video streaming (`/stream.mjpg`), calibration alignment, and recorded incident clip downloads (`/incidents/*`). The network is unbound immediately when not in active video use.
-3. Separation of Safety Detection from Connectivity: Crash detection and emergency escalation execute entirely on the phone using device sensors (IMU at 100 Hz, GPS speed). They do not depend on the Pi link being online.
-4. Strict Parsing Policy (`app/src/pi/parse.ts`): Malformed payloads, missing required fields, or unsupported contract versions yield `null`. The application never guesses, interpolates, or displays synthesized defaults.
+1. Audience & Scope: The audience is the driver of a personal car (`.cursor/rules/end-user-product.mdc`). Three tabs: **Drive**, **Trips**, **Settings**. Engineering items (hardware metrics, numeric thresholds, detector toggles, manual address entry, demo mode) live in a hidden Diagnostics screen (tap version 7 times in Settings > About).
+2. Local-Only Boundary: Zero cloud dependencies, zero external analytics, zero remote push services. All telemetry, contacts, and tokens remain strictly between the phone and your Sahi unit. Never assume Google Mobile Services (GMS) in code, even when running on devices with Google Play services present.
+3. English-Only Application: The application interface, consent statement, voice prompt cues, system notifications, and documentation are strictly English only.
+4. Hybrid Link Split (`contracts/pi-link/CONTRACT.md`, `Subsystems/Phone-Pi Link.md`):
+   - Bluetooth Low Energy (BLE): Always-on control, safety, and telemetry plane. Unit acts as GATT peripheral; phone acts as central. Carries alerts, status, physiology, clock synchronization, settings, and crash incident trigger writes.
+   - Wi-Fi Hotspot: High-bandwidth bulk data plane only. Connects solely for setup/calibration video alignment and recorded incident clip downloads (`/incidents/*`). Live camera video is never streamed on the Drive tab while driving. The network is unbound immediately when not in active use.
+5. Separation of Safety Detection from Connectivity: Crash detection and emergency escalation execute entirely on the phone using device sensors (IMU at 100 Hz, GPS speed). They do not depend on the unit link being online.
+6. Strict Parsing Policy (`app/src/pi/parse.ts`): Malformed payloads, missing required fields, or unsupported contract versions yield `null`. The application never guesses, interpolates, or displays synthesized defaults.
 
 ---
 
@@ -98,7 +99,7 @@ stateDiagram-v2
 | `consent` | User taps "Agree" | `permissions` | Write `consentedAt = Date.now()` to KV-store; route to `/(onboarding)/permissions`. |
 | `permissions` | User completes review / requests permissions | `pairing` | Audit system permissions (Android 12+ BLE, notifications, while-in-use location, phone/SMS); route to `/(onboarding)/connect` or `/pair`. |
 | `pairing` | QR scanned, BLE bonded, auth token written to char `0x09` | `calibration` or `idle` | Save Wi-Fi PSK and BLE token to SecureStore; sync clock; route to `/calibrate` or tabs. |
-| `calibration` | Calibration finishes or user exits | `idle` | Send `POST /calibrate`; unbind Wi-Fi; route to `/live`. |
+| `calibration` | Calibration finishes or user exits | `idle` | Send `POST /calibrate`; unbind Wi-Fi; route to Drive tab. |
 | `idle` | BLE connected AND GPS speed > 10 km/h | `trip auto-start` | Acquire wake lock; create trip row in SQLite; start location foreground service (requires prior while-in-use location grant; Android 16 behavior: unverified, test on device). |
 | `trip auto-start` | Trip record created in SQLite | `driving` | Subscribe to BLE notifies; start 100 Hz IMU; arm crash monitor if speed > 20 km/h. |
 | `driving` | Speed > 10 km/h | `driving` (locked) | Hide tabs and metrics; display full-screen state and hold-to-SOS (`useDrivingLock.ts`). |
@@ -113,8 +114,8 @@ stateDiagram-v2
 | `device reboot` | `BOOT_COMPLETED` received or app launched | `idle` | Close stale trip; inspect heartbeat gap; re-arm monitoring if enabled. (Android 16 startup: unverified, test on device). |
 | Any active | Package update installed (`MY_PACKAGE_REPLACED`) | `app update` | Run SQLite schema migrations; re-audit permissions (Android 12+ BLE, notification, while-in-use location) and battery exemptions. |
 | `idle` / `driving` | `health.contract != app version` | `contract mismatch` | Display "Pi software mismatch" banner; keep compatible characteristics; drop invalid ones. |
-| Any operational | User selects "Unpair Pi" in Settings | `unpair` | Clear BLE token and Wi-Fi credentials from SecureStore; disconnect BLE link. |
-| Any operational | User selects "Delete all data" in Settings | `uninstall & deletion` | Wipe SQLite tables; wipe SecureStore; clear KV-store; restart app via `reloadAppAsync`. |
+| Any operational | User selects "Forget this unit" in Settings -> Your Sahi unit | `unpair` | Clear BLE token and Wi-Fi credentials from SecureStore; disconnect BLE link. |
+| Any operational | User selects "Delete all data" in Settings -> Privacy and my data | `uninstall & deletion` | Wipe SQLite tables; wipe SecureStore; clear KV-store; restart app via `reloadAppAsync`. |
 | Any | User uninstalls application via Android OS | `uninstall & deletion` | OS deletes application sandbox; Pi token remains until rotated on Pi. |
 
 ---

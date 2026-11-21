@@ -1,26 +1,26 @@
 # Pi API, as Sahi uses it
 
-Base URL: `http://10.42.0.1:8080` (the Pi's own hotspot), configurable in Settings → Pi address.
+Base URL: `http://10.42.0.1:8080` (the unit's own hotspot), configurable in Diagnostics (and pairing fallback).
 Plain HTTP + JSON, no auth (the hotspot's WPA2 password is the access control). Types live in
 [`src/pi/types.ts`](../src/pi/types.ts); parsers in [`src/pi/parse.ts`](../src/pi/parse.ts) turn
 anything malformed into `null`, never a guess.
 
 | Method | Path | On the Pi today | In `mock-pi/` | In demo mode | App uses it for |
 |---|---|---|---|---|---|
-| GET | `/stream.mjpg` | ✅ `stream.py` | ✅ placeholder frames | — | Live view, calibration |
-| GET | `/status` | ✅ `stream.py` | ✅ | ✅ | Live tab, trips, crash extras (5 Hz) |
-| POST | `/calibrate` | ✅ `stream.py` | ✅ | ✅ | Guided calibration |
+| GET | `/stream.mjpg` | ✅ `stream.py` | ✅ placeholder frames | — | Setup and calibration (never on Drive tab while driving) |
+| GET | `/status` | ✅ `stream.py` | ✅ | ✅ | Drive tab, trips, crash extras (5 Hz) |
+| POST | `/calibrate` | ✅ `stream.py` | ✅ | ✅ | Guided calibration / driving position |
 | GET | `/alert` | 🆕 proposed | ✅ | ✅ | Color, notification, voice, haptics (5 Hz) |
-| GET | `/physio` | 🆕 proposed | ✅ | ✅ | Heart group on Live (1 Hz) |
-| GET / PUT | `/settings` | 🆕 proposed | ✅ | ✅ | Settings → Driver / Detection |
-| POST | `/test_alert` | 🆕 proposed | ✅ | ✅ | Settings → Test alert |
-| GET | `/health` | 🆕 proposed | ✅ | ✅ | Pi tab (1 Hz while visible) |
+| GET | `/physio` | 🆕 proposed | ✅ | ✅ | Diagnostics (1 Hz) |
+| GET / PUT | `/settings` | 🆕 proposed | ✅ | ✅ | Diagnostics → Detection / Thresholds |
+| POST | `/test_alert` | 🆕 proposed | ✅ | ✅ | Settings → Alerts → Test alert |
+| GET | `/health` | 🆕 proposed | ✅ | ✅ | Diagnostics (1 Hz while visible) |
 | POST | `/incident` | 🆕 proposed | ✅ | ✅ | Crash / SOS: keep the ring buffer |
-| GET | `/incidents` | 🆕 proposed | ✅ | ✅ | Trips → Clips on the Pi |
+| GET | `/incidents` | 🆕 proposed | ✅ | ✅ | Trips → Incident clips |
 | GET | `/incidents/<id>/clip.mp4` | 🆕 proposed | ✅ sample clip | bundled clip | Incident player + download |
 | GET | `/incidents/<id>/data.jsonl` | 🆕 **added by the app** | ✅ | ✅ | Incident sensor timeline |
 | GET | `/incidents/<id>/meta.json` | 🆕 proposed | ✅ | — | (not read by the app yet) |
-| POST | `/system/restart`, `/system/shutdown` | 🆕 proposed | ✅ (logged, ignored) | ✅ | Pi tab → Controls |
+| POST | `/system/restart`, `/system/shutdown` | 🆕 proposed | ✅ (logged, ignored) | ✅ | Diagnostics → Controls |
 
 A 404 from a proposed endpoint means "this Pi runs an older `stream.py`": the app hides that
 feature (e.g. no Heart group, a "this Pi does not report fusion alerts yet" banner) and retries
@@ -142,7 +142,7 @@ Body `{"pattern": "max"}`. The Pi sounds that buzzer pattern and reports it on `
 
 `throttled` is the raw `vcgencmd get_throttled` bitmask; the app decodes bits 0–3 (now) and 16–19
 (since boot). `volts_5v` from `vcgencmd pmic_read_adc EXT5V_V`. `models.*` ∈ `running | off | error`.
-Polled once a second only while the Pi tab is on screen.
+Polled once a second only while the hidden Diagnostics screen is on screen.
 
 ## `POST /incident` (proposed)
 
