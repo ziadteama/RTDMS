@@ -27,6 +27,10 @@
     "id": {
       "type": "string",
       "maxLength": 16
+    },
+    "profile": {
+      "type": "object",
+      "description": "Only with cmd=calibrate: a phone_calibration payload (validate against phone_calibration.schema.json). Absent = start the Pi-camera calibration run."
     }
   }
 }

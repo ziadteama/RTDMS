@@ -1,4 +1,4 @@
-# Pi ↔ phone link contract (version 1)
+# Pi ↔ phone link contract (version 1.1)
 
 Single source of truth for the Sahi app (`app/`) and the Pi runtime (`pi/`). Design rationale:
 `Subsystems/Phone-Pi Link.md`. **Owner: the coordinator.** Neither side edits this directory
@@ -92,12 +92,33 @@ matching key is absent or `off`/`error`. It no longer infers support from `404`s
    `GET /incidents/<id>/data.jsonl`, `GET /incidents/<id>/meta.json`. `clip_ready` is false until
    `clip.mp4` exists.
 
+## Phone eye calibration (v1.1)
+
+The phone can calibrate the driver's eyes with its own front camera (guided flow in the app, same
+MediaPipe landmarks and EAR formula as `models/face/src/dms_face/metrics.py`). Raw phone EAR does
+not transfer to the Pi's camera (different angle, lens, distance), so the Pi uses **only the
+ratio**:
+
+- Payload: `phone_calibration` (schema + fixture). Sent as the JSON body of HTTP `POST /calibrate`,
+  or over BLE as `command` `{"cmd":"calibrate","profile":{…}}`. An empty body / no `profile` keeps
+  the old behaviour (start the Pi-camera run).
+- The Pi rejects `quality: "poor"` and `ear_open - ear_closed < 0.04` (same gate as
+  `build_profile`), answering HTTP 400 / a failed `command_result` with the reason, and keeps the
+  previous profile.
+- On accept: the Pi stores `closed_ratio` in the driver profile, sets
+  `ear_closed = closed_ratio × ear_open` using its **own** `ear_open` (calibrated or default, then
+  adapted by `BaselineAdapter`), and recomputes `ear_closed` whenever the baseline adapts (floor
+  `closed + 0.05` unchanged). Gaze and head-pose values are kept (they come only from the Pi-camera
+  "driving position" run).
+- Status: `drowsiness.message = "calibrated (phone)"`, `calibrated: true`, `calibration: "ok"`.
+
 ## HTTP (Wi-Fi) endpoints that remain
 
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/stream.mjpg` | unchanged (`models/distraction/scripts/stream.py`): MJPEG, ~640 px, q70, ≤ 10 fps, encodes only while a viewer is connected |
 | GET | `/incidents`, `/incidents/<id>/{clip.mp4,data.jsonl,meta.json}` | as above |
+| POST | `/calibrate` | empty body = Pi-camera run; `phone_calibration` body = apply the phone ratio (see above) |
 | POST | `/incident` | same body as `incident_request`, response `incident_response`; BLE fallback only |
 
 HTTP requests carry the token as `Authorization: Bearer <token>`. `GET /status`, `/alert`,
@@ -110,6 +131,7 @@ payloads as their BLE counterparts, but the app uses BLE for them once the BLE t
 | Version | Date | Change |
 |---|---|---|
 | 1 | 2026-11-21 | First version |
+| 1.1 | 2026-11-22 | Additive: `phone_calibration` payload (POST /calibrate body, `command.profile`) |
 
 ## Open questions for the spike (P1) and first integration
 

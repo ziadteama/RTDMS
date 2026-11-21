@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "phone_calibration",
+  "description": "Eye calibration measured with the phone's front camera. The Pi uses only closed_ratio: ear_closed = closed_ratio * its own (adapted) ear_open. Phone EAR values are informational (different camera geometry). Sent as the body of HTTP POST /calibrate, or as command.profile over BLE.",
+  "type": "object",
+  "required": ["source", "closed_ratio", "ear_open", "ear_closed", "snr", "quality", "samples_open", "samples_closed", "created"],
+  "additionalProperties": false,
+  "properties": {
+    "source": { "const": "phone" },
+    "closed_ratio": { "type": "number", "minimum": 0.1, "maximum": 0.8 },
+    "ear_open": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+    "ear_closed": { "type": "number", "minimum": 0, "maximum": 1 },
+    "snr": { "type": "number", "minimum": 0 },
+    "quality": { "enum": ["good", "fair", "poor"] },
+    "samples_open": { "type": "integer", "minimum": 1 },
+    "samples_closed": { "type": "integer", "minimum": 1 },
+    "created": { "type": "integer", "description": "phone wall clock, ms" }
+  }
+}
