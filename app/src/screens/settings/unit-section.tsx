@@ -12,6 +12,7 @@ export function UnitSection() {
   const t = useT();
   const { colors } = useTheme();
   const online = useLive((s) => s.connection === 'online');
+  const eyeCal = useSettings((s) => s.eyeCalibration);
 
   const forget = () => {
     Alert.alert(t('settings.forget'), t('settings.forgetConfirm'), [
@@ -35,8 +36,16 @@ export function UnitSection() {
         valueColor={online ? colors.alert.none : undefined}
       />
       <Row
-        label={t('settings.calibrate')}
+        label={t('settings.eyeCalibration')}
+        value={eyeCal ? t(`cal.eye.quality.${eyeCal.quality}`) : t('settings.eyeCalNotDone')}
+        valueColor={eyeCal?.quality === 'good' ? colors.alert.none : undefined}
         icon="eye"
+        chevron
+        onPress={() => router.push('/eye-calibration')}
+      />
+      <Row
+        label={t('settings.drivingPosition')}
+        detail={t('settings.drivingPositionDetail')}
         chevron
         disabled={!online}
         onPress={() => router.push('/calibrate')}

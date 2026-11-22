@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import Animated, { cubicBezier, useReducedMotion } from 'react-native-reanimated';
 
 import { useT } from '@/i18n';
@@ -22,11 +22,13 @@ export const StateIndicator = memo(function StateIndicator({
   pattern,
   size = 'compact',
   detail,
+  onDetailPress,
 }: {
   state: DriverState | 'paused';
   pattern: AlertPattern | null;
   size?: 'compact' | 'full';
   detail?: string;
+  onDetailPress?: () => void;
 }) {
   const t = useT();
   const { colors } = useTheme();
@@ -72,9 +74,17 @@ export const StateIndicator = memo(function StateIndicator({
           {known ? t(`pattern.${pattern}`) : t('pattern.unknown')}
         </Text>
         {detail ? (
-          <Text variant="body" color={fg} style={{ opacity: 0.85 }} numberOfLines={2}>
-            {detail}
-          </Text>
+          onDetailPress ? (
+            <Pressable onPress={onDetailPress} hitSlop={8} accessibilityRole="button">
+              <Text variant="body" color={fg} style={{ opacity: 0.85, textDecorationLine: 'underline' }} numberOfLines={2}>
+                {detail}
+              </Text>
+            </Pressable>
+          ) : (
+            <Text variant="body" color={fg} style={{ opacity: 0.85 }} numberOfLines={2}>
+              {detail}
+            </Text>
+          )
         ) : null}
       </View>
     </Animated.View>
