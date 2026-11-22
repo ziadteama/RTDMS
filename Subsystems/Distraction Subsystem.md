@@ -107,6 +107,16 @@ Speed (laptop CPU, NCNN, 4 threads): FP32 28.3 ms, INT8 22.6 ms per frame.
 | In-car volunteer recording | Open (`docs/IN_CAR_TEST_PROTOCOL.md`) |
 | Eating | Unsupported |
 
+## Camera failure behaviour (2026-11-22)
+
+`scripts/stream.py` exits with status 1 when the camera cannot be opened (no camera found, or no
+frames within 5 s) or the pipeline thread crashes (`pipeline_worker`; `--video` replay unchanged).
+The unit `pi/rtdms-camera.service` uses `Restart=on-failure`, `RestartSec=30`,
+`StartLimitIntervalSec=600`, `StartLimitBurst=5`: a server that crashes later still restarts, but a
+detached ribbon fails once per 30 s and stops after 5 tries instead of a 3 s crash loop. Recover with
+`systemctl --user reset-failed rtdms-camera && systemctl --user start rtdms-camera`.
+Test: `models/distraction/tests/test_stream_exit.py`.
+
 ## Ownership
 
 Branch zone `phone/<topic>`. See `models/README.md` and `.cursor/rules/git-branching.mdc`.

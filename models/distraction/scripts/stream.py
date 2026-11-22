@@ -100,6 +100,7 @@ class Shared:
         self.viewers = 0
         self.status: dict = {"fps": 0, "face": False, "baseline": 0, "levels": {}, "ms": {}}
         self.running = True
+        self.exit_code = 0  # non-zero when the pipeline thread died (camera missing, crash)
         self.calibrate = False  # set by POST /calibrate, consumed by the pipeline thread
 
         self.phone_calibration: dict | None = None  # guarded by cond
@@ -273,6 +274,19 @@ def pipeline_loop(args, shared: Shared) -> None:
         print(f"[stream] stopped after {n} frames; events in {log.path}", flush=True)
 
 
+def pipeline_worker(args, shared: Shared) -> None:
+    """pipeline_loop in the worker thread: any failure (no camera, no frames in 5 s, a crash)
+    is logged and turned into a non-zero process exit, so systemd backs off instead of the
+    process lingering with a dead pipeline."""
+    try:
+        pipeline_loop(args, shared)
+    except Exception as e:  # noqa: BLE001
+        print(f"[stream] FATAL: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+        shared.exit_code = 1
+    finally:
+        shared.running = False
+
+
 def make_handler(shared: Shared):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a):  # keep the console for events
@@ -405,7 +419,7 @@ class DualStackServer(ThreadingHTTPServer):
 def main(argv=None) -> int:
     args = parse_args(argv)
     shared = Shared()
-    worker = threading.Thread(target=pipeline_loop, args=(args, shared), daemon=True)
+    worker = threading.Thread(target=pipeline_worker, args=(args, shared), daemon=True)
     worker.start()
     srv = DualStackServer((args.host, args.port), make_handler(shared))
     print(f"[stream] open http://<this machine>:{args.port}  (Ctrl-C to stop)", flush=True)
@@ -418,7 +432,7 @@ def main(argv=None) -> int:
     shared.running = False
     srv.shutdown()
     worker.join(5)
-    return 0
+    return shared.exit_code
 
 
 if __name__ == "__main__":

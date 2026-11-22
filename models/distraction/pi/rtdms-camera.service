@@ -7,10 +7,15 @@ Wants=network-online.target
 Type=simple
 ExecStart=%h/rtdms/start_stream.sh
 WorkingDirectory=%h/rtdms
-Restart=always
-RestartSec=3
-# the camera server is the product: never let the service give up after repeated crashes
-StartLimitIntervalSec=0
+# stream.py exits non-zero when the camera cannot be opened (no camera found, or no frames in 5 s),
+# so on-failure covers both a server that crashes later (restart) and a missing camera (back off).
+# Not Restart=always/RestartSec=3: with the ribbon detached that was a crash loop burning CPU.
+# After 5 failed starts in 10 min systemd stops retrying; fix the camera, then
+# `systemctl --user reset-failed rtdms-camera && systemctl --user start rtdms-camera`.
+Restart=on-failure
+RestartSec=30
+StartLimitIntervalSec=600
+StartLimitBurst=5
 Nice=-2
 
 [Install]
