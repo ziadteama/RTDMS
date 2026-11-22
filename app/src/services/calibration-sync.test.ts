@@ -6,6 +6,7 @@ import {
   type CalibrationTransport,
   clearCalibrationSyncState,
   getCalibrationSyncError,
+  HttpCalibrationTransport,
   lastError,
   startCalibrationSync,
   syncEyeCalibration,
@@ -172,5 +173,57 @@ describe('calibration-sync', () => {
     const status = await syncEyeCalibration(transport);
     expect(status).toBe('skipped');
     expect(called).toBe(false);
+  });
+
+  describe('HttpCalibrationTransport', () => {
+    const originalFetch = global.fetch;
+    const dummyPayload = {
+      source: 'phone' as const,
+      closed_ratio: 0.38,
+      ear_open: 0.29,
+      ear_closed: 0.11,
+      snr: 45.0,
+      quality: 'good' as const,
+      samples_open: 120,
+      samples_closed: 40,
+      created: 1795189202400,
+    };
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
+
+    it('returns ok for status 200', async () => {
+      global.fetch = jest.fn().mockResolvedValue({ status: 200, ok: true } as Response);
+      const transport = new HttpCalibrationTransport(() => 'http://test-pi');
+      expect(await transport.send(dummyPayload)).toBe('ok');
+    });
+
+    it('returns rejected for client error status 400', async () => {
+      global.fetch = jest.fn().mockResolvedValue({ status: 400, ok: false } as Response);
+      const transport = new HttpCalibrationTransport(() => 'http://test-pi');
+      expect(await transport.send(dummyPayload)).toBe('rejected');
+    });
+
+    it('returns unreachable for timeout status 408', async () => {
+      global.fetch = jest.fn().mockResolvedValue({ status: 408, ok: false } as Response);
+      const transport = new HttpCalibrationTransport(() => 'http://test-pi');
+      expect(await transport.send(dummyPayload)).toBe('unreachable');
+    });
+
+    it('returns unreachable for rate limited status 429', async () => {
+      global.fetch = jest.fn().mockResolvedValue({ status: 429, ok: false } as Response);
+      const transport = new HttpCalibrationTransport(() => 'http://test-pi');
+      expect(await transport.send(dummyPayload)).toBe('unreachable');
+    });
+
+    it('returns unreachable for server error status 500 and network throw', async () => {
+      global.fetch = jest.fn().mockResolvedValue({ status: 500, ok: false } as Response);
+      const transport = new HttpCalibrationTransport(() => 'http://test-pi');
+      expect(await transport.send(dummyPayload)).toBe('unreachable');
+
+      global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
+      expect(await transport.send(dummyPayload)).toBe('unreachable');
+    });
   });
 });

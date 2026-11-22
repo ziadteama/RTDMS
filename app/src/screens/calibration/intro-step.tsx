@@ -1,9 +1,11 @@
-import { View } from 'react-native';
+import { useState } from 'react';
+import { Linking, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Row, Section } from '@/components/list';
 import { Text } from '@/components/text';
 import { useT } from '@/i18n';
+import { permission } from '@/services/permissions';
 import { spacing } from '@/theme';
 
 export function IntroStep({
@@ -16,6 +18,17 @@ export function IntroStep({
   onLater?: () => void;
 }) {
   const t = useT();
+  const [permissionDenied, setPermissionDenied] = useState(false);
+
+  const handleStart = async () => {
+    const status = await permission('camera', true);
+    if (status === 'denied') {
+      setPermissionDenied(true);
+      return;
+    }
+    setPermissionDenied(false);
+    onStart();
+  };
 
   return (
     <View style={{ flex: 1, justifyContent: 'space-between', gap: spacing.xl }}>
@@ -34,7 +47,22 @@ export function IntroStep({
       </View>
 
       <View style={{ gap: spacing.sm }}>
-        <Button title={t('cal.eye.start')} size="lg" onPress={onStart} />
+        {permissionDenied ? (
+          <View style={{ gap: spacing.sm, alignItems: 'center' }}>
+            <Text variant="body" tone="secondary" align="center">
+              {t('cal.eye.perm.denied')}
+            </Text>
+            <Button
+              title={t('cal.eye.perm.openSettings')}
+              variant="secondary"
+              size="md"
+              onPress={() => void Linking.openSettings()}
+            />
+            <Button title={t('cal.eye.start')} size="lg" onPress={() => void handleStart()} />
+          </View>
+        ) : (
+          <Button title={t('cal.eye.start')} size="lg" onPress={() => void handleStart()} />
+        )}
         {isOnboarding && onLater ? (
           <Button
             title={t('cal.eye.later')}

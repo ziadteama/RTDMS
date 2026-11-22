@@ -15,6 +15,7 @@ export function ResultStep({
   onSave,
   onRetry,
   onDone,
+  onCancel,
 }: {
   quality: CalibrationQuality;
   isSaved: boolean;
@@ -22,6 +23,7 @@ export function ResultStep({
   onSave: () => void;
   onRetry: () => void;
   onDone: () => void;
+  onCancel?: () => void;
 }) {
   const t = useT();
   const { colors } = useTheme();
@@ -67,10 +69,10 @@ export function ResultStep({
           <>
             <Button title={t('cal.eye.retry')} size="lg" onPress={onRetry} />
             <Button
-              title={t('cal.eye.saveAnyway')}
-              variant="secondary"
+              title={t('cal.eye.cancel')}
+              variant="ghost"
               size="md"
-              onPress={onSave}
+              onPress={onCancel ?? onDone}
             />
           </>
         ) : (

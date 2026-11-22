@@ -1,12 +1,16 @@
-import { act, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import React from 'react';
+import { Linking } from 'react-native';
 
-import { createFakeFaceSource, type FaceSample } from './adapters';
+import { createFakeFaceSource, type FaceSample, type CalibrationTransport } from './adapters';
+import { IntroStep } from './intro-step';
+import { ResultStep } from './result-step';
 import {
   useCalibrationMachine,
   type UseCalibrationMachineOptions,
   type UseCalibrationMachineReturn,
 } from './use-calibration-machine';
+import * as permissions from '@/services/permissions';
 import { useLive } from '@/state/live';
 import { useSettings } from '@/state/settings';
 import * as alerts from '@/services/alerts';
@@ -37,10 +41,27 @@ jest.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Warning: 'warning', Success: 'success' },
 }));
 
+jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+
+jest.mock('react-native-reanimated', () => {
+  const { View: RNView } = jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    __esModule: true,
+    default: {
+      View: RNView,
+    },
+    useReducedMotion: () => true,
+    cubicBezier: () => () => 0,
+  };
+});
+
 async function setupHarness(options: UseCalibrationMachineOptions) {
   let machine!: UseCalibrationMachineReturn;
   function Harness(props: UseCalibrationMachineOptions) {
-    machine = useCalibrationMachine(props);
+    machine = useCalibrationMachine({
+      ...props,
+      now: props.now ? () => props.now!() : undefined,
+    });
     return null;
   }
   const view = await render(<Harness {...options} />);
@@ -388,7 +409,7 @@ describe('useCalibrationMachine', () => {
   });
 
   it('saves eyeCalibration to store and handles offline vs online sync', async () => {
-    jest.spyOn(sync, 'syncEyeCalibration').mockImplementation(async () => {
+    const syncSpy = jest.spyOn(sync, 'syncEyeCalibration').mockImplementation(async () => {
       const isOnline = useLive.getState().connection === 'online';
       if (isOnline) {
         useSettings.getState().setEyeCalibration({
@@ -430,6 +451,7 @@ describe('useCalibrationMachine', () => {
     expect(harness.machine.isSaved).toBe(true);
     expect(harness.machine.isSynced).toBe(true);
     expect(useSettings.getState().eyeCalibration?.syncedAt).not.toBeNull();
+    syncSpy.mockRestore();
   });
 
   it('respects calOverride query params for screenshots', async () => {
@@ -473,5 +495,174 @@ describe('useCalibrationMachine', () => {
     });
     expect(failHarness.machine.step).toBe('failed');
     expect(failHarness.machine.failureReason).toBe('no_face');
+  });
+
+  it('handles NON-stable inline now option: open phase completes and cue fires once despite ~15 Hz sample stream', async () => {
+    let fakeTime = 10000;
+    let subscriber: ((sample: FaceSample) => void) | null = null;
+
+    const harness = await setupHarness({
+      subscribe: (cb) => {
+        subscriber = cb;
+        return () => {
+          subscriber = null;
+        };
+      },
+      now: () => fakeTime,
+    });
+
+    jest.useFakeTimers();
+
+    await act(async () => {
+      harness.machine.start();
+    });
+    expect(harness.machine.step).toBe('framing');
+
+    const goodSample: FaceSample = {
+      faceFound: true,
+      faceBoxFraction: 0.5,
+      luma: 60,
+      yaw: 0,
+      pitch: 0,
+      ear: 0.3,
+      earLeft: 0.3,
+      earRight: 0.3,
+      earValid: true,
+      t: fakeTime,
+    };
+
+    await act(async () => {
+      for (let t = 0; t < 1200; t += 66) {
+        fakeTime += 66;
+        subscriber?.({ ...goodSample, t: fakeTime });
+        jest.advanceTimersByTime(66);
+      }
+    });
+
+    expect(harness.machine.step).toBe('open');
+    expect(alerts.speak).toHaveBeenCalledWith('cal.eye.voice.open', undefined);
+    expect(alerts.speak).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      for (let t = 0; t < 10000; t += 66) {
+        fakeTime += 66;
+        subscriber?.({ ...goodSample, t: fakeTime });
+        jest.advanceTimersByTime(66);
+      }
+      jest.advanceTimersByTime(250);
+    });
+
+    expect(harness.machine.step).toBe('closed');
+    expect((alerts.speak as jest.Mock).mock.calls.filter((c) => c[0] === 'cal.eye.voice.open')).toHaveLength(1);
+    expect(alerts.speak).toHaveBeenCalledWith('cal.eye.voice.closed', undefined);
+
+    jest.useRealTimers();
+  });
+
+  it('saves with syncedAt null initially, handles injected transport, and demo mode never claims sent', async () => {
+    let sentPayload: unknown = null;
+    const fakeTransport: CalibrationTransport = {
+      send: jest.fn(async (payload) => {
+        sentPayload = payload;
+        useSettings.getState().setEyeCalibration({
+          ...useSettings.getState().eyeCalibration!,
+          syncedAt: Date.now(),
+        });
+        return 'ok';
+      }),
+    };
+
+    const harness = await setupHarness({
+      subscribe: () => () => {},
+      calOverride: 'good',
+      transport: fakeTransport,
+    });
+
+    expect(harness.machine.step).toBe('result');
+    expect(harness.machine.isSaved).toBe(false);
+    expect(harness.machine.isSynced).toBe(false);
+
+    // 1. In demo mode: never claims sent and transport is never sent
+    useSettings.getState().set({ demo: true });
+    await act(async () => {
+      harness.machine.save();
+    });
+
+    expect(harness.machine.isSaved).toBe(true);
+    expect(harness.machine.isSynced).toBe(false);
+    expect(useSettings.getState().eyeCalibration?.syncedAt).toBeNull();
+    expect(fakeTransport.send).not.toHaveBeenCalled();
+
+    // 2. Online with injected transport
+    useSettings.getState().set({ demo: false });
+    useLive.setState({ connection: 'online' });
+    await act(async () => {
+      harness.machine.save();
+    });
+
+    expect(harness.machine.isSaved).toBe(true);
+    expect(harness.machine.isSynced).toBe(true);
+    expect(useSettings.getState().eyeCalibration?.syncedAt).not.toBeNull();
+    expect(fakeTransport.send).toHaveBeenCalledTimes(1);
+    expect(sentPayload).not.toBeNull();
+  });
+
+  it('ResultStep for poor quality shows only Retry, advice line and Cancel button, no Save', async () => {
+    const onSave = jest.fn();
+    const onRetry = jest.fn();
+    const onDone = jest.fn();
+
+    const view = await render(
+      <ResultStep
+        quality="poor"
+        isSaved={false}
+        isSynced={false}
+        onSave={onSave}
+        onRetry={onRetry}
+        onDone={onDone}
+      />
+    );
+
+    expect(view.getByText('Retry')).toBeTruthy();
+    expect(view.getByText('Cancel')).toBeTruthy();
+    expect(
+      view.getByText(
+        'Low contrast between open and closed eyes. Ensure good lighting and keep eyes fully closed during the second step.'
+      )
+    ).toBeTruthy();
+
+    expect(view.queryByText('Save')).toBeNull();
+    expect(view.queryByText('Save anyway')).toBeNull();
+
+    fireEvent.press(view.getByText('Cancel'));
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('IntroStep requests camera permission: starts if granted, shows message and settings if denied', async () => {
+    const onStart = jest.fn();
+    const openSettingsSpy = jest.spyOn(Linking, 'openSettings').mockImplementation(async () => {});
+
+    jest.spyOn(permissions, 'permission').mockResolvedValueOnce('denied');
+
+    const view = await render(<IntroStep onStart={onStart} />);
+    const startBtn = view.getByText('Start');
+
+    fireEvent.press(startBtn);
+    await act(async () => {});
+
+    expect(onStart).not.toHaveBeenCalled();
+    expect(view.getByText('Camera access is needed to measure your eyes.')).toBeTruthy();
+    const settingsBtn = view.getByText('Open settings');
+    expect(settingsBtn).toBeTruthy();
+
+    fireEvent.press(settingsBtn);
+    expect(openSettingsSpy).toHaveBeenCalledTimes(1);
+
+    jest.spyOn(permissions, 'permission').mockResolvedValueOnce('granted');
+    fireEvent.press(view.getByText('Start'));
+    await act(async () => {});
+
+    expect(onStart).toHaveBeenCalledTimes(1);
+    openSettingsSpy.mockRestore();
   });
 });

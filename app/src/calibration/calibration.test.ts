@@ -69,12 +69,12 @@ describe('Calibration math & algorithms (ported from Python dms_face)', () => {
   });
 
   describe('PhaseCollector', () => {
-    it('discards the first 2 seconds during settling', () => {
-      const collector = new PhaseCollector(2.0);
+    it('discards the first 2 seconds during settling (2000 ms)', () => {
+      const collector = new PhaseCollector(2000);
 
-      // Pushing before 2 s -> settling, ignored
+      // Pushing before 2000 ms -> settling, ignored
       const sample1: EarSample = {
-        t: 0.5,
+        t: 500,
         ear: 0.3,
         earValid: true,
         faceFound: true,
@@ -86,9 +86,9 @@ describe('Calibration math & algorithms (ported from Python dms_face)', () => {
       expect(collector.push(sample1)).toBe(false);
       expect(collector.samplesCount).toBe(0);
 
-      // Pushing at 2.1 s -> accepted
+      // Pushing at 2100 ms -> accepted
       const sample2: EarSample = {
-        t: 2.1,
+        t: 2100,
         ear: 0.3,
         earValid: true,
         faceFound: true,
@@ -102,10 +102,10 @@ describe('Calibration math & algorithms (ported from Python dms_face)', () => {
     });
 
     it('handles timestamps provided in milliseconds', () => {
-      const collector = new PhaseCollector(2.0);
+      const collector = new PhaseCollector(2000);
       expect(
         collector.push({
-          t: 1500, // 1.5 s -> settling
+          t: 1500, // 1500 ms -> settling
           ear: 0.3,
           earValid: true,
           faceFound: true,
@@ -118,7 +118,7 @@ describe('Calibration math & algorithms (ported from Python dms_face)', () => {
 
       expect(
         collector.push({
-          t: 2500, // 2.5 s -> valid
+          t: 2500, // 2500 ms -> valid
           ear: 0.3,
           earValid: true,
           faceFound: true,
@@ -131,11 +131,11 @@ describe('Calibration math & algorithms (ported from Python dms_face)', () => {
     });
 
     it('tracks rejects for no_face, head_turned, and invalid ear', () => {
-      const collector = new PhaseCollector(2.0);
+      const collector = new PhaseCollector(2000);
 
       // no_face
       collector.push({
-        t: 3.0,
+        t: 3000,
         ear: null,
         earValid: false,
         faceFound: false,
@@ -147,7 +147,7 @@ describe('Calibration math & algorithms (ported from Python dms_face)', () => {
 
       // head_turned (|yaw| > 15)
       collector.push({
-        t: 3.1,
+        t: 3100,
         ear: 0.25,
         earValid: false,
         faceFound: true,
@@ -159,7 +159,7 @@ describe('Calibration math & algorithms (ported from Python dms_face)', () => {
 
       // invalid_ear
       collector.push({
-        t: 3.2,
+        t: 3200,
         ear: null,
         earValid: false,
         faceFound: true,

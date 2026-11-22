@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Icon } from '@/components/icon';
@@ -7,17 +7,15 @@ import { Text } from '@/components/text';
 import { useT } from '@/i18n';
 import { radius, spacing, useTheme } from '@/theme';
 
-import { SahiFaceView, type FaceSample, type FramingStatus } from './adapters';
+import type { FramingStatus } from './adapters';
 
 export function FramingStep({
   isNative,
-  onFace,
   status,
   isStable,
   onCancel,
 }: {
   isNative: boolean;
-  onFace: (sample: FaceSample) => void;
   status: FramingStatus;
   isStable: boolean;
   onCancel: () => void;
@@ -37,15 +35,13 @@ export function FramingStep({
             height: 280,
             borderRadius: radius.lg,
             borderCurve: 'continuous',
-            backgroundColor: colors.surface,
+            backgroundColor: isNative ? 'transparent' : colors.surface,
             overflow: 'hidden',
             justifyContent: 'center',
             alignItems: 'center',
           }}
         >
-          {isNative ? (
-            <SahiFaceView active style={StyleSheet.absoluteFill} onFace={onFace} />
-          ) : (
+          {isNative ? null : (
             <View style={{ alignItems: 'center', gap: spacing.sm }}>
               <Icon name="camera" size={36} color={colors.textTertiary} />
             </View>

@@ -2,7 +2,8 @@ import { mad, median, openStateNoise } from './stats';
 import type { EarSample, PhaseResult, RejectCounts } from './types';
 
 export class PhaseCollector {
-  readonly settleS: number;
+  /** Settle duration in milliseconds discarded at the start of the phase. */
+  readonly settleMs: number;
   private readonly ear: number[] = [];
   private readonly yaw: number[] = [];
   private readonly pitch: number[] = [];
@@ -14,18 +15,24 @@ export class PhaseCollector {
     total: 0,
   };
 
-  constructor(settleS = 2.0) {
-    this.settleS = settleS;
+  /**
+   * @param settleMs Duration in milliseconds to discard at phase start (default 2000 ms).
+   */
+  constructor(settleMs = 2000) {
+    this.settleMs = settleMs;
+  }
+
+  get settleS(): number {
+    return this.settleMs / 1000;
   }
 
   /**
-   * Push a sample. Timestamps sample.t are relative to phase start.
-   * Discards the first settleS seconds (default 2 s).
+   * Push a sample. Timestamps sample.t are relative to phase start in milliseconds.
+   * Discards samples where sample.t < settleMs (default 2000 ms).
    * Samples with earValid=false or ear=null are not counted, but recorded as rejects.
    */
   push(sample: EarSample): boolean {
-    const tSec = sample.t > 100 ? sample.t / 1000 : sample.t;
-    if (tSec < this.settleS) {
+    if (sample.t < this.settleMs) {
       return false;
     }
 
@@ -58,9 +65,9 @@ export class PhaseCollector {
     return true;
   }
 
-  pushEar(ear: number, t = 2.5): boolean {
+  pushEar(ear: number, tMs = 2500): boolean {
     return this.push({
-      t,
+      t: tMs,
       ear,
       earValid: true,
       faceFound: true,

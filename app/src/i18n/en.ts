@@ -236,9 +236,10 @@ export const en = {
   'cal.eye.cancel': 'Cancel',
   'cal.eye.retry': 'Retry',
   'cal.eye.save': 'Save',
-  'cal.eye.saveAnyway': 'Save anyway',
   'cal.eye.done': 'Done',
   'cal.eye.continue': 'Continue',
+  'cal.eye.perm.denied': 'Camera access is needed to measure your eyes.',
+  'cal.eye.perm.openSettings': 'Open settings',
 
   // Framing
   'cal.eye.framing.title': 'Fit your face in the oval',

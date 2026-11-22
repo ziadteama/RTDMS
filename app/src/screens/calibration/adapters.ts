@@ -21,10 +21,11 @@ import {
 } from '@/calibration';
 import type { StringKey } from '@/i18n';
 import { speak } from '@/services/alerts';
-import { syncEyeCalibration } from '@/services/calibration-sync';
+import { syncEyeCalibration, type CalibrationTransport } from '@/services/calibration-sync';
 import { useLive } from '@/state/live';
 import { useSettings, type EyeCalibration } from '@/state/settings';
 
+const SETTLE_MS = 2000;
 const SETTLE_S = 2;
 
 export {
@@ -34,6 +35,7 @@ export {
   PhaseCollector,
   buildProfile,
   framingStatus,
+  SETTLE_MS,
   SETTLE_S,
   useSettings,
   syncEyeCalibration,
@@ -50,6 +52,7 @@ export type {
   CalibrationQuality,
   PhoneCalibrationPayload,
   EyeCalibration,
+  CalibrationTransport,
 };
 
 export function safeHaptic(style: 'impact' | 'warning' | 'success' = 'impact'): void {

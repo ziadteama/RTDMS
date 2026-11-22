@@ -30,6 +30,9 @@ export class HttpCalibrationTransport implements CalibrationTransport {
       if (res.status === 200 || res.ok) {
         return 'ok';
       }
+      if (res.status === 408 || res.status === 429) {
+        return 'unreachable';
+      }
       if (res.status >= 400 && res.status < 500) {
         return 'rejected';
       }

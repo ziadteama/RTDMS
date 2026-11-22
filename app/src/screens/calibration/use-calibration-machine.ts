@@ -3,16 +3,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   PhaseCollector,
-  SETTLE_S,
+  SETTLE_MS,
   buildProfile,
   framingStatus,
   safeHaptic,
   safeSpeak,
   syncEyeCalibration,
-  useLive,
   useSettings,
   type BuildProfileFailureReason,
   type CalibrationQuality,
+  type CalibrationTransport,
   type FaceSample,
   type FramingStatus,
   type PhoneCalibrationPayload,
@@ -20,10 +20,13 @@ import {
 
 export type CalibrationStep = 'intro' | 'framing' | 'open' | 'closed' | 'result' | 'failed';
 
+export const defaultNow = () => Date.now();
+
 export type UseCalibrationMachineOptions = {
   subscribe: (cb: (sample: FaceSample) => void) => () => void;
   calOverride?: string;
   now?: () => number;
+  transport?: CalibrationTransport;
 };
 
 export type UseCalibrationMachineReturn = {
@@ -80,7 +83,8 @@ function parseOverride(override?: string) {
 export function useCalibrationMachine({
   subscribe,
   calOverride,
-  now = () => Date.now(),
+  now = defaultNow,
+  transport,
 }: UseCalibrationMachineOptions): UseCalibrationMachineReturn {
   let paramCal: string | undefined;
   try {
@@ -92,6 +96,11 @@ export function useCalibrationMachine({
 
   const initial = parseOverride(calOverride ?? paramCal);
   const override = calOverride ?? paramCal;
+
+  const nowRef = useRef(now);
+  useEffect(() => {
+    nowRef.current = now;
+  }, [now]);
 
   const [step, setStep] = useState<CalibrationStep>(initial.step);
   const [framing, setFraming] = useState<FramingStatus>(() => ({
@@ -116,7 +125,7 @@ export function useCalibrationMachine({
     if (override) return;
 
     return subscribe((sample: FaceSample) => {
-      const currentTime = now();
+      const currentTime = nowRef.current();
       if (step === 'framing') {
         const status = framingStatus(sample);
         setFraming(status);
@@ -144,20 +153,20 @@ export function useCalibrationMachine({
         closedCollectorRef.current.push({ ...sample, t: elapsed });
       }
     });
-  }, [step, subscribe, override, now]);
+  }, [step, subscribe, override]);
 
   // Phase timers and audio/haptics cues
   useEffect(() => {
     if (override) return;
 
     if (step === 'open') {
-      openCollectorRef.current = new PhaseCollector(SETTLE_S);
-      phaseStartRef.current = now();
+      openCollectorRef.current = new PhaseCollector(SETTLE_MS);
+      phaseStartRef.current = nowRef.current();
       safeSpeak('cal.eye.voice.open');
       safeHaptic('impact');
 
       const interval = setInterval(() => {
-        const elapsed = Math.floor((now() - phaseStartRef.current) / 1000);
+        const elapsed = Math.floor((nowRef.current() - phaseStartRef.current) / 1000);
         const rem = Math.max(0, 10 - elapsed);
         setSecondsRemaining(rem);
         if (rem <= 0) {
@@ -171,13 +180,15 @@ export function useCalibrationMachine({
     }
 
     if (step === 'closed') {
+      // Deliberate difference from Python: closed phase is only 3 s (vs longer in Python)
+      // so settle is 0 ms to retain all samples; median is robust against transition noise.
       closedCollectorRef.current = new PhaseCollector(0);
-      phaseStartRef.current = now();
+      phaseStartRef.current = nowRef.current();
       safeSpeak('cal.eye.voice.closed');
       safeHaptic('impact');
 
       const interval = setInterval(() => {
-        const elapsed = Math.floor((now() - phaseStartRef.current) / 1000);
+        const elapsed = Math.floor((nowRef.current() - phaseStartRef.current) / 1000);
         const rem = Math.max(0, 3 - elapsed);
         setSecondsRemaining(rem);
         if (rem <= 0) {
@@ -185,7 +196,7 @@ export function useCalibrationMachine({
           safeSpeak('cal.eye.voice.done');
           safeHaptic('success');
 
-          const openCol = openCollectorRef.current ?? new PhaseCollector(SETTLE_S);
+          const openCol = openCollectorRef.current ?? new PhaseCollector(SETTLE_MS);
           const closedCol = closedCollectorRef.current ?? new PhaseCollector(0);
           const res = buildProfile(openCol, closedCol);
 
@@ -201,7 +212,7 @@ export function useCalibrationMachine({
 
       return () => clearInterval(interval);
     }
-  }, [step, override, now]);
+  }, [step, override]);
 
   const start = useCallback(() => {
     setFraming(DEFAULT_FRAMING);
@@ -231,8 +242,7 @@ export function useCalibrationMachine({
 
   const save = useCallback(() => {
     if (!resultPayload) return;
-    const at = now();
-    const isOnline = useLive.getState().connection === 'online';
+    const at = nowRef.current();
 
     useSettings.getState().setEyeCalibration({
       closedRatio: resultPayload.closed_ratio,
@@ -241,23 +251,26 @@ export function useCalibrationMachine({
       snr: resultPayload.snr,
       quality: resultPayload.quality,
       at,
-      syncedAt: isOnline ? at : null,
+      syncedAt: null,
       samplesOpen: resultPayload.samples_open,
       samplesClosed: resultPayload.samples_closed,
     });
 
     setIsSaved(true);
-    if (isOnline) {
-      setSyncedAt(at);
+    setSyncedAt(null);
+
+    const isDemo = useSettings.getState().demo;
+    if (isDemo) {
+      return;
     }
 
-    void syncEyeCalibration().then((res) => {
-      if (res === 'ok') {
+    void syncEyeCalibration(transport).then((res) => {
+      if (res === 'ok' && !useSettings.getState().demo) {
         const updated = useSettings.getState().eyeCalibration;
         setSyncedAt(updated?.syncedAt ?? at);
       }
     });
-  }, [resultPayload, now]);
+  }, [resultPayload, transport]);
 
   return {
     step,
@@ -267,7 +280,7 @@ export function useCalibrationMachine({
     resultPayload,
     failureReason,
     isSaved,
-    isSynced: syncedAt !== null,
+    isSynced: !useSettings.getState().demo && syncedAt !== null,
     start,
     cancel,
     retry,

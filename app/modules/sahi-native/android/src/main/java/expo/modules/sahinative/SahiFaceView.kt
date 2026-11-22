@@ -66,19 +66,19 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
 
   override fun onDetachedFromWindow() {
     super.onDetachedFromWindow()
-    try {
-      cameraProvider?.unbindAll()
-    } catch (e: Exception) {
-      Log.e(TAG, "Error unbinding camera on detach", e)
-    }
+    releaseResources()
   }
 
   fun onDestroy() {
+    releaseResources()
+  }
+
+  private fun releaseResources() {
     try {
       cameraProvider?.unbindAll()
       cameraProvider = null
     } catch (e: Exception) {
-      Log.e(TAG, "Error unbinding camera on destroy", e)
+      Log.e(TAG, "Error unbinding camera", e)
     }
 
     try {
@@ -97,38 +97,44 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
   }
 
   private fun initLandmarkerAndCamera() {
-    if (cameraExecutor == null || cameraExecutor!!.isShutdown) {
-      cameraExecutor = Executors.newSingleThreadExecutor()
+    val executor = if (cameraExecutor == null || cameraExecutor!!.isShutdown) {
+      Executors.newSingleThreadExecutor().also { cameraExecutor = it }
+    } else {
+      cameraExecutor!!
     }
 
-    if (faceLandmarker == null) {
-      try {
-        val baseOptions = BaseOptions.builder()
-          .setModelAssetPath("face_landmarker.task")
-          .setDelegate(Delegate.CPU)
-          .build()
+    executor.execute {
+      if (faceLandmarker == null) {
+        try {
+          val baseOptions = BaseOptions.builder()
+            .setModelAssetPath("face_landmarker.task")
+            .setDelegate(Delegate.CPU)
+            .build()
 
-        val options = FaceLandmarker.FaceLandmarkerOptions.builder()
-          .setBaseOptions(baseOptions)
-          .setRunningMode(RunningMode.LIVE_STREAM)
-          .setNumFaces(1)
-          .setOutputFaceBlendshapes(false)
-          .setOutputFacialTransformationMatrixes(true)
-          .setResultListener { result, inputImage ->
-            handleResult(result, inputImage)
-          }
-          .setErrorListener { error ->
-            Log.e(TAG, "FaceLandmarker error: ${error.message}", error)
-          }
-          .build()
+          val options = FaceLandmarker.FaceLandmarkerOptions.builder()
+            .setBaseOptions(baseOptions)
+            .setRunningMode(RunningMode.LIVE_STREAM)
+            .setNumFaces(1)
+            .setOutputFaceBlendshapes(false)
+            .setOutputFacialTransformationMatrixes(true)
+            .setResultListener { result, inputImage ->
+              handleResult(result, inputImage)
+            }
+            .setErrorListener { error ->
+              Log.e(TAG, "FaceLandmarker error: ${error.message}", error)
+            }
+            .build()
 
-        faceLandmarker = FaceLandmarker.createFromOptions(context, options)
-      } catch (e: Exception) {
-        Log.e(TAG, "Failed to initialize FaceLandmarker", e)
+          faceLandmarker = FaceLandmarker.createFromOptions(context, options)
+        } catch (e: Exception) {
+          Log.e(TAG, "Failed to initialize FaceLandmarker", e)
+        }
+      }
+
+      ContextCompat.getMainExecutor(context).execute {
+        bindCamera()
       }
     }
-
-    bindCamera()
   }
 
   private fun getLifecycleOwner(): LifecycleOwner? {
@@ -242,7 +248,7 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
     val height = inputImage.height
 
     var minY = Float.MAX_VALUE
-    var maxY = Float.MIN_VALUE
+    var maxY = -Float.MAX_VALUE
     for (lm in landmarks) {
       val y = lm.y()
       if (y < minY) minY = y

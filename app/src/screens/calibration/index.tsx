@@ -2,6 +2,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 
 import { Screen } from '@/components/screen';
 
+import { CameraStage } from './camera-stage';
 import { FailureStep } from './failure-step';
 import { FramingStep } from './framing-step';
 import { IntroStep } from './intro-step';
@@ -21,8 +22,21 @@ export function EyeCalibrationScreen({
   const face = useFaceSamples();
   const machine = useCalibrationMachine({ subscribe: face.subscribe });
 
+  const isCapturing =
+    machine.step === 'framing' ||
+    machine.step === 'open' ||
+    machine.step === 'closed';
+
   return (
     <Screen contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}>
+      {isCapturing ? (
+        <CameraStage
+          isNative={face.isNative}
+          onFace={face.onFace}
+          hidden={machine.step !== 'framing'}
+        />
+      ) : null}
+
       {machine.step === 'intro' ? (
         <IntroStep
           isOnboarding={isOnboarding}
@@ -34,7 +48,6 @@ export function EyeCalibrationScreen({
       {machine.step === 'framing' ? (
         <FramingStep
           isNative={face.isNative}
-          onFace={face.onFace}
           status={machine.framing}
           isStable={machine.isStable}
           onCancel={machine.cancel}
@@ -45,8 +58,6 @@ export function EyeCalibrationScreen({
         <MeasureStep
           phase={machine.step}
           secondsRemaining={machine.secondsRemaining}
-          isNative={face.isNative}
-          onFace={face.onFace}
         />
       ) : null}
 
@@ -58,6 +69,7 @@ export function EyeCalibrationScreen({
           onSave={machine.save}
           onRetry={machine.retry}
           onDone={onDone}
+          onCancel={onDone}
         />
       ) : null}
 
