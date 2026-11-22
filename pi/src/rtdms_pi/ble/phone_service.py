@@ -89,7 +89,7 @@ class PhoneService:
         self.auth.reset()
 
     def _garmin_write(self, raw: bytes) -> None:
-        tracker = self.garmin.receiver.tracker
+        tracker = self.garmin.tracker
         before_lost, before_received = tracker.lost, tracker.received
         self.garmin.handle_write(raw)  # synchronous, before any phone scheduling
         for _ in range(min(60, tracker.lost - before_lost)):
@@ -99,9 +99,11 @@ class PhoneService:
     def read(self, char: Char) -> bytes:
         snapshot = self.state.snapshot()
         builders: dict[Char, Callable[[], dict[str, Any]]] = {
-            Char.ALERT: lambda: alert_payload(snapshot.decision, self.clock()),
+            Char.ALERT: lambda: alert_payload(
+                snapshot.decision, snapshot.t, self.state.phone_clock
+            ),
             Char.STATUS: lambda: status_payload(snapshot, self.settings.read()),
-            Char.PHYSIO: lambda: physio_payload(snapshot),
+            Char.PHYSIO: lambda: physio_payload(snapshot, self.state.phone_clock),
             Char.SETTINGS: self.settings.read,
             Char.HEALTH: self.health_fn,
         }

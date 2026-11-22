@@ -28,6 +28,7 @@ def build_runtime(
         PatternPlayer,
         SilentBuzzer,
     )
+    from .clock import PhoneClock
     from .runtime import Runtime
     from .sources import (
         FrameSource,
@@ -48,7 +49,12 @@ def build_runtime(
         backend = SilentBuzzer()
     vibration = GpioVibration(config.vibration_pin) if config.vibration_pin is not None else None
     player = PatternPlayer(backend, vibration)
-    state = RuntimeState(config.stale_s, config.physio_stale_s)
+    phone_clock = PhoneClock(
+        set_system_clock=(lambda t: time.clock_settime(time.CLOCK_REALTIME, t))
+        if config.sync_system_clock
+        else None,
+    )
+    state = RuntimeState(config.stale_s, config.physio_stale_s, phone_clock=phone_clock)
     source: FrameSource = (
         ScriptedFrameSource([]) if config.no_camera else StreamPipelineSource(config)
     )
@@ -77,6 +83,7 @@ def main() -> None:
     from .incidents.ring import Entry, FrameRing
     from .incidents.sink import RingIncidentSink
     from .incidents.store import IncidentStore
+    from .incidents_api import ClockedIncidentSink
     from .pairing import load_or_create_token
     from .payloads import alert_payload, status_payload
     from .settings import SettingsStore
@@ -114,7 +121,7 @@ def main() -> None:
                         t_wall=time.time(),
                         jpeg=None,
                         status=status_payload(s),
-                        alert=alert_payload(s.decision, time.time()),
+                        alert=alert_payload(s.decision, s.t, runtime.state.phone_clock),
                     )
                 )
 
@@ -140,15 +147,17 @@ def main() -> None:
             health_probe=health_probe,
         )
         debug_server.start()
-        incident_server = serve_incidents(config.host, config.incident_port, store, sink, token)
+        incident_server = serve_incidents(
+            config.host,
+            config.incident_port,
+            store,
+            ClockedIncidentSink(sink, runtime.state.phone_clock),
+            token,
+        )
         if ble:
             from .ble.server import run_runtime_ble
 
-            asyncio.run(
-                run_runtime_ble(
-                    config, runtime, incidents=sink, settings=settings_store
-                )
-            )
+            asyncio.run(run_runtime_ble(config, runtime, incidents=sink, settings=settings_store))
         else:
             runtime.run_forever()
     finally:

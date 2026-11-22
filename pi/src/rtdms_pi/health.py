@@ -12,7 +12,7 @@ from typing import Any
 
 from .ble.contract import CONTRACT_VERSION
 from .config import RuntimeConfig
-from .sources import NullPhysioSource, PhysioSource
+from .sources import GarminPhysioSource, NullPhysioSource, PhysioSource
 from .state import RuntimeState, Snapshot
 
 
@@ -233,6 +233,13 @@ class HealthProbe:
             d["mem_total_mb"] = mem_total
         if disk_free is not None:
             d["disk_free_mb"] = disk_free
+        if isinstance(self.physio_source, GarminPhysioSource):
+            d["physio_diag"] = {
+                **self.physio_source.diagnostics(),
+                "shadow_agree": None,
+                "shadow_disagree": None,
+                "shadow_only": None,
+            }
         return d
 
     def __call__(self) -> dict[str, Any]:

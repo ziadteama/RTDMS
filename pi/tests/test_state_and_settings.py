@@ -10,11 +10,11 @@ def test_state_clock_offset() -> None:
     state = RuntimeState()
     assert state.clock_offset_ms is None
 
-    state.set_clock_offset(1500)
+    state.phone_clock.on_clock_write(2000, 500)
     assert state.clock_offset_ms == 1500
 
-    state.set_clock_offset(None)
-    assert state.clock_offset_ms is None
+    state.phone_clock.on_clock_write(2001, 500)
+    assert state.clock_offset_ms == 1500
 
 
 def test_settings_merged_under_lock() -> None:

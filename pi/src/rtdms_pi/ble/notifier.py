@@ -100,7 +100,9 @@ class Notifier:
                 decision = self._changes.get_nowait()
             except Empty:
                 return emitted
-            emitted |= self._send_alert(alert_payload(decision, now), now, keepalive=False)
+            emitted |= self._send_alert(
+                alert_payload(decision, now, self.state.phone_clock), now, keepalive=False
+            )
 
     def set_throttle(self, factor: float) -> None:
         if not math.isfinite(factor) or not 0 < factor <= 1:
@@ -116,7 +118,7 @@ class Notifier:
             self._send(Char.STATUS, "status", payload, key, now)
 
     def _check_physio(self, snapshot: Any, now: float) -> None:
-        payload = physio_payload(snapshot)
+        payload = physio_payload(snapshot, self.state.phone_clock)
         key = _physio_key(payload)
         stale = now - self._sent_at[Char.PHYSIO] >= STATUS_KEEPALIVE_S / self.factor - EPS
         # keep-alive: a late subscriber needs a state
@@ -127,7 +129,9 @@ class Notifier:
         now, snapshot = self.clock(), self.state.snapshot()
         changed = self._drain_changes(now)
         if not changed and now - self._sent_at[Char.ALERT] >= ALERT_KEEPALIVE_S - EPS:
-            self._send_alert(alert_payload(snapshot.decision, now), now, keepalive=True)
+            self._send_alert(
+                alert_payload(snapshot.decision, now, self.state.phone_clock), now, keepalive=True
+            )
         if changed or now - self._checked_at >= 1.0 / self.factor - EPS:
             self._checked_at = now
             self._check_status(snapshot, now)

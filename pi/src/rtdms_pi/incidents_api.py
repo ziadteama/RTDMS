@@ -3,6 +3,7 @@
 from threading import Lock
 from typing import Any, Protocol
 
+from .clock import PhoneClock
 from .incidents.ids import incident_id as format_incident_id
 
 
@@ -44,3 +45,20 @@ class MemoryIncidentSink:
             if client is not None:
                 self._clients[client] = inc_id
             return inc_id
+
+
+class ClockedIncidentSink:
+    """Give HTTP fallback incidents the same filtered offset as BLE incidents."""
+
+    def __init__(self, sink: IncidentSink, clock: PhoneClock) -> None:
+        self.sink, self.clock = sink, clock
+
+    def report(
+        self,
+        req: dict[str, Any],
+        clock_offset: int | None = None,
+        clock_offset_ms: int | None = None,
+        **kwargs: Any,
+    ) -> str:
+        offset = self.clock.offset_ms
+        return self.sink.report(req, clock_offset=None if offset is None else int(offset))

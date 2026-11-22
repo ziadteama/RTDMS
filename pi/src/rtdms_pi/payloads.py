@@ -7,6 +7,7 @@ from collections.abc import Mapping
 
 from dms_fusion import FusionDecision
 
+from .clock import PhoneClock
 from .sources import number
 from .state import DecisionSnapshot, Snapshot
 
@@ -27,9 +28,17 @@ def _budget(d: dict[str, object], optional: list[str]) -> dict[str, object]:
     return d
 
 
-def alert_payload(decision: FusionDecision | DecisionSnapshot, t: float) -> dict[str, object]:
+def alert_payload(
+    decision: FusionDecision | DecisionSnapshot, mono_s: float, clock: PhoneClock
+) -> dict[str, object]:
+    t, t_src = clock.payload_t(mono_s)
     reasons = [r[:48] for r in decision.reasons[:4]]
-    d: dict[str, object] = {"pattern": decision.pattern.value, "reasons": reasons, "t": t}
+    d: dict[str, object] = {
+        "pattern": decision.pattern.value,
+        "reasons": reasons,
+        "t": round(t, 3),
+        "t_src": t_src,
+    }
     while reasons and len(to_json_bytes(d)) > 240:
         reasons[-1] = reasons[-1][:-1]
         if not reasons[-1]:
@@ -83,19 +92,23 @@ def status_payload(
     return _budget(d, optional)
 
 
-def physio_payload(snapshot: Snapshot) -> dict[str, object]:
+def physio_payload(snapshot: Snapshot, clock: PhoneClock) -> dict[str, object]:
     p = snapshot.physio
+    t, t_src = clock.payload_t(p.t if p else snapshot.t)
+    d: dict[str, object] = {"watch_connected": False, "t": round(t, 3), "t_src": t_src}
     if p is None:
-        return {"watch_connected": False, "t": snapshot.t}
+        return d
     raw = p.raw
-    d: dict[str, object] = {
-        "watch_connected": raw.get("watch_connected") is True,
-        "t": number(raw.get("t")) if number(raw.get("t")) is not None else p.t,
-    }
-    optional = ["hr_bpm", "rr_ms", "fatigue_probability", "hrv_state", "rmssd_ms", "quality"]
-    for key in ("hr_bpm", "fatigue_probability", "rmssd_ms"):
+    d["watch_connected"] = raw.get("watch_connected") is True
+    # Preserve HR context first; diagnostics and beat arrays yield to the notify budget.
+    numeric = ["hr_bpm", "hr_baseline_bpm", "hr_delta_bpm", "hr_trend_bpm_per_10min"]
+    optional = ["hr_bpm", "quality", "worn", *numeric[1:], "hrv_state", "rmssd_ms", "rr_ms"]
+    for key in [*numeric, "rmssd_ms"]:
         if key in raw:
-            d[key] = number(raw[key])
+            value = number(raw[key])
+            d[key] = round(value, 1) if value is not None else None
+    if isinstance(raw.get("worn"), bool):
+        d["worn"] = raw["worn"]
     rr = raw.get("rr_ms")
     if isinstance(rr, (tuple, list)):
         d["rr_ms"] = [number(v) for v in rr[:8] if number(v) is not None]
@@ -120,6 +133,7 @@ def health_payload(
     mem_total_mb: int | None = None,
     disk_free_mb: int | None = None,
     wifi: str | None = None,
+    physio_diag: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     d: dict[str, object] = {
         "cpu_pct": cpu_pct,
@@ -140,4 +154,11 @@ def health_payload(
     ):
         if value is not None:
             d[key] = value
+    if physio_diag is not None:
+        d["physio_diag"] = {
+            **physio_diag,
+            "shadow_agree": None,
+            "shadow_disagree": None,
+            "shadow_only": None,
+        }
     return d

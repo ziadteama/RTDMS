@@ -69,7 +69,7 @@ def test_loss_hysteresis() -> None:
 
 def test_garmin_before_pending_notifications(service: PhoneService) -> None:
     events = []
-    receiver = service.garmin.receiver
+    receiver = service.garmin
     service.state.set_decision(FusionDecision(AlertPattern.MAX, []))
     with patch.object(receiver, "handle_write", wraps=receiver.handle_write) as handle:
         service.port.write(GARMIN_CHAR_UUID, encode(RrPacket(1, 1000, 72, (830,))))
