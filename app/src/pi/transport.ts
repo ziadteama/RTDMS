@@ -28,7 +28,7 @@ export const isNotSupported = (e: unknown) => e instanceof PiHttpError && (e.sta
 export type ClipSource = { uri: string } | { asset: number };
 
 export interface PiTransport {
-  readonly kind: 'http' | 'demo';
+  readonly kind: 'http' | 'demo' | 'ble';
   get(path: string, timeoutMs?: number): Promise<unknown>;
   send(method: 'POST' | 'PUT', path: string, body?: unknown, timeoutMs?: number): Promise<unknown>;
   /** MJPEG URL for the live view, or null (demo). */
