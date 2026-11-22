@@ -24,7 +24,7 @@ camera with its two IR boards**. It is the physical unit for [[5.2 Phase Two Pla
 
 > [!abstract] State at 21 Nov 2026
 > **Designed (concept B, "Brick"), printable files ready, nothing printed yet.**
-> 108.8 × 85 × 30 mm. CadQuery model + STEP + STL in `hardware/enclosure/brick/`.
+> 108.8 × 85 × 45 mm. CadQuery model + STEP + STL in `hardware/enclosure/brick/`.
 > Checked against a real Pi 5 model: **0 mm³ clash**, holes and USB-C line up.
 > **Not verified:** the camera fit on the real board, the Active Cooler (not in the reference
 > model), and anything printed.
@@ -59,7 +59,7 @@ camera with its two IR boards**. It is the physical unit for [[5.2 Phase Two Pla
 | Concept | Size (W × H × D) | Why not / why |
 |---|---|---|
 | A Slab | 106 × 72 × 39 | Thinnest, but tallest face and cable out the top |
-| **B Brick** | **108.8 × 30 × 85** (as built) | **Chosen.** Lowest, sits flat, power out the back |
+| **B Brick** | **108.8 × 45 × 85** (as built) | **Chosen.** Lowest, sits flat, power out the back |
 | C Wedge | 100 × 54 × 82 | Camera aimed up, but tilt fixed and harder to print |
 | D Pod + Base | 100 × 77 × 70 | Adjustable tilt, but hinge + ribbon wear, more parts |
 
@@ -77,7 +77,8 @@ camera with its two IR boards**. It is the physical unit for [[5.2 Phase Two Pla
   and the camera is at the **front**, so the ribbon has to run back over the board and turn 180° into
   the connector. The first 75 mm box left only about 0.4 mm behind the Pi. The box is now **85 mm
   deep**: the extra 10 mm sits behind the Pi for the turn, plus one extra lid post (x = 12 mm) to keep
-  the longer lid stiff. The team's ribbon is long (photo, 22 Nov), so reach is not the problem; the
+  the longer lid stiff. It is also **15 mm taller** (45 mm outside): about 20 mm of free space above
+  the Pi's tallest part, so the ribbon can sit and loop there. The camera and Pi did not move. The team's ribbon is long (photo, 22 Nov), so reach is not the problem; the
   turn is. I could not pick the camera connector out of the reference Pi model, so the route is
   **not modelled or verified**.
 - **microSD:** no opening (option `SD_SLOT`, off). Change the card with the lid open.

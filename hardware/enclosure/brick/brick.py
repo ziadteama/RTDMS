@@ -30,7 +30,7 @@ LID_T = 2.4
 CLR = 0.3
 INNER_W = 104.0          # Pi model spans x -44.9..44.2 (USB stack overhangs 0.9 mm more than spec)
 D = 85.0                 # depth, front to back (10 mm of it is empty space behind the Pi: room for the camera ribbon to turn into the CSI connector)
-H_SHELL = 27.6           # shell height = lid's inner face (USB stack top is 22.9)
+H_SHELL = 42.6           # shell height = lid inner face. 27.6 + 15 mm of headroom above the Pi for the camera ribbon (camera and Pi stay put, USB stack top is at 22.9)
 W = INNER_W + 2 * WALL   # 108.8
 R_V = 5.0                # vertical corner radius
 
