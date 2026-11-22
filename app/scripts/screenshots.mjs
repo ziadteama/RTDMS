@@ -4,6 +4,11 @@
 //   npx expo start --web --port 8081     # terminal 2
 //   node scripts/screenshots.mjs         # → docs/screenshots/<theme>-en/<screen>.png
 //
+// Bluetooth shots (03c, 14): the web build runs the in-memory FakeBleLink, never real radio. Shots
+// with `bleName` in their overrides also get a pairing token. 14-diagnostics-link shows "Bluetooth"
+// only if the fake link comes up online by itself (autoplay in src/pi/ble); otherwise the link
+// stays offline and the row shows the Wi-Fi fallback served by mock-pi. Both are valid evidence.
+//
 // The web build is a stand-in for the Android dev build (no emulator in CI): the native tab bar,
 // @expo/ui controls and fonts are web renderings. See docs/EVIDENCE.md.
 import { mkdirSync } from 'node:fs';
@@ -32,6 +37,7 @@ const SHOTS = [
   ['02-permissions', '/permissions', { onboarded: false }],
   ['03-pair', '/connect', { onboarded: false }],
   ['03b-onboarding-eye-calibration', '/eye-calibration', { onboarded: false }],
+  ['03c-pair-ble-manual', '/connect', { onboarded: false }, async (p) => { await p.getByRole('button', { name: 'Pair with a code instead' }).click(); await p.waitForTimeout(500); }],
   ['04-emergency-contacts', '/emergency-contacts', { onboarded: false }],
   ['05-drive', '/live', {}],
   ['06-drive-driving-lock', '/live', { demo: true }, async (p) => p.waitForTimeout(23_000)], // demo speed > 10 km/h after 20 s
@@ -48,6 +54,7 @@ const SHOTS = [
   ['10h-eye-cal-failure', '/eye-calibration?cal=failure', {}],
   ['11-contacts', '/contacts', {}],
   ['12-privacy', '/privacy', {}],
+  ['14-diagnostics-link', '/diagnostics', { bleName: 'RTDMS-Pi' }, async (p) => { await p.getByText('Signal').first().scrollIntoViewIfNeeded(); await p.waitForTimeout(2500); }],
   ['13-sos', '/sos?incident=1', { demo: true }, async (p) => p.waitForTimeout(3000)],
 ];
 
@@ -64,6 +71,7 @@ for (const theme of ['dark', 'light']) {
     await page.goto(WEB + '/');
     await page.evaluate(([s, c]) => {
       localStorage.clear();
+      if (s.state.bleName) localStorage.setItem('sahi.pi_token', JSON.stringify('k3Jx9mQ2pL7vN4wR8tY1'));
       localStorage.setItem('sahi.settings', JSON.stringify(s));
       localStorage.setItem('sahi.contacts', JSON.stringify(c));
     }, [settings(theme, extra), contacts]);

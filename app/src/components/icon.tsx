@@ -30,6 +30,7 @@ const ICONS = {
   location: { ios: 'location', android: 'location_on' },
   notifications: { ios: 'bell', android: 'notifications' },
   camera: { ios: 'camera', android: 'photo_camera' },
+  bluetooth: { ios: 'antenna.radiowaves.left.and.right', android: 'bluetooth' },
   crash: { ios: 'car.side.rear.and.collision.and.car.side.front', android: 'car_crash' },
   sos: { ios: 'sos', android: 'sos' },
   download: { ios: 'arrow.down.circle', android: 'download' },

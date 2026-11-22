@@ -35,3 +35,19 @@ describe('getInstallId persistence', () => {
     expect(id2).not.toBe(id1);
   });
 });
+
+describe('Pi token', () => {
+  beforeEach(() => {
+    mockStore.clear();
+    useSecure.getState().wipe();
+  });
+
+  it('is stored under sahi.pi_token in the secure store and cleared by wipe()', () => {
+    useSecure.getState().setPiToken('k3Jx9mQ2pL7vN4wR8tY1');
+    expect(useSecure.getState().piToken).toBe('k3Jx9mQ2pL7vN4wR8tY1');
+    expect(JSON.parse(mockStore.get('sahi.pi_token')!)).toBe('k3Jx9mQ2pL7vN4wR8tY1');
+    useSecure.getState().wipe();
+    expect(useSecure.getState().piToken).toBeNull();
+    expect(mockStore.has('sahi.pi_token')).toBe(false);
+  });
+});

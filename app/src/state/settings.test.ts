@@ -94,3 +94,31 @@ describe('useSettings store - eyeCalibration', () => {
     expect(merged.obsoleteField).toBeUndefined();
   });
 });
+
+describe('useSettings store - BLE pairing', () => {
+  beforeEach(() => {
+    mockStore.clear();
+    useSettings.getState().reset();
+  });
+
+  it('defaults bleName and bleDeviceId to null and resets them', () => {
+    expect(useSettings.getState().bleName).toBeNull();
+    expect(useSettings.getState().bleDeviceId).toBeNull();
+    useSettings.getState().set({ bleName: 'RTDMS-Pi', bleDeviceId: 'AA:BB' });
+    useSettings.getState().reset();
+    expect(useSettings.getState().bleName).toBeNull();
+    expect(useSettings.getState().bleDeviceId).toBeNull();
+  });
+
+  it('keeps persisted bleName and bleDeviceId through merge', () => {
+    const { merge } = (
+      useSettings as unknown as {
+        persist: { getOptions: () => { merge: (p: unknown, c: unknown) => Record<string, unknown> } };
+      }
+    ).persist.getOptions();
+    const merged = merge({ bleName: 'RTDMS-Pi', bleDeviceId: 'AA:BB', token: 'x' }, { ...DEFAULT_SETTINGS });
+    expect(merged.bleName).toBe('RTDMS-Pi');
+    expect(merged.bleDeviceId).toBe('AA:BB');
+    expect(merged.token).toBeUndefined();
+  });
+});

@@ -1,22 +1,34 @@
 /**
- * Polls the Pi: /status + /alert at 5 Hz, /physio at 1 Hz (spec: no WebSocket until polling is
- * shown to be too slow). Three failures in a row → offline; then retries every second and, if the
- * phone was paired by QR, re-joins the Pi hotspot every 10 s.
+ * Feeds `useLive` from the Pi. Bluetooth first: while the BLE link is online the unit pushes its
+ * data and no HTTP is sent (poller-ble.ts). Otherwise the HTTP poll runs: /status + /alert +
+ * /physio at 1 Hz when the unit is paired over Bluetooth (it is only the fallback then, and the
+ * phone must not wake the Pi's Wi-Fi at 5 Hz), or /status + /alert at 5 Hz and /physio at 1 Hz
+ * when there is no Bluetooth pairing at all (dev against mock-pi, pure Wi-Fi use). Three failures
+ * in a row → offline; then it retries every second and, if the phone was paired by QR, re-joins
+ * the Pi hotspot every 10 s.
  */
 import SahiNative from '@modules/sahi-native';
+import { getBleLink } from '@/pi/ble';
 import { parseAlert, parsePhysio, parseStatus } from '@/pi/parse';
 import { isNotSupported } from '@/pi/transport';
 import { setLive, useLive } from '@/state/live';
 import { useSecure } from '@/state/secure';
+import { useSettings } from '@/state/settings';
 
 import { pi } from './pi';
+import { startBlePush } from './poller-ble';
 
-const PERIOD_MS = 200;
+const FAST_MS = 200;
+const FALLBACK_MS = 1000;
 const OFFLINE_AFTER = 3;
 const UNSUPPORTED_RETRY_MS = 30_000;
 
-export function startPoller(): () => void {
-  let running = true;
+/** Paired over Bluetooth (name + token) and not in demo mode. */
+const bleConfigured = () => !useSettings.getState().demo && !!useSettings.getState().bleName && !!useSecure.getState().piToken;
+
+/** One HTTP polling loop; returns its stop function. A stopped loop never touches the store again. */
+function startHttpLoop(): () => void {
+  let alive = true;
   let failures = 0;
   let tick = 0;
   let alertRetryAt = 0;
@@ -25,12 +37,13 @@ export function startPoller(): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const loop = async () => {
-    if (!running) return;
+    if (!alive) return;
     const started = Date.now();
+    const period = bleConfigured() ? FALLBACK_MS : FAST_MS;
     const transport = pi();
     const live = useLive.getState();
     const wantAlert = live.alertSupported !== false || started > alertRetryAt;
-    const wantPhysio = tick % 5 === 0 && (live.physioSupported !== false || started > physioRetryAt);
+    const wantPhysio = tick % (FALLBACK_MS / period) === 0 && (live.physioSupported !== false || started > physioRetryAt);
     tick++;
 
     const [s, a, p] = await Promise.allSettled([
@@ -38,7 +51,7 @@ export function startPoller(): () => void {
       wantAlert ? transport.get('/alert') : Promise.resolve(undefined),
       wantPhysio ? transport.get('/physio') : Promise.resolve(undefined),
     ]);
-    if (!running) return;
+    if (!alive) return;
 
     const patch: Partial<typeof live> = {};
     const status = s.status === 'fulfilled' ? parseStatus(s.value) : null;
@@ -47,6 +60,7 @@ export function startPoller(): () => void {
       patch.status = status;
       patch.connection = 'online';
       patch.lastOkAt = Date.now();
+      patch.link = transport.kind === 'demo' ? null : 'http';
     } else if (++failures >= OFFLINE_AFTER && live.connection !== 'offline') {
       patch.connection = 'offline';
     }
@@ -85,14 +99,44 @@ export function startPoller(): () => void {
       void SahiNative.joinWifi(wifi.ssid, wifi.password).catch(() => {});
     }
 
-    const wait = failures >= OFFLINE_AFTER ? 1000 : Math.max(0, PERIOD_MS - (Date.now() - started));
+    const wait = failures >= OFFLINE_AFTER ? 1000 : Math.max(0, period - (Date.now() - started));
     timer = setTimeout(loop, wait);
   };
 
   void loop();
   return () => {
-    running = false;
+    alive = false;
     if (timer) clearTimeout(timer);
-    setLive({ connection: 'connecting', status: null, alert: null, physio: null, alertSupported: null, physioSupported: null });
+    timer = null;
+  };
+}
+
+export function startPoller(): () => void {
+  const link = getBleLink();
+  let stopHttp: (() => void) | null = null;
+  let stopPush: (() => void) | null = null;
+
+  // Exactly one source at a time: BLE notifications while the link is online, else HTTP.
+  const sync = () => {
+    const viaBle = bleConfigured() && link.state === 'online';
+    if (viaBle && !stopPush) {
+      stopHttp?.();
+      stopHttp = null;
+      stopPush = startBlePush(link);
+    } else if (!viaBle && !stopHttp) {
+      stopPush?.();
+      stopPush = null;
+      stopHttp = startHttpLoop();
+    }
+  };
+
+  const offState = link.onState(sync);
+  sync();
+  return () => {
+    offState();
+    stopHttp?.();
+    stopPush?.();
+    stopHttp = stopPush = null;
+    setLive({ connection: 'connecting', link: null, status: null, alert: null, physio: null, alertSupported: null, physioSupported: null });
   };
 }

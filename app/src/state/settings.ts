@@ -43,6 +43,10 @@ export type Settings = {
   relayKey?: string;
   driverName?: string;
   eyeCalibration: EyeCalibration | null;
+  /** Advertised BLE name of the paired unit (QR `B`); null = no Bluetooth pairing. The token is in useSecure. */
+  bleName: string | null;
+  /** Remembered peripheral id from the last BLE connect. */
+  bleDeviceId: string | null;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -64,6 +68,8 @@ export const DEFAULT_SETTINGS: Settings = {
   relayKey: undefined,
   driverName: 'Driver',
   eyeCalibration: null,
+  bleName: null,
+  bleDeviceId: null,
 };
 
 type SettingsStore = Settings & {

@@ -7,6 +7,7 @@ import { useSecure } from '@/state/secure';
 import { useSettings } from '@/state/settings';
 
 import { startAlertEngine } from './alerts';
+import { startBleLink } from './ble-link';
 import { startCalibrationSync } from './calibration-sync';
 import { startIncidentDelivery } from './incident-delivery';
 import { startMonitor } from './monitor';
@@ -54,6 +55,12 @@ export function useRuntime(): void {
       });
     }
   }, []);
+
+  // Not gated on onboarding: pairing happens during it and the pair screen waits for the link.
+  // The service watches the pairing in the stores itself (and sits idle with no timers if none).
+  useEffect(() => {
+    if (!paused) return startBleLink();
+  }, [paused]);
 
   useEffect(() => {
     if (!onboarded || paused) return;

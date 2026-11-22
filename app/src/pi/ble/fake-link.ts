@@ -1,3 +1,5 @@
+import { alertAt, physioAt, SCENARIO_LENGTH_S, statusAt } from '@/demo/scenario';
+
 import type { BleLink, BleNotify, BleNotifyKind, BleState, BleTarget } from './types';
 
 /**
@@ -20,12 +22,15 @@ export class FakeBleLink implements BleLink {
   written: { char: 'settings' | 'command' | 'incident'; body: unknown }[] = [];
   private stateCbs = new Set<(s: BleState) => void>();
   private notifyCbs = new Set<(n: BleNotify) => void>();
+  private autoplayTimer: ReturnType<typeof setInterval> | null = null;
+  private autoplayStarted = Date.now();
 
   start(target: BleTarget) {
     this.target = target;
     this.setState('scanning');
   }
   stop() {
+    this.clearAutoplay();
     this.target = null;
     this.setState('idle');
   }
@@ -41,6 +46,7 @@ export class FakeBleLink implements BleLink {
     if (s === this.state) return;
     this.state = s;
     if (s === 'online') this.deviceId = this.target?.deviceId ?? 'fake-device';
+    if (s === 'offline' || s === 'idle') this.clearAutoplay();
     this.stateCbs.forEach((cb) => cb(s));
   }
   emit(kind: BleNotifyKind, value: unknown, at = Date.now()) {
@@ -70,5 +76,28 @@ export class FakeBleLink implements BleLink {
   }
   async readRssi() {
     return this.state === 'online' ? this.rssi : null;
+  }
+
+  autoplay(demoNow?: () => number): () => void {
+    const getNow = demoNow ?? (() => ((Date.now() - this.autoplayStarted) / 1000) % SCENARIO_LENGTH_S);
+    const tick = () => {
+      if (this.state === 'online') {
+        const t = getNow();
+        this.emit('alert', alertAt(t));
+        this.emit('status', statusAt(t));
+        this.emit('physio', physioAt(t));
+      }
+    };
+    this.clearAutoplay();
+    this.autoplayTimer = setInterval(tick, 1000);
+    tick();
+    return () => this.clearAutoplay();
+  }
+
+  private clearAutoplay(): void {
+    if (this.autoplayTimer) {
+      clearInterval(this.autoplayTimer);
+      this.autoplayTimer = null;
+    }
   }
 }

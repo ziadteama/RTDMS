@@ -6,25 +6,18 @@ import SahiNative from '@modules/sahi-native';
 import { Button } from '@/components/button';
 import { Text } from '@/components/text';
 import { useT } from '@/i18n';
-import { normalizeBaseUrl, parseQr, parseStatus } from '@/pi/parse';
-import { HttpTransport } from '@/pi/transport';
+import { getBleLink } from '@/pi/ble';
+import { normalizeBaseUrl, parseQr } from '@/pi/parse';
 import { useSecure } from '@/state/secure';
 import { DEFAULT_BASE_URL, useSettings } from '@/state/settings';
 import { radius, spacing, touch, type, useTheme } from '@/theme';
 
-type Phase = { kind: 'idle' } | { kind: 'busy'; label: string } | { kind: 'error'; label: string } | { kind: 'ok' };
+import { PairBleManual } from './pair-ble-manual';
+import { firstTrue, httpReachable, waitBleOnline } from './pair-link';
 
-async function reachable(baseUrl: string): Promise<boolean> {
-  const tr = new HttpTransport(baseUrl);
-  for (let i = 0; i < 3; i++) {
-    try {
-      if (parseStatus(await tr.get('/status', 2500))) return true;
-    } catch {
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-  }
-  return false;
-}
+type Ble = { name: string; token: string };
+
+type Phase = { kind: 'idle' } | { kind: 'busy'; label: string } | { kind: 'error'; label: string } | { kind: 'ok' };
 
 /** QR pairing to the Pi hotspot, or a typed address (mock Pi on a laptop, Pi on a LAN). */
 export function Pair({ onDone }: { onDone: () => void }) {
@@ -35,19 +28,38 @@ export function Pair({ onDone }: { onDone: () => void }) {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const handled = useRef(false);
 
-  const connect = async (baseUrl: string, wifi: { ssid: string; password: string } | null) => {
+  /**
+   * Pair with the unit. Succeeds when EITHER the Wi-Fi check answers OR the Bluetooth link comes
+   * online within 10 s; a Bluetooth-only QR (no Wi-Fi) is judged by Bluetooth alone. On failure the
+   * previous Bluetooth pairing is put back.
+   */
+  const connect = async (baseUrl: string | null, wifi: { ssid: string; password: string } | null, ble: Ble | null) => {
     if (wifi) {
       setPhase({ kind: 'busy', label: t('onb.pair.joining', { ssid: wifi.ssid }) });
       useSecure.getState().setWifi(wifi);
       if (SahiNative) await SahiNative.joinWifi(wifi.ssid, wifi.password).catch(() => false);
     }
     setPhase({ kind: 'busy', label: t('onb.pair.checking') });
-    if (await reachable(baseUrl)) {
-      useSettings.getState().set({ baseUrl, demo: false });
+    const before = { name: useSettings.getState().bleName, token: useSecure.getState().piToken };
+    // Subscribe first: saving the pairing makes the background service start the link at once.
+    const wait = ble ? waitBleOnline(getBleLink()) : null;
+    if (ble) {
+      useSecure.getState().setPiToken(ble.token);
+      useSettings.getState().set({ bleName: ble.name, demo: false });
+    }
+    const checks = [wait?.done, baseUrl && (wifi || !ble) ? httpReachable(baseUrl) : undefined].filter((c): c is Promise<boolean> => !!c);
+    const ok = await firstTrue(checks);
+    wait?.cancel();
+    if (ok) {
+      useSettings.getState().set({ ...(baseUrl ? { baseUrl } : {}), demo: false });
       setPhase({ kind: 'ok' });
       onDone();
     } else {
-      setPhase({ kind: 'error', label: t('onb.pair.fail', { url: baseUrl }) });
+      if (ble) {
+        useSecure.getState().setPiToken(before.token);
+        useSettings.getState().set({ bleName: before.name });
+      }
+      setPhase({ kind: 'error', label: ble && !baseUrl ? t('onb.pair.btFail') : t('onb.pair.fail', { url: baseUrl ?? '' }) });
       handled.current = false;
     }
   };
@@ -60,8 +72,10 @@ export function Pair({ onDone }: { onDone: () => void }) {
       return;
     }
     handled.current = true;
-    setAddress(info.baseUrl);
-    void connect(info.baseUrl, info.ssid ? { ssid: info.ssid, password: info.password ?? '' } : null);
+    const ble = info.bleName && info.token ? { name: info.bleName, token: info.token } : null;
+    const wifi = info.ssid ? { ssid: info.ssid, password: info.password ?? '' } : null;
+    if (wifi) setAddress(info.baseUrl);
+    void connect(wifi || !ble ? info.baseUrl : null, wifi, ble);
   };
 
   const onManual = () => {
@@ -70,7 +84,7 @@ export function Pair({ onDone }: { onDone: () => void }) {
       setPhase({ kind: 'error', label: t('onb.pair.badUrl') });
       return;
     }
-    void connect(url, null);
+    void connect(url, null, null);
   };
 
   const camera = process.env.EXPO_OS !== 'web' && permission?.granted;
@@ -107,6 +121,11 @@ export function Pair({ onDone }: { onDone: () => void }) {
         {!camera && process.env.EXPO_OS !== 'web' ? (
           <Button title={t('onb.perm.camera')} icon="camera" variant="secondary" onPress={() => void requestPermission()} />
         ) : null}
+        <PairBleManual
+          busy={phase.kind === 'busy'}
+          onInvalid={() => setPhase({ kind: 'error', label: t('onb.pair.badBle') })}
+          onSubmit={(ble) => void connect(null, null, ble)}
+        />
         <Button
           title={t('onb.pair.demo')}
           variant="ghost"
