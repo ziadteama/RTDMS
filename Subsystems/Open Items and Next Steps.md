@@ -47,8 +47,8 @@ The single list of what is **not** done. Update it when something moves.
 | Item | State |
 |---|---|
 | Per-request logging in the relay (numbers masked) | not done |
-| **WhatsApp session logged out (401)** | **needs the user** | The relay (now a service) reports `whatsapp_logged_out`. Re-link the dedicated number: Linked devices → Link a device, scan the QR the relay prints. Back up the auth dir first; do not delete it blindly |
-| Real app → relay → WhatsApp test with demo mode off | pending (user), after the re-link |
+| WhatsApp session logged out (401) | **fixed 22 Nov 17:05** | Re-linked with `relay/deploy/relink-whatsapp.sh`; health says `connected` and it survives restart and `kill -9`. Cause of the logout unknown; watch for it again (session expiry is a known risk) |
+| Real app → relay → WhatsApp test with demo mode off | pending (user); the relay is connected again |
 | Cause of the blocked link in SMS (carrier or recipient) | unconfirmed; ask the recipient to check Spam and blocked |
 | Relay boot start | **needs the user**: `sudo loginctl enable-linger teamacs` on the dev machine. The service itself restarts on crash |
 | Host the relay on an always-on server instead of the dev machine | open |
