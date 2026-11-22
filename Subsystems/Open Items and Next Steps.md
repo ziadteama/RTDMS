@@ -17,6 +17,7 @@ The single list of what is **not** done. Update it when something moves.
 
 | Item | State | Notes |
 |---|---|---|
+| BLE pairing mode (replace open mode) | not started | The Pi currently runs in DEV open mode (no token; PR pi/ble-open-mode). Build: Pi accepts the first phone for 2 minutes after a button press or `rtdms-pair --open`, the app's "Find my Sahi unit" connects and stores a server-issued token. Acceptance criteria in [[Phone-Pi Link]] (Pairing). Open mode must not ship |
 | Run the Pi runtime (`pi/`) on the real Pi | not run | Merged and passes 154 Docker tests. Needs deploying; the Pi currently runs only the camera server |
 | **Bench spike**: one GATT service with the Garmin characteristic + ten phone ones, phone and watch together; Wi-Fi hotspot on `wlan0` alongside | not run | Go criteria in [[Phone-Pi Link]]. The Pi hardware agent was stopped before it started |
 | Pi hotspot (`wlan0`, 5 GHz) and the in-app Wi-Fi join | not tested | Only the Tailscale route has been used so far |
