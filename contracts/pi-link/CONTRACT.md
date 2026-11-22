@@ -1,4 +1,4 @@
-# Pi ↔ phone link contract (version 1.2)
+# Pi ↔ phone link contract (version 1.3)
 
 Single source of truth for the Sahi app (`app/`) and the Pi runtime (`pi/`). Design rationale:
 `Subsystems/Phone-Pi Link.md`. **Owner: the coordinator.** Neither side edits this directory
@@ -45,6 +45,7 @@ Phone characteristics: base `1375193a-7edb-4a34-b3f2-1813023900NN` (NN below). N
 | 08 | `clock` | write | `clock` | phone writes its wall clock (ms) on every connect |
 | 09 | `auth` | write | `auth` | first write after connecting; all other writes are rejected until accepted |
 | 0a | `health` | read | `health` | long read (≤ 512 B) |
+| 0b | `watch_alert` | notify, read | 2 bytes binary (not JSON): `[pattern index 0–4 in AlertPattern order, uint8 seq]` | for the **Garmin watch**, not the phone: on change plus a 5 s keep-alive (v1.3) |
 
 Rules:
 - Notify payloads (`alert`, `status`, `physio`) stay ≤ **240 bytes** (MTU 247 − 3 B header,
@@ -57,6 +58,23 @@ Rules:
 - The Pi keeps advertising after a phone disconnects. The phone reconnects by remembered address.
 - **Garmin first:** the Pi runtime must not delay the Garmin RR stream for phone traffic. The Pi
   rate-limits phone notifies if the Garmin loss rate rises (budget gate in P6).
+
+## Time (v1.3)
+
+Two clocks, two jobs:
+
+- **Phone = what time it is.** Every payload `t` (BLE and HTTP) is **UTC epoch seconds (float, ms
+  precision) in phone time**: `(pi_monotonic_ms − clock_offset_ms) / 1000`, where
+  `clock_offset_ms = pi_monotonic_ms_at_write − phone_ms`. Optional `t_src` says where it came from:
+  `"phone"`, or `"pi"` (the Pi's wall clock, used only before any `clock` write). Time zones are a
+  display concern on the phone; no payload carries one.
+- **Pi monotonic = how long, and which came first** (fusion, frames, heart rate, incidents). It never
+  jumps and keeps working when the phone is away.
+- The phone writes `clock` on every connect **and every 60 s** while connected. The Pi keeps the
+  smallest offset of the last 10 writes (min filter: the write that waited least in the BLE stack)
+  and, once per boot, sets its system clock from the phone if it is off by more than 2 s.
+- The phone uses payload `t`, not its own arrival time, for trip events, heart-rate samples and
+  incident alignment.
 
 ## Pairing
 
@@ -133,6 +151,7 @@ payloads as their BLE counterparts, but the app uses BLE for them once the BLE t
 | 1 | 2026-11-21 | First version |
 | 1.1 | 2026-11-22 | Additive: `phone_calibration` payload (POST /calibrate body, `command.profile`) |
 | 1.2 | 2026-11-22 | Pi efficiency (CR-BLE-RATES): slower notify cadence, send on change. No layout or schema change. The phone treats more than 3 s without any notify as stale (was 1 s) and, while BLE is online, sends no HTTP polls (HTTP fallback poll is 1 Hz) |
+| 1.3 | 2026-11-23 | CR-CLOCK-PHYSIO: one time model (§Time; `t_src`; `clock` every 60 s); `physio` drops `fatigue_probability`, adds `worn`, `hr_baseline_bpm`, `hr_delta_bpm`, `hr_trend_bpm_per_10min` (`quality` = heart-rate stream quality); `alert.emergency` (`"unresponsive"`); `health.physio_diag`; characteristic 0b `watch_alert` for the Garmin watch |
 
 ## Open questions for the spike (P1) and first integration
 

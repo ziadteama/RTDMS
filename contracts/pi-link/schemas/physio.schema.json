@@ -24,12 +24,6 @@
       },
       "maxItems": 8
     },
-    "fatigue_probability": {
-      "type": [
-        "number",
-        "null"
-      ]
-    },
     "hrv_state": {
       "enum": [
         "warmup",
@@ -53,7 +47,35 @@
       ]
     },
     "t": {
-      "type": "number"
+      "type": "number",
+      "description": "UTC epoch seconds in phone time (v1.3)"
+    },
+    "worn": {
+      "type": "boolean"
+    },
+    "hr_baseline_bpm": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "hr_delta_bpm": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "hr_trend_bpm_per_10min": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "t_src": {
+      "enum": [
+        "phone",
+        "pi"
+      ]
     }
   }
 }

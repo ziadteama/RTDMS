@@ -27,7 +27,19 @@
       "maxItems": 4
     },
     "t": {
-      "type": "number"
+      "type": "number",
+      "description": "UTC epoch seconds in phone time (v1.3)"
+    },
+    "emergency": {
+      "enum": [
+        "unresponsive"
+      ]
+    },
+    "t_src": {
+      "enum": [
+        "phone",
+        "pi"
+      ]
     }
   }
 }
