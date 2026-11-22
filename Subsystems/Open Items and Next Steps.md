@@ -9,7 +9,7 @@ updated: 2026-11-22
 
 # Open Items and Next Steps
 
-↑ [[Home]] | [[Project Log 2026-11]] | [[Orchestration Playbook]]
+↑ [[Home]] | [[Project Log 2026-11]] | [[MVP Readiness]] | [[Orchestration Playbook]]
 
 The single list of what is **not** done. Update it when something moves.
 
@@ -38,7 +38,7 @@ The single list of what is **not** done. Update it when something moves.
 | Wi-Fi joined only during video sessions, then released (A4) | not started |
 | UI polish and redrawn screens with an `impeccable` critique (A5) | not started; the Stitch project still shows the old design |
 | Keep-awake guard on the Drive screen | fixed (PR #55, `suppressDeactivateWarnings`) |
-| Settings has no way back to pairing once a unit is saved | open | Pair screen is reachable only through `sahi://pair`; add a Settings row |
+| Settings has no way back to pairing once a unit is saved | **done (#70, 22 Nov)** | Row "Connect a different unit" in Settings; status row shows Bluetooth or Wi-Fi |
 | Demo mode should switch off when real contacts are added | reported |
 | Clip handling: resumable download, consent before sharing | not started |
 
@@ -65,7 +65,7 @@ The single list of what is **not** done. Update it when something moves.
 
 ## Housekeeping
 
-- **Flaky first jest run** on cold trees (`controls.test.tsx` timeout at 16 s); passes on reruns. Find the cause or raise the timeout.
+- ~~Flaky first jest run on cold trees~~ **fixed (#70):** `testTimeout` 60 s; 700 tests pass with a cleared cache.
 - ~~`stream.py` exits 0 when it finds no camera~~ **fixed (#68, deployed 22 Nov 17:12):** it exits 1; the unit uses `Restart=on-failure`, 30 s backoff, stops after 5 failures in 10 min. Checked on the Pi with the camera detached. Re-enable the service when the ribbon is back: `systemctl --user reset-failed rtdms-camera && systemctl --user enable --now rtdms-camera`.
 - `ruff` reports 5 errors in `models/distraction` (`hybrid.py`, `hybrid_alerts.py`, `stream.py`) that were already on main; clean them up.
 - BLE numbers that missed budget: command round trip p95 96–135 ms (< 100 ms), reconnect including a scan 2.8–6.6 s (< 5 s). Re-measure with the phone; the app connects directly to the remembered device.
@@ -74,4 +74,3 @@ The single list of what is **not** done. Update it when something moves.
 - Fusion thresholds (`eye_closure_s`, `offroad_gaze_s`, `phone_s`, sensitivity) are stored by the Pi runtime but not applied; the face and fusion owners must read them.
 - Camera frames do not yet reach the Pi's incident buffer, so a saved clip has no video yet.
 - The incident HTTP server uses temporary port 8081 until merged into :8080.
-- Codex quota returns at 23:01 on 22 Nov.
