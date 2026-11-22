@@ -11,8 +11,9 @@ aliases:
   - Phone-Pi Link
   - Sahi transport
   - phone Pi communication
-status: proposed-not-measured
+status: ble-pi-side-measured-phone-not
 researched: 2026-11-21
+updated: 2026-11-22
 ---
 
 # Phone–Pi Link — how Sahi talks to the Pi
@@ -285,20 +286,49 @@ and one viewer.
 
 ### Results
 
-*Not run yet. The Pi was offline on 2026-11-21.*
+**Run 2026-11-22: Pi side only** (laptop central, no phone, no Garmin watch, no camera). The full
+tables, raw files and the findings are in `pi/tools/link_spike/results/README.md`. Setup: the
+`rtdms-pi-user` service on the Pi 5 (BlueZ 5.82, bless 0.2.6), laptop adapter 15-30 cm away.
 
-**Tooling status (2026-11-21):** the spike tools were written under `pi/tools/link_spike/` (not
-`models/physiology/tools/pi/link_spike/` as planned: the real phone service in [[Pi Runtime]] uses
-the contract's characteristics, so the spike measures the real service). Written and unit-tested
-for their pure parts; **never run on hardware**. Run order and go criteria are unchanged above.
+| Check | Budget | Measured |
+|---|---|---|
+| Characteristics | 11 visible | 11 (10 phone + Garmin) |
+| Write before auth | rejected | rejected |
+| Alert notify, nothing changing | 1 Hz keep-alive | 0.99 Hz, max gap 1.04 s; status keep-alive 5 s |
+| Command round trip | p95 under 100 ms | p50 91 ms, p95 96 ms, max 136 ms (n=100): narrow, set by the connection interval the central picks |
+| Alert change reaches the central | p95 up to 300 ms | p50 95 ms, p95 113 ms (n=31, clock offset removed, about +-55 ms) |
+| Reconnect to a known address | under 5 s | 1.6-1.8 s (n=8) |
+| Reconnect including a scan | under 5 s | 2.8-6.6 s: 2 of 5 cycles over, the scan varies |
+| dmesg | no bluetooth/brcmfmac errors | init lines only, `throttled=0x0` |
+| BLE CPU, 4-process synthetic load | up to 2% of one core | 0.17% idle, 0.15% connected |
+| BLE RSS | up to 25 MB | about +14 MB (119 MB process, 105 MB without the BLE server) |
+| Idle wake-ups | only the timers | 1.1 context switches/s, the 1 Hz tick |
 
-### Pi-side implementation status (not verified on hardware)
+**Still not measured:** Garmin coexistence (runs A to D of the matrix, no watch), the 5 GHz hotspot
+next to BLE, vision fps with BLE connected (the camera is detached), Android behaviour (MTU 247,
+screen-off notifies, auto-reconnect, vendor battery managers), and the on-air ATT code for a write
+before auth (unit-tested only). The go / no-go for run D stays open.
 
-The phone service, auth gate, notifier rates and incident store are implemented and tested in
-Docker with a simulated GATT layer (one Bluetooth adapter cannot loop back to itself, so a bleak
-loopback on the dev machine was not possible). Open items for the spike: `bless` has no
-disconnect event (auth uses a TTL), ATT error mapping for rejected writes, one service holding 11
-characteristics with the watch connected. Details: [[Pi Runtime]].
+**Found on hardware, all fixed on `pi/ble-bringup` except the wireplumber change (a Pi setting):**
+
+- bless 0.2.6 property enums are `Flag`, so the service crashed on start.
+- The Pi desktop's wireplumber published a BLE-MIDI GATT service with an encrypted characteristic.
+  An unpaired central that touched it started SMP pairing (numeric comparison, nobody answers), the
+  pairing failed and the link dropped. Symptoms: ATT 0x0e, "device disconnected" during service
+  discovery. Fix: `~/.config/wireplumber/wireplumber.conf.d/90-rtdms-no-ble-midi.conf` with
+  `monitor.bluez-midi = disabled`. A headless production image without wireplumber does not need it.
+- A write before auth was ATT 0x0e; the service now raises `org.bluez.Error.NotAuthorized`
+  (BlueZ maps it to ATT 0x08). **App note:** treat any rejected write as "authenticate again".
+- Disconnects are now seen through a D-Bus watch on `org.bluez.Device1.Connected`, which resets auth.
+  Any peer disconnect resets it, so a Garmin watch dropping also asks the phone to re-auth.
+- The advertised name is `RTDMS-Pi` and equals the QR `B` field.
+
+### Pi-side implementation status
+
+The phone service, auth gate, send-on-change notifier (v1.2 rates) and incident store run on the
+Pi as a systemd user service ([[Pi Runtime]]). Tests still use a simulated GATT layer in Docker;
+the real adapter was exercised from the laptop over the air. One service holding 11 characteristics
+with the watch connected is unmeasured.
 
 ## Open questions
 
