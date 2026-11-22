@@ -66,6 +66,7 @@ async def run_ble(
         garmin=garmin if isinstance(garmin, GarminPhysioSource) else None,
         start_calibration=runtime.frame_source.start_calibration,
         apply_phone_calibration=runtime.frame_source.apply_phone_calibration,
+        validate_outgoing=config.debug_validate,
     )
     try:
         await port.start(config.ble_name)

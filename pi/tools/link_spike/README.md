@@ -25,7 +25,7 @@ Reference specification: `Subsystems/Phone-Pi Link.md` ("Bench spike").
 - `ble_rtt.py`: Bleak laptop client acting as phone central:
   - Connects to peripheral `RTDMS-Pi` and authenticates using `$RTDMS_TOKEN`.
   - Measures write-with-response round-trip time (`command` -> `result`) p50 and p95.
-  - Measures notification packet loss on the 5 Hz `alert` stream over 60 seconds.
+  - Measures notification packet loss on the 1 Hz `alert` stream over 60 seconds.
   - Measures reconnect latency across 5 disconnect/reconnect cycles.
 
 - `garmin_loss.py`: Reads Garmin packet counter statistics:
@@ -48,3 +48,40 @@ On a physical Android smartphone with the nRF Connect app:
 2. **Screen-off notifications**: Subscribe to `alert` (UUID `1375193a-7edb-4a34-b3f2-181302390001`), lock phone screen, verify notifications continue without delay.
 3. **Auto-reconnect**: Walk out of BLE range, wait 10 seconds, return in range, verify immediate automatic reconnect by remembered MAC.
 4. **Network coexistence**: Verify phone cellular data remains functional while joined to `RTDMS-Pi` AP, and check behavior with "Smart Network Switch" / "Adaptive Connectivity" enabled vs disabled.
+
+## Contract v1.2 bench
+
+On the laptop, install `bleak`, export `RTDMS_TOKEN` securely, then run:
+
+```sh
+python3 pi/tools/link_spike/bench_link.py --name RTDMS-Pi --notify-seconds 30 \
+  --samples 100 --cycles 5 --out results.json
+```
+
+Uses BlueZ adapter `hci0`. The token is read only from the environment; payloads and
+backend exception text are never printed or stored. Results include service properties,
+pre-auth access checks, notification arrival times/sizes, command RTT and reconnect timing.
+The idle expectations are alert at 1 Hz, status keep-alive every 5 seconds (plus changes),
+and one initial physio notification. Notification rates are measured only during the idle
+observation window, before the RTT commands. Maximum gaps include the observation edges.
+Reconnect timings include disconnect, scanning, the auth-reset probe, auth and clock write.
+
+`test_alert` currently only plays the buzzer, so alert-change latency is **not measurable**.
+The report explicitly records this limitation. Exit 0 requires every step to PASS, so this
+version exits 1 even when every measurable check passes. Hardware BLE checks cannot run in
+the Docker verification gate.
+
+On the Pi (stdlib only):
+
+```sh
+python3 pi/tools/link_spike/proc_sample.py --pid 1234 --seconds 60 --interval 1 --out proc.json
+python3 pi/tools/link_spike/proc_sample.py --pid-by-name rtdms-pi --seconds 60 \
+  --interval 1 --load 4 --out proc-load.json
+```
+
+Name matching uses exact `/proc/PID/comm` or executable basename and rejects ambiguous names.
+CPU percentages use one core as 100% (multithreaded processes can exceed 100%); the average
+is weighted by elapsed time. RSS is reported in MiB. Context-switch counters are those of
+the process leader, as exposed by `/proc/PID/status`; CPU time covers the process threads.
+Thread counts and interval measurements are retained in JSON. Synthetic load children are
+killed and reaped on completion, errors, Ctrl-C and SIGTERM. SIGKILL cannot be handled.

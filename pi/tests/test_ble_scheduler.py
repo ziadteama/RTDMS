@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
+import time
 from collections import Counter
 from unittest.mock import patch
 
@@ -20,7 +22,7 @@ from rtdms_pi.payloads import to_json_bytes
 from rtdms_pi.state import RuntimeState
 
 
-@pytest.mark.parametrize("factor,counts", [(1, (51, 21, 11)), (0.5, (51, 11, 6))])
+@pytest.mark.parametrize("factor,counts", [(1, (11, 3, 3)), (0.5, (11, 2, 2))])
 def test_rates(clock: Clock, factor: float, counts: tuple[int, ...]) -> None:
     port = FakeGatt(clock)
     state = RuntimeState(clock=clock)
@@ -108,3 +110,97 @@ def test_change_during_drain_never_replays_old_snapshot(clock: Clock) -> None:
     notifier.step()
     assert seen == ["max", "repeated"]
     notifier.close()
+
+
+def _collector(clock: Clock):
+    state = RuntimeState(clock=clock)
+    seen: list[tuple[Char, dict]] = []
+    notifier = Notifier(state, clock, lambda c, s, p: seen.append((c, p)))
+    notifier.step()
+    seen.clear()
+    return state, notifier, seen
+
+
+def _frame(state: RuntimeState, fps: float, temp_c: float, t: float) -> None:
+    state.update_frame(None, None, fps, temp_c, False, t)
+
+
+def test_status_deadband(clock: Clock) -> None:
+    state, notifier, seen = _collector(clock)
+    _frame(state, 30.0, 40.0, clock.t)
+    clock.advance(1)
+    notifier.step()
+    assert [c for c, _ in seen if c == Char.STATUS] == [Char.STATUS]
+    seen.clear()
+    _frame(state, 30.2, 40.03, clock.t)
+    clock.advance(1)
+    notifier.step()
+    assert not [c for c, _ in seen if c == Char.STATUS]
+    _frame(state, 45.0, 40.03, clock.t)
+    clock.advance(1)
+    notifier.step()
+    assert [c for c, _ in seen if c == Char.STATUS] == [Char.STATUS]
+    notifier.close()
+
+
+def test_decision_change_alerts_without_clock_advance(clock: Clock) -> None:
+    state, notifier, seen = _collector(clock)
+    state.set_decision(FusionDecision(AlertPattern.MAX, []))
+    notifier.step()
+    assert [p["pattern"] for c, p in seen if c == Char.ALERT] == ["max"]
+    notifier.close()
+
+
+@pytest.mark.asyncio
+async def test_run_is_event_driven() -> None:
+    state = RuntimeState()
+    notifier = Notifier(state, time.time, lambda *_: None)
+    stop = asyncio.Event()
+    task = asyncio.create_task(notifier.run(stop))
+    await asyncio.sleep(3.2)
+    stop.set()
+    await asyncio.wait_for(task, 1)
+    assert notifier.wakeups <= 5
+    notifier.close()
+
+
+@pytest.mark.asyncio
+async def test_thread_change_wakes_run() -> None:
+    state = RuntimeState()
+    seen: list[tuple[str, float]] = []
+    notifier = Notifier(
+        state,
+        time.time,
+        lambda c, s, p: seen.append((str(p.get("pattern", "")), time.monotonic())),
+    )
+    stop = asyncio.Event()
+    task = asyncio.create_task(notifier.run(stop))
+    await asyncio.sleep(0.1)
+    sent = 0.0
+
+    def fire() -> None:
+        nonlocal sent
+        sent = time.monotonic()
+        state.set_decision(FusionDecision(AlertPattern.MAX, []))
+
+    threading.Thread(target=fire).start()
+    await asyncio.sleep(0.2)
+    stop.set()
+    await asyncio.wait_for(task, 1)
+    got = [t for pat, t in seen if pat == "max"]
+    assert got and got[0] - sent < 0.05
+    notifier.close()
+
+
+def test_no_validation_in_hot_path(service: PhoneService) -> None:
+    with patch("rtdms_pi.ble.phone_service.validate") as v:
+        service.notifier.step()
+    v.assert_not_called()
+    assert len(service.port.notifications) == 3
+
+
+def test_validate_outgoing_rejects_invalid(service: PhoneService) -> None:
+    service._emit(Char.ALERT, "alert", {"pattern": "bogus"})
+    service.validate_outgoing = True
+    with pytest.raises(ValueError):
+        service._emit(Char.ALERT, "alert", {"pattern": "bogus"})

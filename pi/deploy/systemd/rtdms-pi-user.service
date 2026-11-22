@@ -1,0 +1,22 @@
+[Unit]
+Description=RTDMS Pi runtime (BLE link, no camera)
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/mkdir -p %h/.local/state/rtdms
+ExecStartPre=/usr/bin/chmod 700 %h/.local/state/rtdms
+ExecStart=%h/rtdms-pi/venv/bin/rtdms-pi --no-camera --ble --buzzer none --port 8090
+WorkingDirectory=%h/rtdms-pi
+Environment=STATE_DIRECTORY=%h/.local/state/rtdms
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=OMP_NUM_THREADS=1
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=3
+# the Pi also runs the vision models; this unit must yield to them
+Nice=10
+CPUWeight=20
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=default.target

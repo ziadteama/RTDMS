@@ -9,7 +9,9 @@ WorkingDirectory=/opt/rtdms
 # Defaults are hardware-free. Add --camera --buzzer gpio after hardware bring-up.
 ExecStart=/opt/rtdms/venv/bin/rtdms-pi
 Restart=on-failure
-Nice=-5
+Nice=10
+CPUWeight=20
+IOSchedulingClass=idle
 MemoryMax=3G
 Environment=OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 StateDirectory=rtdms

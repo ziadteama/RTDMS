@@ -44,7 +44,9 @@ class PhoneService:
         garmin: GarminPhysioSource | None = None,
         start_calibration: Callable[[], None] | None = None,
         apply_phone_calibration: Callable[[dict[str, Any]], None] | None = None,
+        validate_outgoing: bool = False,
     ) -> None:
+        self.validate_outgoing = validate_outgoing
         self.port, self.state, self.player = port, runtime_state, player
         self.settings, self.incidents, self.clock = settings, incidents, clock
         self.auth, self.health_fn, self.on_command = auth, health_fn, on_command
@@ -181,10 +183,12 @@ class PhoneService:
             )
 
     def _emit(self, char: Char, schema: str, payload: dict[str, Any]) -> None:
-        clean = validate(schema, payload)
-        if clean is None:
-            raise ValueError("invalid outgoing payload")
-        data = to_json_bytes(clean)
+        if char == Char.RESULT or self.validate_outgoing:
+            clean = validate(schema, payload)
+            if clean is None:
+                raise ValueError("invalid outgoing payload")
+            payload = clean
+        data = to_json_bytes(payload)
         if char != Char.RESULT and len(data) > 240:
             raise ValueError("notify budget exceeded")
         self.port.notify(char.uuid, data)

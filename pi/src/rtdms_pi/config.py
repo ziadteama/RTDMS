@@ -26,6 +26,7 @@ class RuntimeConfig:
     ble: bool | None = None
     fake_ble: bool = False
     ble_name: str = "RTDMS-Pi"
+    debug_validate: bool = False
     repo_root: Path = Path(__file__).resolve().parents[3]
 
     def __post_init__(self) -> None:
@@ -66,4 +67,9 @@ class RuntimeConfig:
         p.add_argument("--ble", action=argparse.BooleanOptionalAction, default=None)
         p.add_argument("--fake-ble", action="store_true")
         p.add_argument("--ble-name", default=os.getenv("RTDMS_BLE_NAME", "RTDMS-Pi"))
+        p.add_argument(
+            "--debug-validate",
+            action="store_true",
+            default=os.getenv("RTDMS_DEBUG_VALIDATE") == "1",
+        )
         return cls(**vars(p.parse_args(argv)))

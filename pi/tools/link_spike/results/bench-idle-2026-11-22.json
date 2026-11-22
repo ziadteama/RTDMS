@@ -1,0 +1,212 @@
+{
+ "contract": "1.2",
+ "adapter": "hci0",
+ "steps": {
+  "discovery": {
+   "status": "PASS",
+   "services": [
+    {
+     "uuid": "00001801-0000-1000-8000-00805f9b34fb",
+     "characteristics": [
+      {
+       "uuid": "00002b29-0000-1000-8000-00805f9b34fb",
+       "properties": [
+        "read",
+        "write"
+       ]
+      },
+      {
+       "uuid": "00002b2a-0000-1000-8000-00805f9b34fb",
+       "properties": [
+        "read"
+       ]
+      },
+      {
+       "uuid": "00002a05-0000-1000-8000-00805f9b34fb",
+       "properties": [
+        "indicate"
+       ]
+      }
+     ]
+    },
+    {
+     "uuid": "0000180a-0000-1000-8000-00805f9b34fb",
+     "characteristics": [
+      {
+       "uuid": "00002a50-0000-1000-8000-00805f9b34fb",
+       "properties": [
+        "read"
+       ]
+      }
+     ]
+    },
+    {
+     "uuid": "0000fff0-0000-1000-8000-00805f9b34fb",
+     "characteristics": [
+      {
+       "uuid": "1375193a-7edb-4a34-b3f2-181302390005",
+       "properties": [
+        "write"
+       ]
+      },
+      {
+       "uuid": "1375193a-7edb-4a34-b3f2-181302390007",
+       "properties": [
+        "write"
+       ]
+      },
+      {
+       "uuid": "1375193a-7edb-4a34-b3f2-181302390009",
+       "properties": [
+        "write"
+       ]
+      },
+      {
+       "uuid": "1375193a-7edb-4a34-b3f2-181302390002",
+       "properties": [
+        "notify",
+        "read"
+       ]
+      },
+      {
+       "uuid": "1375193a-7edb-4a34-b3f2-181302390001",
+       "properties": [
+        "notify",
+        "read"
+       ]
+      },
+      {
+       "uuid": "1375193a-7edb-4a34-b3f2-181302390004",
+       "properties": [
+        "read",
+        "write"
+       ]
+      },
+      {
+       "uuid": "1375193a-7edb-4a34-b3f2-18130239c8a8",
+       "properties": [
+        "write",
+        "write-without-response"
+       ]
+      },
+      {
+       "uuid": "1375193a-7edb-4a34-b3f2-18130239000a",
+       "properties": [
+        "read"
+       ]
+      },
+      {
+       "uuid": "1375193a-7edb-4a34-b3f2-181302390003",
+       "properties": [
+        "notify",
+        "read"
+       ]
+      },
+      {
+       "uuid": "1375193a-7edb-4a34-b3f2-181302390008",
+       "properties": [
+        "write"
+       ]
+      },
+      {
+       "uuid": "1375193a-7edb-4a34-b3f2-181302390006",
+       "properties": [
+        "notify"
+       ]
+      }
+     ]
+    },
+    {
+     "uuid": "00001800-0000-1000-8000-00805f9b34fb",
+     "characteristics": [
+      {
+       "uuid": "00002a01-0000-1000-8000-00805f9b34fb",
+       "properties": [
+        "read"
+       ]
+      },
+      {
+       "uuid": "00002a00-0000-1000-8000-00805f9b34fb",
+       "properties": [
+        "read"
+       ]
+      }
+     ]
+    }
+   ],
+   "missing_or_wrong_properties": []
+  },
+  "before_auth": {
+   "status": "PASS",
+   "command_rejected": true,
+   "alert_read": "allowed"
+  },
+  "notifications": {
+   "status": "PASS",
+   "duration_s": 30.36045199498767,
+   "characteristics": {
+    "alert": {
+     "count": 30,
+     "mean_hz": 0.988127581399408,
+     "max_gap_s": 1.0398787749873009
+    },
+    "status": {
+     "count": 6,
+     "mean_hz": 0.19762551627988162,
+     "max_gap_s": 5.044703195017064
+    },
+    "physio": {
+     "count": 0,
+     "mean_hz": 0.0,
+     "max_gap_s": 30.36045199498767
+    },
+    "result": {
+     "count": 0,
+     "mean_hz": 0.0,
+     "max_gap_s": 30.36045199498767
+    }
+   }
+  },
+  "command_rtt": {
+   "status": "PASS",
+   "count": 100,
+   "failures": 0,
+   "p50_ms": 91.21,
+   "p95_ms": 96.31,
+   "max_ms": 136.30599898169748
+  },
+  "alert_change": {
+   "status": "not measurable",
+   "reason": "handlers_command.handle_command calls player.test_pattern only; test_alert does not change the decision published by alert."
+  },
+  "reconnect": {
+   "status": "FAIL",
+   "cycles": [
+    {
+     "seconds": 4.076383816020098,
+     "auth_reset": true,
+     "status": "PASS"
+    },
+    {
+     "seconds": 3.763826965005137,
+     "auth_reset": true,
+     "status": "PASS"
+    },
+    {
+     "seconds": 5.010345638002036,
+     "status": "FAIL"
+    },
+    {
+     "seconds": 2.7846369140024763,
+     "auth_reset": true,
+     "status": "PASS"
+    },
+    {
+     "seconds": 6.550213050009916,
+     "status": "FAIL"
+    }
+   ]
+  }
+ },
+ "passed": false
+}
