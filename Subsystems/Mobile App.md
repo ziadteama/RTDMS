@@ -34,6 +34,12 @@ SMS, a screen), and turns a crash into an emergency call with a recorded clip.
 > crash detector on real motion, background kill on ColorOS. Full list: [[Open Items and Next Steps]].
 > Decisions and evidence: [[Project Log 2026-11]].
 
+> [!info] Phone eye calibration (2026-11-22, branch `app/phone-calibration`, not merged)
+> The front camera plus MediaPipe (`SahiFaceView`) measures the driver's open and closed EAR; the app
+> builds a `closed_ratio` profile and syncs it to the Pi (`POST /calibrate`, retried on reconnect;
+> demo sends nothing). No frames are stored or sent. Guided flow in onboarding and Settings > Unit.
+> **Not verified on the device:** camera view, cues, real sync (mock Pi only). Details: [[Eye Calibration#App side]].
+
 > [!info] Earlier status (2026-11-20): MVP code built, not yet run on a phone or against the real Pi
 > The app is in `app/` (Expo SDK 58, TypeScript strict, Android development build): every MVP
 > screen, the crash detector, the emergency flow, trips, demo mode and a mock Pi. Gates pass

@@ -62,4 +62,34 @@ Rejections return HTTP 400 `{"ok":false,"error":reason}` or a failed BLE `comman
 - **Hardware gaps**: BLE path is untested on hardware. The Pi's own two-phase run remains the fallback.
 
 ## App side
-_Written by the app work (PR app/phone-calibration)._
+
+Code: `app/src/calibration/`, `app/modules/sahi-native/` (`SahiFaceView`), `app/src/services/calibration-sync.ts`, `app/src/screens/calibration/`. App note: [[Mobile App]]. UX: `app/docs/ux/flow-9-eye-calibration.md`.
+
+### What it measures
+
+The phone's front camera measures the driver's own Eye Aspect Ratio twice, eyes open and eyes closed. Only the ratio `closed_ratio = ear_closed / ear_open` matters to the Pi (see [[#Why and transfer math]]); the raw values travel in the payload for checks but are not applied.
+
+- **`SahiFaceView`**: native Expo view (CameraX front camera + MediaPipe Face Landmarker, `face_landmarker.task` bundled in the app). `onFace` events at 15 Hz or less carry EAR, yaw, pitch, face box and luma. EAR is an exact port of `models/face/src/dms_face/metrics.py`. EAR is marked invalid when `|yaw| > 30` or `|pitch| > 25`.
+- **Profile maths**: pure TypeScript port of `build_profile` (`app/src/calibration/build-profile.ts`). The first 2 s of the eyes-open phase are discarded (settle; none in the closed phase), then median + MAD. Rejected unless open minus closed EAR is at least 0.04. Quality from SNR = separation / noise: 40 or more `good`, 20 or more `fair`, else `poor`. Failure reasons: `too_dark` (luma below 40), `no_face`, `head_turned`, `eyes_not_shut`, `too_few_samples`.
+- **Payload**: `contracts/pi-link/schemas/phone_calibration.schema.json`, stored in app settings as `eyeCalibration` (with `syncedAt`).
+
+### Flow
+
+Intro (about 20 s, park first), framing (oval + three ticks: face in oval, good lighting, looking straight ahead; continues after the face holds still), eyes open 10 s, eyes closed 3 s (spoken cue and haptic at each phase start, spoken "Open." and success haptic at the end), result (grade, Save / Retry, sync line; a poor grade offers Retry and Save anyway), plus one failure screen per reason above. Entry points: onboarding (step after connect, skippable with Later), Settings > Unit "Eye calibration" (shows the last grade or "not done"), Settings > Unit "Driving position" (the existing Pi-camera calibration, unchanged), and the Drive state detail line, which links here when no eye calibration is saved or the Pi reports itself uncalibrated. Screens: `app/docs/ux/flow-9-eye-calibration.md`.
+
+### Data and privacy
+
+- No frame is stored or sent; only the numeric payload leaves the phone.
+- The camera runs only while the view is mounted (unbound on detach).
+- `FakeFaceSource` replaces the camera on web, in Jest and in demo mode.
+
+### Sync to the Pi
+
+`calibration-sync.ts` sends `POST /calibrate` over HTTP now; a BLE `calibrate` command is a documented hook, not wired. It sends when `eyeCalibration` exists with `syncedAt` null and the unit is online, retries on reconnect, and sets `syncedAt` on 200. A 400 is not retried for the same calibration. Demo mode sends nothing and never marks synced.
+
+### Status and limits
+
+- **Tested**: Jest (maths, sync, settings, `FakeFaceSource`, face metrics); sync against the mock Pi only.
+- **Not verified on the device**: camera and face view on the real phone, voice and haptic cues, real sync to the Pi.
+- **Build**: all of the above is in the PR app/phone-calibration (guided screens, entry points, native view, maths, sync); dev build 00006dd7-29c3-48d8-8110-ea1f2838c5bf on EAS.
+- Pi-side limits (cross-camera assumption unvalidated, BLE untested) are listed under [[#Limitations and unvalidated assumptions]].
