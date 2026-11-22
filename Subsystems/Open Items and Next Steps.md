@@ -50,7 +50,7 @@ The single list of what is **not** done. Update it when something moves.
 | WhatsApp session logged out (401) | **fixed 22 Nov 17:05** | Re-linked with `relay/deploy/relink-whatsapp.sh`; health says `connected` and it survives restart and `kill -9`. Cause of the logout unknown; watch for it again (session expiry is a known risk) |
 | Real app → relay → WhatsApp test with demo mode off | pending (user); the relay is connected again |
 | Cause of the blocked link in SMS (carrier or recipient) | unconfirmed; ask the recipient to check Spam and blocked |
-| Relay boot start | **needs the user**: `sudo loginctl enable-linger teamacs` on the dev machine. The service itself restarts on crash |
+| Relay boot start | **done 22 Nov**: linger is on for the dev machine user, so `rtdms-relay` starts at boot. Not yet tested by an actual reboot |
 | Host the relay on an always-on server instead of the dev machine | open |
 | WhatsApp ban risk (unofficial library, linked spare number) | accepted by the user; session expiry needs re-linking |
 
@@ -66,7 +66,8 @@ The single list of what is **not** done. Update it when something moves.
 ## Housekeeping
 
 - **Flaky first jest run** on cold trees (`controls.test.tsx` timeout at 16 s); passes on reruns. Find the cause or raise the timeout.
-- `stream.py` exits 0 when it finds no camera, so systemd restarts it forever; make it fail (non-zero) and stop retrying.
+- ~~`stream.py` exits 0 when it finds no camera~~ **fixed (#68, deployed 22 Nov 17:12):** it exits 1; the unit uses `Restart=on-failure`, 30 s backoff, stops after 5 failures in 10 min. Checked on the Pi with the camera detached. Re-enable the service when the ribbon is back: `systemctl --user reset-failed rtdms-camera && systemctl --user enable --now rtdms-camera`.
+- `ruff` reports 5 errors in `models/distraction` (`hybrid.py`, `hybrid_alerts.py`, `stream.py`) that were already on main; clean them up.
 - BLE numbers that missed budget: command round trip p95 96–135 ms (< 100 ms), reconnect including a scan 2.8–6.6 s (< 5 s). Re-measure with the phone; the app connects directly to the remembered device.
 - Not measured: Garmin watch with the phone service, 5 GHz hotspot next to BLE, fps with camera plus BLE, Android background behaviour.
 
