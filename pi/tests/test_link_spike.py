@@ -53,6 +53,9 @@ def test_build_csv_row() -> None:
 
 
 def test_calculate_notify_loss() -> None:
+    # Contract v1.2 alert keep-alive is 1 Hz.
+    assert calculate_notify_loss(60, 60.0, expected_hz=1.0) == 0.0
+    assert calculate_notify_loss(54, 60.0, expected_hz=1.0) == 10.0
     # 60s at 5 Hz = 300 expected packets
     # If 300 received -> 0% loss
     assert calculate_notify_loss(300, 60.0, 5.0) == 0.0

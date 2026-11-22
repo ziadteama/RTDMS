@@ -97,7 +97,7 @@ async def run_benchmark(args: argparse.Namespace) -> None:
         await asyncio.sleep(args.notify_seconds)
         await client.stop_notify(Char.ALERT.uuid)
 
-    notify_loss = calculate_notify_loss(alert_count, args.notify_seconds, 5.0)
+    notify_loss = calculate_notify_loss(alert_count, args.notify_seconds, expected_hz=1.0)
     print(f"Notify stream: received={alert_count} in {args.notify_seconds}s, loss={notify_loss}%")
 
     print(f"== Step 3: Measuring reconnect time over {args.cycles} cycles ==")
