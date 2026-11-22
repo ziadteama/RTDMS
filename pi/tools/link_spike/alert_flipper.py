@@ -17,9 +17,9 @@ from pathlib import Path
 
 from dms_fusion import AlertPattern, FusionDecision
 
+from rtdms_pi.ble.server import run_runtime_ble
 from rtdms_pi.config import RuntimeConfig
 from rtdms_pi.main import build_runtime
-from rtdms_pi.ble.server import run_runtime_ble
 
 
 def flip(runtime_state, period_s: float, stop: threading.Event, log: Path) -> None:  # type: ignore[no-untyped-def]
@@ -40,7 +40,8 @@ def main() -> None:
     config = RuntimeConfig(state_dir=args.state_dir, ble=True)
     runtime = build_runtime(config, True)
     stop = threading.Event()
-    threading.Thread(target=flip, args=(runtime.state, args.period, stop, args.log), daemon=True).start()
+    flip_args = (runtime.state, args.period, stop, args.log)
+    threading.Thread(target=flip, args=flip_args, daemon=True).start()
     try:
         asyncio.run(run_runtime_ble(config, runtime))
     finally:

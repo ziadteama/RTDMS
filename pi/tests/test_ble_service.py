@@ -362,3 +362,56 @@ async def test_run_ble_calibration_wiring(tmp_path: Path) -> None:
         assert results == [{"ok": True}, {"ok": True}]
     finally:
         player.close()
+
+
+def test_open_mode_accepts_writes_without_auth(service: PhoneService) -> None:
+    service.auth.open_mode = True
+    assert service.auth.authed
+    write(service, Char.COMMAND, fixture("command"))
+    # an auth write with an empty or any token is a harmless no-op
+    service.port.write(Char.AUTH.uuid, b'{"token": ""}')
+    service.port.write(Char.AUTH.uuid, b"garbage")
+    service.on_disconnect()
+    assert service.auth.authed
+
+
+def test_token_mode_is_default_and_still_rejects(service: PhoneService) -> None:
+    assert not service.auth.open_mode
+    with pytest.raises(GattWriteRejected):
+        write(service, Char.COMMAND, fixture("command"))
+    with pytest.raises(GattWriteRejected):
+        service.port.write(Char.AUTH.uuid, b'{"token": ""}')
+
+
+def test_open_flag_and_env(monkeypatch: Any) -> None:
+    from rtdms_pi.config import RuntimeConfig
+
+    monkeypatch.delenv("RTDMS_BLE_OPEN", raising=False)
+    assert RuntimeConfig.from_args([]).ble_open is False
+    assert RuntimeConfig.from_args(["--ble-open"]).ble_open is True
+    monkeypatch.setenv("RTDMS_BLE_OPEN", "1")
+    assert RuntimeConfig.from_args([]).ble_open is True
+
+
+@pytest.mark.asyncio
+async def test_run_ble_open_mode_warns(tmp_path: Path, caplog: Any) -> None:
+    import asyncio
+
+    from rtdms_pi.ble.server import run_ble
+    from rtdms_pi.buzzer import PatternPlayer, SilentBuzzer
+    from rtdms_pi.config import RuntimeConfig
+    from rtdms_pi.runtime import Runtime
+    from rtdms_pi.sources import NullPhysioSource, ScriptedFrameSource
+    from rtdms_pi.state import RuntimeState
+
+    runtime = Runtime(
+        ScriptedFrameSource([]), NullPhysioSource(), PatternPlayer(SilentBuzzer()), RuntimeState()
+    )
+    stop = asyncio.Event()
+    stop.set()
+    caplog.set_level("WARNING")
+    await run_ble(RuntimeConfig(state_dir=tmp_path, ble_open=True), runtime, stop, fake=True)
+    assert "BLE open mode: no token required (dev only)" in caplog.text
+    caplog.clear()
+    await run_ble(RuntimeConfig(state_dir=tmp_path), runtime, stop, fake=True)
+    assert "open mode" not in caplog.text

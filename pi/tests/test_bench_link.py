@@ -155,6 +155,10 @@ async def test_full_bench_reconnect_auth_and_result_flow(
             )]
             clients.append(self)
 
+        @property
+        def is_connected(self) -> bool:
+            return self.connected
+
         async def connect(self) -> None:
             self.connected = True
 
@@ -177,7 +181,7 @@ async def test_full_bench_reconnect_auth_and_result_flow(
                 self.authenticated = True
             elif not self.authenticated:
                 self.rejections += 1
-                raise BleakError("secret-token")
+                raise BleakError("NotAuthorized (ATT 0x08)")
             elif uuid == UUIDS["command"]:
                 self.result_callback(None, bytearray(json.dumps({
                     "id": payload["id"], "ok": True,

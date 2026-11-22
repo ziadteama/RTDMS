@@ -119,7 +119,8 @@ async def rejected_command(client: Any, error_type: type[Exception]) -> tuple[bo
         )
     except error_type as exc:
         text = str(exc)
-        # A rejection is an authorization error with the link still up; a drop or ATT 0x0e is a FAIL.
+        # A rejection is an authorization error with the link still up;
+        # a drop or ATT 0x0e is a FAIL.
         ok = ("0x08" in text or "NotAuthorized" in text or "Not Authorized" in text) and bool(
             client.is_connected
         )
