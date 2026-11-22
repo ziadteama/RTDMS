@@ -26,7 +26,7 @@ The single list of what is **not** done. Update it when something moves.
 | Concurrent CPU / fps / temperature budget with all models, Bluetooth and hotspot | not measured | `.cursor/rules/pi-performance-pipeline.mdc` |
 | The Pi rebooted by itself twice on 22 Nov (uptime under a minute at 22:50 and 23:05) | unexplained | No reboot history (`last` empty) and no previous-boot journal. Check power supply and the 5 V rail before any long test |
 | Camera server autostart | **done (linger on, 22 Nov)**; camera ribbon detached on purpose for now | `rtdms-camera` systemd user service (PR #46) runs `~/rtdms/start_stream.sh`, restarts on crash, starts at boot. Stopped while the camera is detached. Known issue: `stream.py` exits 0 when the camera is missing, so systemd restarts it every 3 s instead of failing |
-| Phone eye calibration on the real phone | **needs the phone** | Install dev build `00006dd7` (APK link in [[Eye Calibration]]); check camera/face view, EAR in real light, voice/haptics, onboarding order, and that the Pi shows `calibrated (phone)` after Save. Pi side is deployed and checked with the fixture |
+| Phone eye calibration on the real phone | **flow verified on the phone (22 Nov); sync to the Pi not yet** | Dev build `ba793815` (PR #55): camera preview, face found at about 10 Hz, user finished the calibration. Still to check: Save → Pi `/status` shows `calibrated (phone)` (the Pi camera server is stopped while the ribbon is detached), voice/haptics, onboarding order |
 | Settings dropdown fix (PR #48) on the real phone | **needs the phone** | Squeezed vertical labels came from the Compose Picker; replaced with value + sheet. Only checked by tests |
 
 ## App
@@ -36,7 +36,7 @@ The single list of what is **not** done. Update it when something moves.
 | Bluetooth transport (A3) behind `PiTransport` | not started |
 | Wi-Fi joined only during video sessions, then released (A4) | not started |
 | UI polish and redrawn screens with an `impeccable` critique (A5) | not started; the Stitch project still shows the old design |
-| Keep-awake guard on the Drive screen | reported, not fixed |
+| Keep-awake guard on the Drive screen | fixed (PR #55, `suppressDeactivateWarnings`) |
 | Demo mode should switch off when real contacts are added | reported |
 | Clip handling: resumable download, consent before sharing | not started |
 
