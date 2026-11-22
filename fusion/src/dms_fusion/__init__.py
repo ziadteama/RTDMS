@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
+
+from .emergency import EmergencyStage, EmergencyStatus
 
 
 class AlertPattern(StrEnum):
@@ -17,7 +19,8 @@ class AlertPattern(StrEnum):
 @dataclass(frozen=True, slots=True)
 class FusionDecision:
     pattern: AlertPattern
-    reasons: list[str]
+    reasons: list[str] = field(default_factory=list)
+    emergency: str | None = None  # "unresponsive" once the emergency monitor fires
 
 
 def decide(
@@ -25,6 +28,8 @@ def decide(
     face: dict[str, object] | None = None,
     phone: dict[str, object] | None = None,
     physiology: dict[str, object] | None = None,
+    emergency: EmergencyStatus | None = None,
+    break_due: bool = False,
 ) -> FusionDecision:
     """Map model reports → alert pattern. Thresholds are stubs until calibrated."""
     reasons: list[str] = []
@@ -58,7 +63,18 @@ def decide(
     # only as a shadow-mode score and an emergency vital-sign check (physiology pivot plan).
     del physiology
 
-    return FusionDecision(pattern=pattern, reasons=reasons)
+    if break_due and pattern is AlertPattern.NONE:
+        pattern = AlertPattern.SHORT_BEEP
+        reasons.append("break reminder")
+
+    flag = None
+    if emergency is not None and emergency.stage is not EmergencyStage.NORMAL:
+        pattern = AlertPattern.MAX
+        reasons.insert(0, emergency.reason or "driver not responding")
+        if emergency.stage is EmergencyStage.EMERGENCY:
+            flag = "unresponsive"
+
+    return FusionDecision(pattern=pattern, reasons=reasons, emergency=flag)
 
 
 _ORDER = [
