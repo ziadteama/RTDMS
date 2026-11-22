@@ -43,3 +43,9 @@ def test_phone_flags_false_do_nothing():
 def test_phone_flag_plus_physio_stays_continuous():
     d = decide(phone={"texting": True}, physiology={"fatigue_probability": 0.8})
     assert d.pattern is AlertPattern.CONTINUOUS
+
+
+def test_eating_and_drinking_never_alert():
+    d = decide(phone={"eating": True, "drinking": True, "food_p": 0.95, "call": False})
+    assert d.pattern is AlertPattern.NONE
+    assert d.reasons == []

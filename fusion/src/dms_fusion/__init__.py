@@ -38,6 +38,8 @@ def decide(
     if phone:
         # The IR pipeline (models/distraction hybrid) already debounces: `call` / `texting` are
         # booleans that are true only after a sustained detection, so they alert directly.
+        # Eating / drinking / food outputs are deliberately ignored until that model is validated
+        # (decision D28): only the keys read below can raise an alert.
         for action in ("call", "texting"):
             if phone.get(action) is True:
                 pattern = AlertPattern.CONTINUOUS
