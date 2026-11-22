@@ -185,12 +185,14 @@ new model must follow (including **ownership zones for parallel work**).
   build + a local Kotlin module for SMS / call / background sensors). **An end-user product, English
   only**: tabs Drive / Trips / Settings, hidden Diagnostics. Runs on a real phone (realme GT 6T) and
   has talked to the Pi's camera server; SOS = WhatsApp first via the relay + link-free SMS. Bluetooth
-  transport, Wi-Fi-only-for-video and UI polish not built. Gates:
+  transport (BLE first, HTTP fallback, dev open pairing) merged and partly checked on the phone;
+  Wi-Fi-only-for-video and UI polish not built. Gates:
   `cd app && npx tsc --noEmit && npx eslint . && npx jest`. Notes:
   [Subsystems/Mobile App.md](Subsystems/Mobile%20App.md), [Mobile App End-User Scope](Subsystems/Mobile%20App%20End-User%20Scope.md), code docs in `app/docs/`.
 - `pi/` — **Pi runtime** (per-frame fusion, buzzer patterns, Bluetooth phone service, incident
-  recording, hotspot and systemd scripts, health/settings). Merged; **Docker-verified only
-  (154 tests), never run on the Pi**. Notes: [Subsystems/Pi Runtime.md](Subsystems/Pi%20Runtime.md).
+  recording, hotspot and systemd scripts, health/settings). Merged; 207 Docker tests. **The Bluetooth
+  part runs on the Pi** (user service `rtdms-pi-user`, dev open mode, bench numbers in the Phone-Pi
+  Link note); camera, buzzer and hotspot parts never run on the Pi. Notes: [Subsystems/Pi Runtime.md](Subsystems/Pi%20Runtime.md).
 - `relay/` — **SOS relay**: Node service that sends the crash SOS over WhatsApp (unofficial
   Baileys library, ban risk accepted by the user). Verified end to end with real messages. Notes:
   [Subsystems/WhatsApp SOS Relay.md](Subsystems/WhatsApp%20SOS%20Relay.md).

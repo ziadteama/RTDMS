@@ -66,6 +66,8 @@ Pure core (message text, validation, limiter, status ranks) with the clock, DB a
 ## Ops
 
 - Link the number: run the server, watch for the QR / `pairing`, scan with WhatsApp > Linked devices on the dedicated SIM. Keep the auth dir.
+- **Always on (22 Nov):** systemd user service `rtdms-relay` (`relay/deploy/rtdms-relay.service`, installed with `relay/deploy/install-service.sh`). `Restart=always`, secrets from `~/RTDMS-coord/relay-data/relay.env` (outside git), the WhatsApp session in `relay-data/auth`. Tested: `kill -9` brought it back in 5 s. It starts at boot only after `sudo loginctl enable-linger <user>`; sleep and suspend are masked on the dev machine. It runs from the checkout in `~/RTDMS/relay`, so a branch switch there changes the code at the next restart.
+- **Logged out:** on first start under the service WhatsApp answered `401 logged out`. The relay cannot send until the number is re-linked (see Open Items). Check with `curl localhost:8088/v1/health` (`whatsapp` should be `connected`) and `journalctl --user -u rtdms-relay`.
 - HTTPS is not set up by the repo. Options: Cloudflare Tunnel, Tailscale Funnel, or a VPS with Caddy. See `relay/README.md`.
 - Docker: `relay/Dockerfile` and `compose.yaml` (volumes for `auth/` and `data/`). Not built yet.
 

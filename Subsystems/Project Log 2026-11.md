@@ -37,6 +37,15 @@ archived in [[Coordination Board 2026-11]].
 > - **App side** (PR #52, docs #51): native `SahiFaceView` (CameraX + MediaPipe face landmarker, same EAR as the Pi), calibration math port, sync to the unit, guided 5-step flow in onboarding and Settings. Gates 520 tests; EAS dev build `00006dd7` compiled. **Not run on the phone yet.**
 > - How: Sonnet orchestrators delegating to Codex (quota ran out mid-night), then agy and Claude subagents with cross-review; MAIN re-ran gates before every merge. One jest run showed a single flaky failure that did not reproduce in three reruns.
 
+> [!info] Day 22 Nov (09:40–17:00): first device run, Bluetooth link, relay as a service
+> - **Eye calibration run on the realme** (build `00006dd7`): camera preview was black and every check failed; fixed in PR #55 (details under *Bugs*). With build `ba793815` the preview shows the face, the face model reports it at about 10 Hz and the calibration finishes. Sync to the Pi is **not yet verified** (Pi camera server stopped).
+> - **Pi camera detached on purpose.** The ribbon is out ("we don't need it for now"), so `rtdms-camera` is disabled on the Pi. The Pi is reached over Tailscale; for a while it was cabled straight into the dev machine and shared its internet (see [[Dev Environment and Test Devices]]).
+> - **Bluetooth LE link built end to end** (contract v1.2 #57, Pi #58/#59, app #60/#61): BLE first, HTTP fallback. Pi side runs as the user service `rtdms-pi-user` and advertises `RTDMS-Pi`. Bench from the dev machine met the CPU, memory and alert-latency budgets; command round trip and scan-inclusive reconnect missed (numbers in [[Phone-Pi Link]]).
+> - **Dev "open mode" (no code)**: #62/#63/#64. The phone finds `RTDMS-Pi` by scanning and connects with no QR and no token. DEV ONLY. A real pairing mode is planned and tracked in [[Open Items and Next Steps]].
+> - **First phone ↔ Pi Bluetooth connection seen:** the Pi listed the phone as an LE central, the Pi's HTTP port was dead, and the app still showed "unit connected" with the Pi's live health (CPU 1 %, 44 °C, 5.14 V, uptime). Link row text on Diagnostics, screen-off behaviour and fallback were **not yet checked**.
+> - **WhatsApp relay now a systemd user service** (#65, restart on crash tested with `kill -9`). The saved WhatsApp session turned out to be **logged out (401)**; re-linking needs the relay's phone. Boot start needs one sudo step (`loginctl enable-linger`).
+> - How: Sonnet orchestrators (Pi, app) delegating to Codex (back after 23:01), agy and Claude subagents with cross-review; MAIN re-ran every gate and merged #45–#65. One orchestrator reported green gates that did not reproduce on the first cold run (see *Lessons*).
+
 ## Decisions
 
 | # | Date | Decision | Why | Detail |
@@ -56,6 +65,13 @@ archived in [[Coordination Board 2026-11]].
 | D13 | 22 Nov | **SOS goes WhatsApp first, SMS as backup**, through a team relay using an unofficial library (Baileys). Ban risk accepted by the user | User preference; SMS stays because WhatsApp needs data | [[WhatsApp SOS Relay]] |
 | D14 | 22 Nov | The relay runs on the dev machine for now; the phone reaches it over Tailscale | No public exposure needed for a prototype | [[Dev Environment and Test Devices]] |
 | D15 | 22 Nov | APK builds use Expo's cloud (EAS), not a local Android SDK | No JDK or SDK on the dev machine | [[Dev Environment and Test Devices]] |
+| D16 | 22 Nov | **Phone measures eye closure, Pi uses the ratio.** The phone sends only `closed_ratio`; the Pi sets `ear_closed = ratio × its own ear_open`. Raw EAR does not transfer between cameras | Different angle, lens and distance | [[Eye Calibration]] |
+| D17 | 22 Nov | **Bluetooth first, HTTP fallback.** HTTP stays for video, clips and Tailscale dev testing | User choice; keeps dev testing working | [[Phone-Pi Link]] |
+| D18 | 22 Nov | **Pi efficiency first** (user requirement): BLE ≤ 2 % of one core, ≤ 25 MB extra RSS, no idle wake-ups beyond the timers, alert p95 ≤ 300 ms, vision fps drop ≤ 3 % | The Pi also runs the models | `.cursor/rules/pi-performance-pipeline.mdc` |
+| D19 | 22 Nov | Contract v1.2 (CR-BLE-RATES): alert on change + 1 Hz keep-alive, status 1 Hz on change + 5 s keep-alive, physio ≤ 1 Hz; phone stale after 3 s; no HTTP polling while BLE is online | D18 | `contracts/pi-link/CONTRACT.md` |
+| D20 | 22 Nov | **Dev BLE open mode: no code, for now.** Pairing mode later (Pi accepts the first phone for 2 minutes after a button press; the app stores a server-issued token) | User: "for now make it with no codes… doc that we will make pairing mode later" | [[Phone-Pi Link]] |
+| D21 | 22 Nov | The Pi camera stays detached for now; `rtdms-camera` is disabled until the ribbon is back | User | [[Open Items and Next Steps]] |
+| D22 | 22 Nov | The WhatsApp relay runs as a systemd **user** service on the dev machine | It was a hand-started process with no restart | [[WhatsApp SOS Relay]] |
 
 ## Evidence collected
 
@@ -79,9 +95,26 @@ archived in [[Coordination Board 2026-11]].
 | `npm start` crashed in real mode | Node strip-only mode rejects a TypeScript constructor shorthand; the dry-run smoke test never loaded that file | Start flag changed to `--experimental-transform-types` (package.json and Dockerfile) |
 | Red box "ExpoKeepAwake.deactivate rejected" | Returning to the app after switching away | Fixed in PR #55: `useKeepAwake(undefined, { suppressDeactivateWarnings: true })` |
 | Eye calibration camera preview black, all three checks failing | First run of dev build `00006dd7` on the realme (22 Nov); camera indicator on, CameraX logged `Failed to get Surfaces` | React Native never measures native children, so the preview stayed 0×0 and CameraX had no Surface: no preview, no frames for the face model. `SahiFaceView` now measures and lays out the preview itself (PR #55). Verified on the phone with build `ba793815`: face found at about 10 Hz, calibration finished |
+| Eye calibration preview black, all three checks failing | First run of build `00006dd7`: camera indicator on, CameraX logged `Failed to get Surfaces` | React Native never measures native children, so the preview stayed 0×0. `SahiFaceView` now measures and lays out the preview itself, plus a TextureView (PR #55). Verified with build `ba793815` |
+| App shows "failed to load" after installing a new build | Metro (running in web mode) had no `react-native-ble-plx` in `node_modules` of the main checkout; I had installed it only in a temporary copy | `npm install` in the main checkout and restart Metro with `--clear`. After merges the phone can also keep an old bundle: restart Metro, force-stop the app and reload |
+| Pi camera service crash-looping every 3 s after a reboot | Linger made it start at boot with no camera attached (`stream.py` exits 0 when it finds no camera, so systemd just restarts it) | `rtdms-camera` disabled; re-enable with `systemctl --user enable --now rtdms-camera` when the ribbon is back. Open item: make it fail instead of exit 0 |
+| Pi BLE service crashed on start; unpaired centrals dropped | `bless` property enums are `Flag`, not int; the Pi's wireplumber also published an encrypted BLE-MIDI service | Fixed in #58; wireplumber BLE-MIDI disabled with a user config on the Pi (outside git) |
+| Ruff errors merged with #58 | My review ran `docker verify` on a stale image, which also silently skipped new tests | Fixed in #62. **Always run `docker compose -f pi/compose.yaml run --build --rm verify`** |
+| Dev machine disk "full" | `/tmp` is a 3.9 GB RAM-backed tmpfs and held 1.8 GB of downloaded APKs | Old APKs deleted; keep APKs out of `/tmp` |
+| WhatsApp relay logged out | After switching the relay to a service it reported `whatsapp_logged_out` (401); the auth dir is untouched | **Open**: re-link on the relay's phone (Linked devices → Link a device). Unknown whether the session died earlier |
 | Contract fixtures said 2024 but the incident id said 2026 | Pi orchestrator's CR-1 | Fixtures corrected; two Pi tests updated |
 | Result screen said "Calling 123…" before any call | SOS screen | Fixed to show the real call state |
 | First WhatsApp test "failed" | Number was mistyped in the first run | Retest to the right number delivered |
+
+## Lessons from the day
+
+- **Never trust an orchestrator's "gates green".** MAIN re-runs every gate in a clean copy. Twice a first cold run of `jest` failed (#52, #61, #63: `controls.test.tsx` timing out at 16 s) and then passed three times; cause not found, follow-up logged.
+- **Stale Docker images lie.** `--build` is required for the Pi verify, otherwise new tests are skipped.
+- **Check a native view on the device early.** A black preview cost three builds; a 0×0 native child is the first thing to suspect.
+- **Native change means a new APK; JS-only change loads from Metro.** The app can still show an old bundle until Metro is restarted and the app force-stopped.
+- **Shared scratch folders collide.** Two orchestrators overwrote each other's briefs; each now writes under its own `/tmp/claude-1000/<name>/`.
+- **Don't screenshot the user's phone to debug.** Read the app's own text (`uiautomator dump` when the app is in the foreground) or ask for a screenshot.
+- **Secrets stay outside git.** The Pi sudo password lives in `~/RTDMS-coord/secrets/pi.env` (mode 0600); the pairing QR with the token is only in that folder.
 
 ## Open product and technical questions
 
