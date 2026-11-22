@@ -1,4 +1,4 @@
-# Pi ↔ phone link contract (version 1.1)
+# Pi ↔ phone link contract (version 1.2)
 
 Single source of truth for the Sahi app (`app/`) and the Pi runtime (`pi/`). Design rationale:
 `Subsystems/Phone-Pi Link.md`. **Owner: the coordinator.** Neither side edits this directory
@@ -35,9 +35,9 @@ Phone characteristics: base `1375193a-7edb-4a34-b3f2-1813023900NN` (NN below). N
 
 | NN | Name | Properties | Payload schema | Rate / rule |
 |---|---|---|---|---|
-| 01 | `alert` | notify, read | `alert` | on every change and a 5 Hz keep-alive; **only input to the phone's alert output** |
-| 02 | `status` | notify, read | `status` | 2 Hz; the slimmed `/status` |
-| 03 | `physio` | notify, read | `physio` | 1 Hz |
+| 01 | `alert` | notify, read | `alert` | immediately on every change plus a **1 Hz** keep-alive (v1.2; was 5 Hz); **only input to the phone's alert output** |
+| 02 | `status` | notify, read | `status` | **1 Hz** and only when a field changed beyond a deadband, plus a 5 s keep-alive (v1.2; was 2 Hz); the slimmed `/status` |
+| 03 | `physio` | notify, read | `physio` | on each new beat window, at most 1 Hz |
 | 04 | `settings` | read, write | `settings` | write takes any subset; read returns the full object |
 | 05 | `command` | write | `command` | result comes back on `result` |
 | 06 | `result` | notify | `command_result` / `incident_response` | one notify per `command` or `incident` write |
@@ -132,6 +132,7 @@ payloads as their BLE counterparts, but the app uses BLE for them once the BLE t
 |---|---|---|
 | 1 | 2026-11-21 | First version |
 | 1.1 | 2026-11-22 | Additive: `phone_calibration` payload (POST /calibrate body, `command.profile`) |
+| 1.2 | 2026-11-22 | Pi efficiency (CR-BLE-RATES): slower notify cadence, send on change. No layout or schema change. The phone treats more than 3 s without any notify as stale (was 1 s) and, while BLE is online, sends no HTTP polls (HTTP fallback poll is 1 Hz) |
 
 ## Open questions for the spike (P1) and first integration
 
