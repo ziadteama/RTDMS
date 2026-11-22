@@ -111,15 +111,20 @@ class Notifications:
             self.pending.pop(key, None)
 
 
-async def rejected_command(client: Any, error_type: type[Exception]) -> bool:
+async def rejected_command(client: Any, error_type: type[Exception]) -> tuple[bool, str]:
     try:
         await client.write_gatt_char(
             UUIDS["command"], encode({"cmd": "test_alert", "pattern": "none", "id": "unauth"}),
             response=True,
         )
-    except error_type:
-        return True
-    return False
+    except error_type as exc:
+        text = str(exc)
+        # A rejection is an authorization error with the link still up; a drop or ATT 0x0e is a FAIL.
+        ok = ("0x08" in text or "NotAuthorized" in text or "Not Authorized" in text) and bool(
+            client.is_connected
+        )
+        return ok, text[:120]
+    return False, "write accepted"
 
 
 async def run_benchmark(args: argparse.Namespace, token: str) -> dict[str, Any]:
@@ -165,13 +170,16 @@ async def run_benchmark(args: argparse.Namespace, token: str) -> dict[str, Any]:
         print(json.dumps(listing).replace(token, "[REDACTED]"))
         active = "before_auth"
         async with asyncio.timeout(10):
-            rejected = await rejected_command(client, error_type)
+            rejected, reject_detail = await rejected_command(client, error_type)
             try:
                 await client.read_gatt_char(UUIDS["alert"])
                 alert_read = "allowed"
             except error_type:
                 alert_read = "rejected"
-        record(active, rejected, command_rejected=rejected, alert_read=alert_read)
+        record(
+            active, rejected, command_rejected=rejected, reject_detail=reject_detail,
+            alert_read=alert_read,
+        )
         active = "notifications"
         notifications = Notifications()
         async with asyncio.timeout(15):
@@ -217,7 +225,7 @@ async def run_benchmark(args: argparse.Namespace, token: str) -> dict[str, Any]:
                 async with asyncio.timeout(5):
                     await client.disconnect()
                     await connect()
-                    reset = await rejected_command(client, error_type)
+                    reset, _ = await rejected_command(client, error_type)
                     await auth()
                 elapsed = time.monotonic() - started
                 cycles.append({"seconds": elapsed, "auth_reset": reset,

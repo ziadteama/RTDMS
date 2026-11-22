@@ -77,6 +77,7 @@ def dbus(monkeypatch):
         MessageType=SimpleNamespace(SIGNAL="signal", ERROR="error"),
     )
     monkeypatch.setitem(sys.modules, "dbus_fast", module)
+    monkeypatch.setitem(sys.modules, "dbus_next.errors", SimpleNamespace(DBusError=DBusError))
     return module
 
 
@@ -137,7 +138,7 @@ async def test_one_service_and_dispatch(monkeypatch, service, bless, dbus) -> No
     assert server.chars[Char.SETTINGS.uuid].props == Props.read | Props.write
     assert server.chars[Char.RESULT.uuid].props == Props.notify
     assert server.read_request_func(server.chars[Char.HEALTH.uuid])
-    monkeypatch.setitem(sys.modules, "dbus_fast", None)
+    monkeypatch.setitem(sys.modules, "dbus_next.errors", None)
     with pytest.raises(GattWriteRejected):
         server.write_request_func(server.chars[Char.CLOCK.uuid], b'{"phone_ms":1}')
     port.notify(Char.ALERT.uuid, b"value")

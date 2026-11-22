@@ -22,7 +22,7 @@ from rtdms_pi.payloads import to_json_bytes
 from rtdms_pi.state import RuntimeState
 
 
-@pytest.mark.parametrize("factor,counts", [(1, (11, 3, 1)), (0.5, (11, 2, 1))])
+@pytest.mark.parametrize("factor,counts", [(1, (11, 3, 3)), (0.5, (11, 2, 2))])
 def test_rates(clock: Clock, factor: float, counts: tuple[int, ...]) -> None:
     port = FakeGatt(clock)
     state = RuntimeState(clock=clock)

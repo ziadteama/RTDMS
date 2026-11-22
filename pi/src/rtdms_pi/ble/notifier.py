@@ -1,6 +1,7 @@
 """Event-driven, send-on-change telemetry schedule, testable by step()."""
 
 import asyncio
+import logging
 import math
 from collections.abc import Callable, Mapping
 from queue import Empty, SimpleQueue
@@ -79,7 +80,10 @@ class Notifier:
     def _send(
         self, char: Char, schema: str, payload: dict[str, object], key: bytes, now: float
     ) -> None:
-        self.emit(char, schema, payload)
+        try:
+            self.emit(char, schema, payload)
+        except Exception:  # one bad payload or a dead link must not end the telemetry loop
+            logging.getLogger(__name__).exception("BLE notify failed: %s", char.name)
         self._sent_at[char], self._key[char] = now, key
 
     def _send_alert(self, payload: dict[str, object], now: float, *, keepalive: bool) -> bool:
@@ -114,7 +118,8 @@ class Notifier:
     def _check_physio(self, snapshot: Any, now: float) -> None:
         payload = physio_payload(snapshot)
         key = _physio_key(payload)
-        if key != self._key.get(Char.PHYSIO):
+        stale = now - self._sent_at[Char.PHYSIO] >= STATUS_KEEPALIVE_S / self.factor - EPS
+        if stale or key != self._key.get(Char.PHYSIO):  # keep-alive: a late subscriber needs a state
             self._send(Char.PHYSIO, "physio", payload, key, now)
 
     def step(self) -> None:

@@ -8,9 +8,9 @@ Raw files here: `bench-idle-2026-11-22.json` (bench_link), `proc-sample-2026-11-
 | Check | Budget / expectation | Measured | Result |
 |---|---|---|---|
 | Characteristics visible | 11 in service 0xFFF0 | 11 (10 phone + Garmin) with the contract properties | PASS |
-| Write before auth | rejected | rejected (ATT 0x0e before the NotAuthorized fix; 0x08 afterwards, not re-measured on air) | PASS |
-| Notify rates, nothing changing | alert 1 Hz, status keep-alive 5 s, physio once | alert 0.99 Hz (max gap 1.04 s, 54 B), status 6 in 30 s, physio 0 after subscribe | PASS |
-| Command round trip (write + result notify) | p95 < 100 ms | n=100, 0 failures, p50 91 ms, p95 96 ms, max 136 ms | PASS, narrow (dominated by the connection interval the central picks) |
+| Write before auth | rejected | first run ATT 0x0e (Unlikely Error); after the NotAuthorized fix (dbus_next error class, found in review) `[org.bluez.Error.NotAuthorized] Operation Not Authorized`, link stays up | PASS |
+| Notify rates, nothing changing | alert 1 Hz, status keep-alive 5 s, physio once | alert 0.99 Hz (max gap 1.04 s, 54 B), status 6 in 30 s, physio: initial send only (a 5 s keep-alive was added afterwards for late subscribers, 6 in 30 s) | PASS |
+| Command round trip (write + result notify) | p95 < 100 ms | run 1: n=100, p50 91, p95 96, max 136 ms. Re-run after the review fixes: p50 91, p95 135, max 136 ms | NOT RELIABLY MET from this laptop: the time is bimodal (about 91 or 135 ms), set by the connection interval the laptop's BlueZ chose, not by Pi load. Must be re-measured with the phone |
 | Alert change reaches the central | p95 <= 300 ms | n=31 flips: p50 95 ms, p95 113 ms, max 116 ms (laptop/Pi clock offset 68 ms +- ~55 ms removed) | PASS |
 | Reconnect, 5 cycles, scan + connect + discover + auth | < 5 s each | 4.1, 3.8, 5.0, 2.8, 6.6 s: 2 of 5 over | FAIL as defined |
 | Reconnect to a known address (no scan), 8 cycles | < 5 s | connect+discover 1.1-1.5 s, auth 0.25-0.3 s, total 1.6-1.8 s; with scan 1.6-6.2 s (the scan is the variable part, one 4.75 s outlier) | PASS for the phone case (the app remembers the device id) |
@@ -23,7 +23,7 @@ Raw files here: `bench-idle-2026-11-22.json` (bench_link), `proc-sample-2026-11-
 |---|---|---|---|
 | BLE <= 2% of one core (avg) | 0.17% | 0.15% | PASS |
 | RSS extra <= 25 MB | 119 MB total; the same runtime without the BLE server is 105 MB (RSS of an in-process build), so BLE adds about 14 MB | 119.2 MB (+0.05 MB over 60 s) | PASS |
-| 0 idle wake-ups beyond the timers | 1.1 voluntary context switches/s (the 1 Hz tick) | 1.07/s | PASS |
+| 0 idle wake-ups beyond the timers | 1.1 voluntary context switches/s (the 1 Hz tick; main thread only, from /proc/PID/status) | 1.07/s | PASS for the main thread; other threads not counted |
 | Threads | 5 | 5 | n/a |
 
 The vision-pipeline fps drop (<= 3%) is not measured: the camera is detached.

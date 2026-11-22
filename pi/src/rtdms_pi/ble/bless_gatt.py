@@ -67,11 +67,11 @@ class BlessGatt:
                 callback(bytes(value))
             except GattWriteRejected as exc:
                 logging.getLogger(__name__).warning("BLE write rejected: authentication required")
-                try:
-                    dbus = importlib.import_module("dbus_fast")
+                try:  # bless 0.2.x serves D-Bus through dbus_next: only its DBusError is named
+                    errors = importlib.import_module("dbus_next.errors")
                 except ImportError:
                     raise exc from None
-                raise dbus.DBusError(
+                raise errors.DBusError(
                     "org.bluez.Error.NotAuthorized", "authentication required"
                 ) from None
 

@@ -80,6 +80,8 @@ async def test_rejected_command_only_accepts_bleak_error() -> None:
         pass
 
     class Client:
+        is_connected = True
+
         def __init__(self, error: Exception | None) -> None:
             self.error = error
 
@@ -87,8 +89,15 @@ async def test_rejected_command_only_accepts_bleak_error() -> None:
             if self.error:
                 raise self.error
 
-    assert await rejected_command(Client(BleakError()), BleakError)
-    assert not await rejected_command(Client(None), BleakError)
+    ok, _ = await rejected_command(
+        Client(BleakError("[org.bluez.Error.NotAuthorized] ATT error: 0x08")), BleakError
+    )
+    assert ok
+    assert not (await rejected_command(Client(BleakError("ATT error: 0x0e")), BleakError))[0]
+    assert not (await rejected_command(Client(None), BleakError))[0]
+    dropped = Client(BleakError("NotAuthorized"))
+    dropped.is_connected = False
+    assert not (await rejected_command(dropped, BleakError))[0]
     with pytest.raises(TimeoutError):
         await rejected_command(Client(TimeoutError()), BleakError)
 
