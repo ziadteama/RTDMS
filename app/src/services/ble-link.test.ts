@@ -36,10 +36,10 @@ describe('startBleLink', () => {
     expect(link.state).toBe('idle');
     useSettings.getState().set({ bleName: 'RTDMS-Pi' });
     await flush();
-    expect(link.state).toBe('idle'); // still no token
+    expect(link.state).toBe('scanning'); // no token: DEV open link
+    expect(link.target).toEqual({ name: 'RTDMS-Pi', token: null, deviceId: null });
     useSecure.getState().setPiToken(TOKEN);
     await flush();
-    expect(link.state).toBe('scanning');
     expect(link.target).toEqual({ name: 'RTDMS-Pi', token: TOKEN, deviceId: null });
     stop();
   });

@@ -59,6 +59,21 @@ describe('PlxBleLink', () => {
     expect(fakeDevice.monitors.has(CHAR_UUID.RESULT)).toBe(true);
   });
 
+  it('connects with NO auth write when there is no token (DEV open mode)', async () => {
+    link.start({ name: 'RTDMS-Pi' });
+    await flushAsync();
+    expect(link.state).toBe('online');
+    expect(fakeDevice.writes.map((w) => w.charUuid)).toEqual([CHAR_UUID.CLOCK]);
+  });
+
+  it('scan lists matching units strongest first and stops the scan', async () => {
+    const p = link.scan('RTDMS-Pi', 500);
+    await flushAsync();
+    jest.advanceTimersByTime(500);
+    await expect(p).resolves.toEqual([{ id: 'dev-test-1', name: 'RTDMS-Pi', rssi: -60 }]);
+    expect(mockManager.isScanning).toBe(false);
+  });
+
   it('emits decoded notify values for alert, status, and physio', async () => {
     link.start(target);
     await flushAsync();

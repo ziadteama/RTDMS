@@ -11,13 +11,18 @@ export type BleNotify = { kind: BleNotifyKind; value: unknown; at: number };
 export type BleTarget = {
   /** Advertised name from the QR `B` field, e.g. "RTDMS-Pi". */
   name: string;
-  /** QR `K` token, written to characteristic 09 (auth) first after every connect. */
-  token: string;
+  /** QR `K` token, written to characteristic 09 (auth) first after every connect. Omitted for a unit in DEV open mode (no auth write). */
+  token?: string | null;
   /** Remembered peripheral id from a previous connect; preferred over scanning. */
   deviceId?: string | null;
 };
 
+/** A unit seen while scanning: peripheral id, advertised name, signal in dBm. */
+export type BleUnit = { id: string; name: string; rssi: number | null };
+
 export interface BleLink {
+  /** Why the last attempt failed: 'auth' (the unit wants a pairing code) or 'connection'; null when fine. */
+  readonly lastError: string | null;
   readonly state: BleState;
   /** Wall-clock ms of the last notify received, or null. */
   readonly lastNotifyAt: number | null;
@@ -37,6 +42,8 @@ export interface BleLink {
   command(body: unknown, timeoutMs?: number): Promise<unknown>;
   /** Write 07 incident_request and resolve with the next 06 incident_response; same rules as command(). */
   incident(body: unknown, timeoutMs?: number): Promise<unknown>;
+  /** One-shot scan for units advertising `name`, strongest first. Does not touch the running link. */
+  scan(name: string, ms?: number): Promise<BleUnit[]>;
   /** Signal strength of the connected peripheral in dBm, or null. */
   readRssi(): Promise<number | null>;
 }

@@ -74,6 +74,7 @@ export const diagnostics = {
   'diag.link.label': 'Link',
   'diag.link.ble': 'Bluetooth',
   'diag.link.http': 'Wi-Fi',
+  'diag.link.open': 'Open link (no code)',
   'diag.link.none': 'none',
   'diag.link.signal': 'Signal',
   'diag.link.dbm': '{dbm} dBm',

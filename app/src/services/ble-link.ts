@@ -9,11 +9,10 @@ import { requestBlePermissions } from '@/pi/ble/permissions';
 import { useSecure } from '@/state/secure';
 import { useSettings } from '@/state/settings';
 
-/** name + token of the active pairing, or null (demo, or nothing paired over Bluetooth). */
-function pairing(): { name: string; token: string } | null {
+/** name + token of the active pairing, or null (demo, or nothing paired over Bluetooth). No token = DEV open link. */
+function pairing(): { name: string; token: string | null } | null {
   const { demo, bleName } = useSettings.getState();
-  const token = useSecure.getState().piToken;
-  return !demo && bleName && token ? { name: bleName, token } : null;
+  return !demo && bleName ? { name: bleName, token: useSecure.getState().piToken } : null;
 }
 
 export function startBleLink(): () => void {
@@ -24,7 +23,7 @@ export function startBleLink(): () => void {
 
   const evaluate = () => {
     const p = pairing();
-    const key = p ? `${p.name}\n${p.token}` : '';
+    const key = p ? `${p.name}\n${p.token ?? ''}` : '';
     if (key === wanted) return;
     wanted = key;
     if (!p) {

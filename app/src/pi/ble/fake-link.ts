@@ -1,6 +1,6 @@
 import { alertAt, physioAt, SCENARIO_LENGTH_S, statusAt } from '@/demo/scenario';
 
-import type { BleLink, BleNotify, BleNotifyKind, BleState, BleTarget } from './types';
+import type { BleLink, BleNotify, BleNotifyKind, BleState, BleTarget, BleUnit } from './types';
 
 /**
  * In-memory BleLink for Jest, the web build and screenshots (same idea as FakeFaceSource). Tests
@@ -11,6 +11,9 @@ export class FakeBleLink implements BleLink {
   lastNotifyAt: number | null = null;
   deviceId: string | null = null;
   rssi: number | null = -55;
+  lastError: string | null = null;
+  /** Units scan() returns. */
+  nearby: BleUnit[] = [{ id: 'fake-device', name: 'RTDMS-Pi', rssi: -55 }];
   target: BleTarget | null = null;
   /** Canned answers: read('health'), command(), incident(). Missing handler rejects. */
   handlers: {
@@ -73,6 +76,9 @@ export class FakeBleLink implements BleLink {
     this.written.push({ char: 'incident', body });
     const h = this.handlers.incident;
     return this.need(h && (() => h(body)));
+  }
+  async scan(name: string) {
+    return this.nearby.filter((u) => u.name === name);
   }
   async readRssi() {
     return this.state === 'online' ? this.rssi : null;

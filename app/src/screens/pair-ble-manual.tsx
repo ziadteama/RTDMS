@@ -15,15 +15,19 @@ export function PairBleManual({
   busy,
   onSubmit,
   onInvalid,
+  initialOpen = false,
+  initialName = '',
 }: {
   busy: boolean;
+  initialOpen?: boolean;
+  initialName?: string;
   onSubmit: (ble: { name: string; token: string }) => void;
   onInvalid: () => void;
 }) {
   const t = useT();
   const { colors } = useTheme();
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
+  const [open, setOpen] = useState(initialOpen);
+  const [name, setName] = useState(initialName);
   const [token, setToken] = useState('');
 
   if (!open) return <Button title={t('onb.pair.bleOpen')} variant="ghost" onPress={() => setOpen(true)} accessibilityHint={t('onb.pair.bleHint')} />;

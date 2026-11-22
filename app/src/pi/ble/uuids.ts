@@ -3,6 +3,9 @@
  * Mirrors pi/src/rtdms_pi/ble/uuids.py and contracts/pi-link/CONTRACT.md.
  */
 
+/** Advertised name of a Sahi unit (Pi default; the QR `B` field overrides it). */
+export const UNIT_BLE_NAME = 'RTDMS-Pi';
+
 export const SERVICE_UUID = '0000fff0-0000-1000-8000-00805f9b34fb';
 export const GARMIN_CHAR_UUID = '1375193a-7edb-4a34-b3f2-18130239c8a8';
 

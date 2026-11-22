@@ -23,8 +23,8 @@ const FALLBACK_MS = 1000;
 const OFFLINE_AFTER = 3;
 const UNSUPPORTED_RETRY_MS = 30_000;
 
-/** Paired over Bluetooth (name + token) and not in demo mode. */
-const bleConfigured = () => !useSettings.getState().demo && !!useSettings.getState().bleName && !!useSecure.getState().piToken;
+/** Paired over Bluetooth (name; the token is optional: DEV open link) and not in demo mode. */
+const bleConfigured = () => !useSettings.getState().demo && !!useSettings.getState().bleName;
 
 /** One HTTP polling loop; returns its stop function. A stopped loop never touches the store again. */
 function startHttpLoop(): () => void {

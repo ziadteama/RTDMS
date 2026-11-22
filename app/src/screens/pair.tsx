@@ -7,13 +7,15 @@ import { Button } from '@/components/button';
 import { Text } from '@/components/text';
 import { useT } from '@/i18n';
 import { getBleLink } from '@/pi/ble';
+import type { BleUnit } from '@/pi/ble/types';
 import { normalizeBaseUrl, parseQr } from '@/pi/parse';
 import { useSecure } from '@/state/secure';
 import { DEFAULT_BASE_URL, useSettings } from '@/state/settings';
 import { radius, spacing, touch, type, useTheme } from '@/theme';
 
 import { PairBleManual } from './pair-ble-manual';
-import { firstTrue, httpReachable, waitBleOnline } from './pair-link';
+import { PairFind } from './pair-find';
+import { firstTrue, httpReachable, pairOpen, waitBleOnline } from './pair-link';
 
 type Ble = { name: string; token: string };
 
@@ -26,6 +28,7 @@ export function Pair({ onDone }: { onDone: () => void }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [address, setAddress] = useState(useSettings.getState().baseUrl);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+  const [codeFor, setCodeFor] = useState<string | null>(null);
   const handled = useRef(false);
 
   /**
@@ -61,6 +64,20 @@ export function Pair({ onDone }: { onDone: () => void }) {
       }
       setPhase({ kind: 'error', label: ble && !baseUrl ? t('onb.pair.btFail') : t('onb.pair.fail', { url: baseUrl ?? '' }) });
       handled.current = false;
+    }
+  };
+
+  /** Tap on a unit found by the scan: connect with no code (DEV open mode); fall back to a code if the unit wants one. */
+  const onPickUnit = async (unit: BleUnit) => {
+    setCodeFor(null);
+    setPhase({ kind: 'busy', label: t('onb.pair.checking') });
+    const result = await pairOpen(unit);
+    if (result === 'ok') {
+      setPhase({ kind: 'ok' });
+      onDone();
+    } else {
+      setCodeFor(result === 'needs-code' ? unit.name : null);
+      setPhase({ kind: 'error', label: result === 'needs-code' ? t('onb.pair.needsCode') : t('onb.pair.btFail') });
     }
   };
 
@@ -100,6 +117,7 @@ export function Pair({ onDone }: { onDone: () => void }) {
         </View>
       ) : null}
       <View style={{ gap: spacing.md }}>
+        <PairFind busy={phase.kind === 'busy'} onPick={(u) => void onPickUnit(u)} onError={(label) => setPhase({ kind: 'error', label })} />
         <Text variant="label" tone="secondary">
           {t('onb.pair.manual')}
         </Text>
@@ -122,6 +140,9 @@ export function Pair({ onDone }: { onDone: () => void }) {
           <Button title={t('onb.perm.camera')} icon="camera" variant="secondary" onPress={() => void requestPermission()} />
         ) : null}
         <PairBleManual
+          key={codeFor ?? 'closed'}
+          initialOpen={codeFor !== null}
+          initialName={codeFor ?? ''}
           busy={phase.kind === 'busy'}
           onInvalid={() => setPhase({ kind: 'error', label: t('onb.pair.badBle') })}
           onSubmit={(ble) => void connect(null, null, ble)}

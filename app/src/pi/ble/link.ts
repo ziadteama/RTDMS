@@ -3,7 +3,7 @@ import type { BleManager, Device, Subscription } from 'react-native-ble-plx';
 
 import { authPayload, clockPayload, decode, encode } from './codec';
 import { computeBackoff, defaultManagerFactory, isAuthError, matchesTarget, MONITORED_CHARS, ResultRouter } from './link-util';
-import type { BleLink, BleNotify, BleState, BleTarget } from './types';
+import type { BleLink, BleNotify, BleState, BleTarget, BleUnit } from './types';
 import { CHAR_UUID, SERVICE_UUID } from './uuids';
 
 export class PlxBleLink implements BleLink {
@@ -155,8 +155,11 @@ export class PlxBleLink implements BleLink {
     if (!this.current(session)) return;
     await device.discoverAllServicesAndCharacteristics();
     if (!this.current(session)) return;
-    await device.writeCharacteristicWithResponseForService(SERVICE_UUID, CHAR_UUID.AUTH, encode(authPayload(this.target!.token)));
-    if (!this.current(session)) return;
+    // No token: the unit is in DEV open mode and takes writes without auth (a token-mode unit rejects the clock write below).
+    if (this.target!.token) {
+      await device.writeCharacteristicWithResponseForService(SERVICE_UUID, CHAR_UUID.AUTH, encode(authPayload(this.target!.token)));
+      if (!this.current(session)) return;
+    }
     await device.writeCharacteristicWithResponseForService(SERVICE_UUID, CHAR_UUID.CLOCK, encode(clockPayload(Date.now())));
     if (!this.current(session)) return;
     this.subscribeAll(device, session);
@@ -256,6 +259,27 @@ export class PlxBleLink implements BleLink {
 
   command(body: unknown, timeoutMs = 4000): Promise<unknown> { return this.request('command', body, timeoutMs); }
   incident(body: unknown, timeoutMs = 6000): Promise<unknown> { return this.request('incident', body, timeoutMs); }
+
+  async scan(name: string, ms = 6000): Promise<BleUnit[]> {
+    const manager = (this.manager ??= this.managerFactory());
+    const found = new Map<string, BleUnit>();
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(done, ms);
+      function done(err?: unknown) {
+        clearTimeout(timer);
+        void manager.stopDeviceScan().catch(() => {});
+        if (err) reject(err);
+        else resolve();
+      }
+      void manager
+        .startDeviceScan([SERVICE_UUID], { scanMode: 1 }, (err, dev) => {
+          if (err) return done(err);
+          if (dev && matchesTarget(dev, { name })) found.set(dev.id, { id: dev.id, name: dev.name ?? dev.localName ?? name, rssi: dev.rssi ?? null });
+        })
+        .catch(done);
+    });
+    return [...found.values()].sort((a, b) => (b.rssi ?? -999) - (a.rssi ?? -999));
+  }
 
   async readRssi(): Promise<number | null> {
     if (this.state !== 'online' || !this.connectedDevice) return null;
