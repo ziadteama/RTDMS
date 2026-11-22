@@ -71,7 +71,6 @@ class Snapshot:
     fps: float = 0.0
     temp_c: float | None = None
     camera_ok: bool = False
-    calibrate_requested: bool = False
     t: float = 0.0
 
 
@@ -131,10 +130,6 @@ class RuntimeState:
     def unsubscribe_decisions(self, callback: Callable[[DecisionSnapshot], None]) -> None:
         with self._lock:
             self._decision_listeners.remove(callback)
-
-    def request_calibration(self, requested: bool = True) -> None:
-        with self._lock:
-            self._data = replace(self._data, calibrate_requested=requested)
 
     def snapshot(self) -> Snapshot:
         with self._lock:

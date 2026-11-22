@@ -38,6 +38,7 @@ import cv2  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from drowsiness import parse_phone_calibration  # noqa: E402
 from run import apply_overrides  # noqa: E402
 
 from rtdms_distraction.capture import open_source  # noqa: E402
@@ -100,6 +101,18 @@ class Shared:
         self.status: dict = {"fps": 0, "face": False, "baseline": 0, "levels": {}, "ms": {}}
         self.running = True
         self.calibrate = False  # set by POST /calibrate, consumed by the pipeline thread
+
+        self.phone_calibration: dict | None = None  # guarded by cond
+        self.calibration_error: str | None = None  # guarded by cond
+
+    def submit_phone_calibration(self, payload: dict) -> None:
+        """Validate and queue a snapshot; the latest submission wins."""
+        from dms_face.calibration import DriverProfile, profile_from_phone
+
+        profile_from_phone(payload, DriverProfile())
+        with self.cond:
+            self.phone_calibration = dict(payload)
+            self.calibration_error = None
 
 
 ROTATE = {90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
@@ -173,6 +186,15 @@ def pipeline_loop(args, shared: Shared) -> None:
                 if shared.calibrate:
                     shared.calibrate = False
                     drowsy.start_calibration()
+                with shared.cond:
+                    payload = shared.phone_calibration
+                    error = shared.calibration_error
+                    shared.phone_calibration = None
+                    shared.calibration_error = None
+                if payload is not None:
+                    drowsy.apply_phone_calibration(payload)
+                elif error is not None:
+                    drowsy.message = f"calibration failed: {error}"
                 dz = drowsy.feed(t, res.face.landmarks if res.face is not None else None)
             hy = None
             if hybrid is not None:
@@ -256,8 +278,8 @@ def make_handler(shared: Shared):
         def log_message(self, *a):  # keep the console for events
             pass
 
-        def _send(self, body: bytes, ctype: str) -> None:
-            self.send_response(200)
+        def _send(self, body: bytes, ctype: str, status: int = 200) -> None:
+            self.send_response(status)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
@@ -266,7 +288,24 @@ def make_handler(shared: Shared):
 
         def do_POST(self):  # noqa: N802 (http.server API)
             if self.path.startswith("/calibrate"):
-                shared.calibrate = True
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                    if length < 0:
+                        raise ValueError("invalid Content-Length")
+                    if length > 0:
+                        body = self.rfile.read(min(length, 4096))
+                        if length > 4096:
+                            raise ValueError("calibration body too large")
+                        shared.submit_phone_calibration(parse_phone_calibration(body))
+                    else:
+                        shared.calibrate = True
+                except ValueError as e:
+                    reason = str(e)
+                    with shared.cond:
+                        shared.calibration_error = reason
+                    self._send(json.dumps({"ok": False, "error": reason}).encode(),
+                               "application/json", 400)
+                    return
                 self._send(b'{"ok": true}', "application/json")
             else:
                 self.send_error(404)
