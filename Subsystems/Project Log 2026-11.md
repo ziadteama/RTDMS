@@ -43,7 +43,7 @@ archived in [[Coordination Board 2026-11]].
 > - **Bluetooth LE link built end to end** (contract v1.2 #57, Pi #58/#59, app #60/#61): BLE first, HTTP fallback. Pi side runs as the user service `rtdms-pi-user` and advertises `RTDMS-Pi`. Bench from the dev machine met the CPU, memory and alert-latency budgets; command round trip and scan-inclusive reconnect missed (numbers in [[Phone-Pi Link]]).
 > - **Dev "open mode" (no code)**: #62/#63/#64. The phone finds `RTDMS-Pi` by scanning and connects with no QR and no token. DEV ONLY. A real pairing mode is planned and tracked in [[Open Items and Next Steps]].
 > - **First phone ↔ Pi Bluetooth connection seen:** the Pi listed the phone as an LE central, the Pi's HTTP port was dead, and the app still showed "unit connected" with the Pi's live health (CPU 1 %, 44 °C, 5.14 V, uptime). Link row text on Diagnostics, screen-off behaviour and fallback were **not yet checked**.
-> - **WhatsApp relay now a systemd user service** (#65, restart on crash tested with `kill -9`). The saved WhatsApp session turned out to be **logged out (401)**; re-linking needs the relay's phone. Boot start needs one sudo step (`loginctl enable-linger`).
+> - **WhatsApp relay now a systemd user service** (#65, restart on crash tested with `kill -9`). The saved WhatsApp session turned out to be **logged out (401)**; re-linked the same evening (script `relink-whatsapp.sh`). Boot start needs one sudo step (`loginctl enable-linger`).
 > - How: Sonnet orchestrators (Pi, app) delegating to Codex (back after 23:01), agy and Claude subagents with cross-review; MAIN re-ran every gate and merged #45–#65. One orchestrator reported green gates that did not reproduce on the first cold run (see *Lessons*).
 
 ## Decisions
@@ -101,7 +101,7 @@ archived in [[Coordination Board 2026-11]].
 | Pi BLE service crashed on start; unpaired centrals dropped | `bless` property enums are `Flag`, not int; the Pi's wireplumber also published an encrypted BLE-MIDI service | Fixed in #58; wireplumber BLE-MIDI disabled with a user config on the Pi (outside git) |
 | Ruff errors merged with #58 | My review ran `docker verify` on a stale image, which also silently skipped new tests | Fixed in #62. **Always run `docker compose -f pi/compose.yaml run --build --rm verify`** |
 | Dev machine disk "full" | `/tmp` is a 3.9 GB RAM-backed tmpfs and held 1.8 GB of downloaded APKs | Old APKs deleted; keep APKs out of `/tmp` |
-| WhatsApp relay logged out | After switching the relay to a service it reported `whatsapp_logged_out` (401); the auth dir is untouched | **Open**: re-link on the relay's phone (Linked devices → Link a device). Unknown whether the session died earlier |
+| WhatsApp relay logged out | After switching the relay to a service it reported `whatsapp_logged_out` (401) | Re-linked at 17:05 with `relay/deploy/relink-whatsapp.sh` (old session kept renamed). Survives restart and `kill -9`. Unknown whether the session died before the switch. A QR printed by the terminal tool did not reach the user: render a PNG instead |
 | Contract fixtures said 2024 but the incident id said 2026 | Pi orchestrator's CR-1 | Fixtures corrected; two Pi tests updated |
 | Result screen said "Calling 123…" before any call | SOS screen | Fixed to show the real call state |
 | First WhatsApp test "failed" | Number was mistyped in the first run | Retest to the right number delivered |
