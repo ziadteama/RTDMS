@@ -147,3 +147,72 @@ def test_pi_time_is_carried_not_watch_time() -> None:
     t = SequenceTracker()
     f = t.accept(pkt(1, 123_456), rx_monotonic=42.5, rx_wall=1_800_000_000.25)
     assert (f.rx_monotonic, f.rx_wall) == (42.5, 1_800_000_000.25)
+
+
+@pytest.mark.parametrize('count', range(5))
+def test_v2_round_trip(count: int) -> None:
+    flags = (RrFlags.HR_VALID | RrFlags.SPLIT | RrFlags.ACK
+             | RrFlags.ECHO_VALID | RrFlags.CONTACT)
+    p = RrPacket(65535, 0xFFFFFFFF, 73, (817,) * count, flags=flags, version=2,
+                 contact=True, motion=255, ack=True, echo_seq=0)
+    raw = encode(p)
+    assert len(raw) == 12 + 2 * count
+    assert raw[:12] == bytes([2, 31, 255, 255, 255, 255, 255, 255, 73, 255, 0, count])
+    assert decode(raw) == p
+
+
+def test_v2_no_valid_hr_or_echo_and_no_contact() -> None:
+    p = decode(bytes.fromhex('02 00 01 00 E8 03 00 00 00 20 FF 00'))
+    assert p.hr_bpm is None
+    assert p.echo_seq is None
+    assert p.contact is False
+    assert p.motion == 32
+    assert p.ack is False
+    assert decode(encode(p)) == p
+
+
+def test_v1_optional_defaults() -> None:
+    p = decode(SPEC_EXAMPLE)
+    assert (p.version, p.contact, p.motion, p.ack, p.echo_seq) == (1, None, None, False, None)
+    assert encode(RrPacket(1, 1, 70, ()))[0] == 1
+
+
+@pytest.mark.parametrize('raw', [
+    bytes.fromhex('02 00 00 00 00 00 00 00 00 00 00'),
+    bytes.fromhex('02 00 00 00 00 00 00 00 00 00 00 01'),
+    bytes.fromhex('02 00 00 00 00 00 00 00 00 00 00 00 00 00'),
+    bytes.fromhex('02 00 00 00 00 00 00 00 00 00 00 05') + bytes(8),
+    bytes.fromhex('02 00 00 00 00 00 00 00 00 00 00 05') + bytes(10),
+    bytes.fromhex('03 00 00 00 00 00 00 00 00 00 00 00'),
+])
+def test_v2_bad_lengths_and_unknown_version(raw: bytes) -> None:
+    with pytest.raises(RrCodecError):
+        decode(raw)
+
+
+@pytest.mark.parametrize('field,value', [
+    ('motion', -1), ('motion', 256), ('echo_seq', -1), ('echo_seq', 256),
+    ('version', 3), ('rr_ms', (800,) * 5),
+])
+def test_v2_encode_rejects_invalid_fields(field: str, value: object) -> None:
+    from dataclasses import replace
+
+    p = RrPacket(1, 1000, 70, (), version=2)
+    with pytest.raises(RrCodecError):
+        encode(replace(p, **{field: value}))
+
+
+def test_hr_value_overrides_stale_valid_flag() -> None:
+    for version in (1, 2):
+        p = RrPacket(1, 1000, None, (), flags=RrFlags.HR_VALID, version=version)
+        raw = encode(p)
+        assert raw[8] == 0
+        assert not raw[1] & RrFlags.HR_VALID
+        assert decode(raw).hr_bpm is None
+
+
+def test_v2_reserved_flag_bits_are_ignored() -> None:
+    raw = bytes.fromhex("02E10100E80300004600000000")[:12]  # flags 0xE1: bits 5-7 + HR_VALID
+    p = decode(raw)
+    assert p.flags == RrFlags.HR_VALID
+    assert p.hr_bpm == 70 and p.rr_ms == ()
