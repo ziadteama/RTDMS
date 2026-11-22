@@ -11,6 +11,7 @@ import SahiNative from '@modules/sahi-native';
 import { t } from '@/i18n';
 import type { CrashEvent, MotionSample } from '@/crash/detector';
 import { magnitudeG } from '@/crash/detector';
+import { payloadTime } from '@/pi/time';
 import { db } from '@/state/db';
 import { useLive } from '@/state/live';
 import { useSecure } from '@/state/secure';
@@ -39,10 +40,10 @@ function downsample(motion: MotionSample[]): [number, number][] {
   return out.sort((a, b) => a[0] - b[0]);
 }
 
-export function triggerSos(kind: 'crash' | 'manual', e?: CrashEvent, motion: MotionSample[] = []): number {
+export function triggerSos(kind: 'crash' | 'manual' | 'unresponsive', e?: CrashEvent, motion: MotionSample[] = []): number {
   const live = useLive.getState();
   const tripId = currentTripId();
-  const at = e?.tImpact ?? Date.now();
+  const at = e?.tImpact ?? (kind === 'unresponsive' && live.alert ? payloadTime(live.alert) : Date.now());
   const id = db.addIncident({
     tripId,
     t: at,
@@ -59,15 +60,15 @@ export function triggerSos(kind: 'crash' | 'manual', e?: CrashEvent, motion: Mot
     called: null,
   });
   if (tripId !== null)
-    db.addEvent(tripId, at, kind === 'crash' ? 'crash' : 'sos', String(id), e ? String(e.gPeak) : null);
+    db.addEvent(tripId, at, kind === 'manual' ? 'sos' : kind, String(id), e ? String(e.gPeak) : null);
 
   // Persist before delivery; the Pi link never blocks the countdown, SMS or call.
   void incidentQueue.enqueue({ client_id: incidentClientId(), localId: id,
     t_crash: at, g_peak: e?.gPeak ?? 0, lat: live.location?.lat ?? null,
     lon: live.location?.lon ?? null }).then(() => incidentQueue.flush()).catch(() => {});
 
-  if (kind === 'crash' && SahiNative)
-    SahiNative.notify(SOS_NOTIFICATION_ID, 'sos', t('sos.notifTitle'), t('sos.notifBody'), `sahi://sos?incident=${id}`);
+  if (kind !== 'manual' && SahiNative)
+    SahiNative.notify(SOS_NOTIFICATION_ID, 'sos', t(kind === 'unresponsive' ? 'sos.unresponsive' : 'sos.notifTitle'), t('sos.notifBody'), `sahi://sos?incident=${id}`);
   router.push({ pathname: '/sos', params: { incident: String(id) } });
   return id;
 }

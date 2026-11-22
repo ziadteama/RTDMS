@@ -37,7 +37,7 @@ export function startBlePush(link: BleLink): () => void {
   const off = link.onNotify(({ kind, value }) => {
     const adapted = adaptNotify(kind, value);
     if (!adapted) return;
-    const raw = JSON.stringify(kind === 'alert' ? { pattern: adapted.pattern, reasons: adapted.reasons } : adapted);
+    const raw = JSON.stringify(kind === 'alert' ? { pattern: adapted.pattern, reasons: adapted.reasons, emergency: adapted.emergency } : adapted);
     const live = useLive.getState();
     const patch: Partial<LiveState> = {};
     if (raw !== lastRaw[kind]) {

@@ -13,6 +13,7 @@ import { clearKv } from '@/state/storage';
 
 export function PrivacySection() {
   const t = useT();
+  const saveTripHeartRate = useSettings((x) => x.saveTripHeartRate);
   const paused = useSettings((x) => x.paused);
   const set = useSettings((x) => x.set);
 
@@ -36,6 +37,8 @@ export function PrivacySection() {
   return (
     <Section title={t('settings.privacy')} footer={t('settings.pauseFooter')}>
       <Row label={t('settings.pause')} icon="pause" right={<Toggle label={t('settings.pause')} value={paused} onChange={(v) => set({ paused: v })} />} />
+      <Row label={t('settings.saveHr')} detail={t('settings.saveHrHelp')}
+        right={<Toggle label={t('settings.saveHr')} value={saveTripHeartRate} onChange={(v) => set({ saveTripHeartRate: v })} />} />
       <Row label={t('settings.whatStored')} icon="info" chevron onPress={() => router.push('/privacy')} />
       <Row label={t('settings.deleteAll')} icon="delete" destructive onPress={deleteAll} />
     </Section>

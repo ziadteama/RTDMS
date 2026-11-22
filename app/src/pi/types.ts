@@ -1,7 +1,7 @@
 /**
  * Wire types for the Pi HTTP API. `PiStatus` mirrors `models/distraction/scripts/stream.py`
  * (`pipeline_loop` → `status` dict, `drowsiness.py` `Drowsiness.feed`, `hybrid.py` `Hybrid.feed`)
- * field for field. Everything else is the proposed contract in `app/docs/API.md`.
+ * field for field. Alert and physio follow `contracts/pi-link/` v1.3.
  *
  * Type-only module with erasable syntax: the mock Pi server runs it under Node type stripping.
  */
@@ -52,7 +52,7 @@ export type PiHybrid = {
 export type BehaviourLevel = 'none' | 'warning' | 'alert';
 
 /** GET /status, exactly as stream.py serves it. Optional keys depend on stream.py flags. */
-export type PiStatus = {
+export type PiStatus = PayloadTime & {
   fps: number;
   face: boolean;
   baseline: number;
@@ -64,26 +64,27 @@ export type PiStatus = {
   hybrid?: PiHybrid;
 };
 
-/** GET /alert (proposed): the latest fusion decision. */
-export type PiAlert = { pattern: AlertPattern; reasons: string[]; t: number };
+/** Shared optional source metadata; status time may be absent on older units. */
+export type PayloadTime = { t?: number; t_src?: 'phone' | 'pi' };
+export type PiAlert = PayloadTime & { pattern: AlertPattern; reasons: string[]; t: number; emergency?: 'unresponsive' };
 
 /** physiology HrvSnapshot.state / QualityState (models/physiology garmin_hrv.py, types.py). */
 export type HrvState = 'warmup' | 'valid' | 'degraded' | 'bad' | 'stale';
 export type SignalQuality = 'good' | 'degraded' | 'bad';
 
-/** GET /physio (proposed). `hrv` is HrvSnapshot.to_dict() trimmed to what the app shows. */
+/** Physio v2: HR context plus PRV/RR fields used only in Diagnostics. */
 export type PiPhysio = {
   watch_connected: boolean;
   hr_bpm: number | null;
   rr_ms: number[];
-  fatigue_probability: number | null;
-  hrv: {
-    state: HrvState;
-    mean_hr_bpm: number | null;
-    rmssd_ms: number | null;
-    quality: SignalQuality;
-    coverage: number;
-  } | null;
+  worn: boolean | null;
+  hr_baseline_bpm: number | null;
+  hr_delta_bpm: number | null;
+  hr_trend_bpm_per_10min: number | null;
+  quality: SignalQuality | null;
+  hrv_state: HrvState | null;
+  rmssd_ms: number | null;
+  t_src?: 'phone' | 'pi';
   t: number;
 };
 
@@ -91,6 +92,7 @@ export type ModelState = 'running' | 'off' | 'error';
 
 /** GET /health (proposed). `throttled` is the raw `vcgencmd get_throttled` bitmask. */
 export type PiHealth = {
+  physio_diag?: Partial<Record<'watch_offset_spread_ms' | 'late_packets' | 'shadow_agree' | 'shadow_disagree' | 'shadow_only', number | null>>;
   cpu_pct: number;
   temp_c: number | null;
   throttled: number;

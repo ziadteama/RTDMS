@@ -75,7 +75,12 @@ export const db: Db = {
     return r ? toTrip(r) : null;
   },
   deleteTrip(id) {
-    sql.runSync('DELETE FROM trips WHERE id = ?', id);
+    sql.withTransactionSync(() => {
+      sql.runSync('DELETE FROM hr WHERE trip_id = ?', id);
+      sql.runSync('DELETE FROM events WHERE trip_id = ?', id);
+      sql.runSync('DELETE FROM incidents WHERE trip_id = ?', id);
+      sql.runSync('DELETE FROM trips WHERE id = ?', id);
+    });
     bump();
   },
   addEvent(tripId, t, kind, value, detail = null) {

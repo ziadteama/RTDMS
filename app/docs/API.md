@@ -71,7 +71,7 @@ the result appears in `/status` → `drowsiness.message`: `"calibrating"` → `"
 `"calibration failed: <reason>"`. The app's calibration screen times the two steps and reads that
 message; nothing else is needed.
 
-## `GET /alert` (proposed)
+## `GET /alert` (Pi-link v1.3)
 
 The latest `fusion/src/dms_fusion` `decide()` result:
 
@@ -80,26 +80,35 @@ The latest `fusion/src/dms_fusion` `decide()` result:
 ```
 
 `pattern` ∈ `none | short_beep | repeated | continuous | max` (`AlertPattern`, fusion's order).
-`t` = Pi time of the decision. **This is the only input to the phone's alert output** (notification,
+`t` is UTC epoch seconds; use it when `t_src` is `"phone"`, otherwise use arrival time.
+Optional `emergency: "unresponsive"` starts the cancellable SOS countdown once per episode. **This is the only input to the phone's alert output** (notification,
 voice, haptics, state-indicator color). See [DESIGN.md](DESIGN.md) for the color mapping.
 
-## `GET /physio` (proposed)
+## `GET /physio` (Pi-link v1.3)
+
+The source of truth is `contracts/pi-link/schemas/physio.schema.json` and its fixture.
 
 ```json
 {
   "watch_connected": true,
   "hr_bpm": 71,
+  "worn": true,
+  "quality": "good",
+  "hr_baseline_bpm": 74,
+  "hr_delta_bpm": -3,
+  "hr_trend_bpm_per_10min": -0.8,
   "rr_ms": [845, 850],
-  "fatigue_probability": 0.31,
-  "hrv": {"state": "valid", "mean_hr_bpm": 70.2, "rmssd_ms": 35.1, "quality": "good", "coverage": 0.93},
-  "t": 1732117202.4
+  "hrv_state": "valid",
+  "rmssd_ms": 35.1,
+  "t": 1795189202.4,
+  "t_src": "phone"
 }
 ```
 
-`hrv` is `models/physiology` `HrvSnapshot.to_dict()` trimmed to what the app shows (same names):
-`state` ∈ `warmup | valid | degraded | bad | stale`, `quality` ∈ `good | degraded | bad`.
-`fatigue_probability` is the physiology model's output, `null` until it has a trusted window; the
-app shows it as a percentage and applies no threshold. `hrv` is `null` when the watch is off.
+Heart rate is not a fatigue signal. `quality` describes the heart-rate stream; PRV/RR and
+baseline/delta/trend are Diagnostics-only metrics. Trip heart-rate storage defaults on and can
+be turned off in Settings → Privacy. Deleting a trip removes its heart-rate samples too.
+The phone writes its clock on connect and every 60 seconds while Bluetooth is connected.
 
 ## `GET /settings`, `PUT /settings` (proposed)
 

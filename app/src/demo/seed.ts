@@ -47,7 +47,7 @@ export function seedDemoHistory(now = Date.now()): void {
     add('alert', 'repeated', alerts.repeated, 'face drowsy');
     add('state', 'phone', alerts.continuous, null);
     add('alert', 'continuous', alerts.continuous, 'phone sustained');
-    add('alert', 'max', alerts.max, 'face drowsy, physio confirms');
+    add('alert', 'max', alerts.max, 'face drowsy');
     db.saveTrip(id, { summary, score: safetyScore(summary), endedAt: t0 + minutes * 60_000 });
   }
 }

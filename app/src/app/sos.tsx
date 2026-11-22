@@ -113,7 +113,7 @@ export default function Sos() {
       accessibilityViewIsModal
     >
       <Text variant="title" color={fg} accessibilityRole="header">
-        {kind === 'crash' ? t('sos.crash') : t('sos.manual')}
+        {kind === 'crash' ? t('sos.crash') : kind === 'unresponsive' ? t('sos.unresponsive') : t('sos.manual')}
       </Text>
       {phase.kind === 'countdown' ? (
         <>

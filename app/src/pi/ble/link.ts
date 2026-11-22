@@ -26,6 +26,7 @@ export class PlxBleLink implements BleLink {
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private scanTimer: ReturnType<typeof setTimeout> | null = null;
+  private clockTimer: ReturnType<typeof setInterval> | null = null;
   private onlineSince: number | null = null;
   private btStateSub: Subscription | null = null;
 
@@ -173,6 +174,11 @@ export class PlxBleLink implements BleLink {
     this.deviceId = device.id;
     this.onlineSince = Date.now();
     this.lastError = null;
+    this.clockTimer = setInterval(() => {
+      if (!this.current(session) || this.state !== 'online') return;
+      void device.writeCharacteristicWithResponseForService(SERVICE_UUID, CHAR_UUID.CLOCK, encode(clockPayload(Date.now())))
+        .catch(() => {}); // retried next tick
+    }, 60_000);
     this.setState('online');
   }
 
@@ -219,6 +225,8 @@ export class PlxBleLink implements BleLink {
   }
 
   private cleanupConnection(): void {
+    if (this.clockTimer) clearInterval(this.clockTimer);
+    this.clockTimer = null;
     this.stopScan();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
@@ -261,10 +269,8 @@ export class PlxBleLink implements BleLink {
     const uuid = kind === 'command' ? CHAR_UUID.COMMAND : CHAR_UUID.INCIDENT;
     return this.router.request(kind, timeoutMs, () => dev.writeCharacteristicWithResponseForService(SERVICE_UUID, uuid, encoded));
   }
-
   command(body: unknown, timeoutMs = 4000): Promise<unknown> { return this.request('command', body, timeoutMs); }
   incident(body: unknown, timeoutMs = 6000): Promise<unknown> { return this.request('incident', body, timeoutMs); }
-
   async scan(name: string, ms = 6000): Promise<BleUnit[]> {
     const manager = (this.manager ??= this.managerFactory());
     const found = new Map<string, BleUnit>();

@@ -5,6 +5,7 @@
  */
 import { driverState, isEscalation, type DriverState } from '@/pi/alert';
 import type { AlertPattern } from '@/pi/types';
+import { payloadTime } from '@/pi/time';
 import { db } from '@/state/db';
 import { useLive, type LiveState } from '@/state/live';
 import { useSettings } from '@/state/settings';
@@ -83,7 +84,7 @@ export function startTripManager(): () => void {
       if (closure > summary.longestClosureMs) summary.longestClosureMs = closure;
       if (state !== lastState && LOGGED_STATES.includes(state)) {
         summary.states[state] = (summary.states[state] ?? 0) + 1;
-        db.addEvent(tripId, now, 'state', state);
+        db.addEvent(tripId, payloadTime(s.status, now), 'state', state);
       }
       lastState = state;
     }
@@ -92,15 +93,15 @@ export function startTripManager(): () => void {
     if (pattern !== lastPattern) {
       if (pattern && pattern !== 'none' && isEscalation(lastPattern, pattern)) {
         summary.alerts[pattern]++;
-        db.addEvent(tripId, now, 'alert', pattern, s.alert!.reasons.join(', '));
+        db.addEvent(tripId, payloadTime(s.alert!, now), 'alert', pattern, s.alert!.reasons.join(', '));
       }
       lastPattern = pattern;
     }
 
     const bpm = s.physio?.hr_bpm;
-    if (bpm != null && now - lastHrAt >= HR_EVERY_MS) {
+    if (useSettings.getState().saveTripHeartRate && s.physio !== prev.physio && bpm != null && now - lastHrAt >= HR_EVERY_MS) {
       lastHrAt = now;
-      db.addHr(tripId, now, bpm);
+      db.addHr(tripId, payloadTime(s.physio!, now), bpm);
     }
     if (now - lastSaveAt >= SAVE_EVERY_MS) save();
   };

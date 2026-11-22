@@ -14,11 +14,13 @@ import { CrashMonitor, synthesizeCrash, unpackMotion, type CrashExtras } from '@
 import { speedAt } from '@/demo/scenario';
 import { t } from '@/i18n';
 import { DemoTransport } from '@/pi/transport';
+import { payloadTime } from '@/pi/time';
 import { setLive, useLive } from '@/state/live';
 import { useSettings } from '@/state/settings';
 
 import { triggerSos } from './emergency';
 import { pi } from './pi';
+import { startUnresponsiveMonitor } from './unresponsive';
 
 export { gpsLost };
 
@@ -96,6 +98,7 @@ export async function locationPermission(): Promise<boolean> {
 }
 
 export function startMonitor(): () => void {
+  const stopUnresponsive = startUnresponsiveMonitor();
   const demo = useSettings.getState().demo;
   let stopped = false;
   let watch: Location.LocationSubscription | null = null;
@@ -108,7 +111,7 @@ export function startMonitor(): () => void {
   const unsub = useLive.subscribe((s, prev) => {
     const now = Date.now();
     if (s.status !== prev.status && s.status && !s.status.face) faceLost.push(now);
-    if (s.physio !== prev.physio && s.physio?.hr_bpm != null) hr.push({ t: now, bpm: s.physio.hr_bpm });
+    if (s.physio !== prev.physio && s.physio?.hr_bpm != null) hr.push({ t: payloadTime(s.physio, now), bpm: s.physio.hr_bpm });
     while (faceLost.length && faceLost[0]! < now - 60_000) faceLost.shift();
     while (hr.length && hr[0]!.t < now - 60_000) hr.shift();
   });
@@ -159,6 +162,7 @@ export function startMonitor(): () => void {
 
   return () => {
     stopped = true;
+    stopUnresponsive();
     unsub();
     timers.forEach(clearInterval);
     motion?.remove();

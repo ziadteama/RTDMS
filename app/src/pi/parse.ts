@@ -30,6 +30,12 @@ const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is st
 const oneOf = <T extends string>(v: unknown, allowed: readonly T[]): T | null =>
   typeof v === 'string' && (allowed as readonly string[]).includes(v) ? (v as T) : null;
 
+function parseTime(v: Obj) {
+  const t = num(v.t);
+  const source = oneOf(v.t_src, ['phone', 'pi'] as const);
+  return { ...(t !== null ? { t } : {}), ...(source ? { t_src: source } : {}) };
+}
+
 const DROWSY_STATES: readonly DrowsinessState[] = ['starting', 'unavailable', 'alert', 'distracted', 'warning', 'drowsy'];
 const LEVELS: readonly BehaviourLevel[] = ['none', 'warning', 'alert'];
 
@@ -81,7 +87,7 @@ export function parseStatus(v: unknown): PiStatus | null {
       const n = num(m);
       if (n !== null) ms[k] = n;
     }
-  const out: PiStatus = { fps, face: v.face, baseline: num(v.baseline) ?? 0, levels, ms };
+  const out: PiStatus = { ...parseTime(v), fps, face: v.face, baseline: num(v.baseline) ?? 0, levels, ms };
   if ('temp_c' in v) out.temp_c = num(v.temp_c);
   const d = parseDrowsiness(v.drowsiness);
   if (d) out.drowsiness = d;
@@ -93,8 +99,9 @@ export function parseStatus(v: unknown): PiStatus | null {
 export function parseAlert(v: unknown): PiAlert | null {
   if (!isObj(v)) return null;
   const pattern = oneOf<AlertPattern>(v.pattern, ALERT_PATTERNS);
-  if (!pattern) return null;
-  return { pattern, reasons: strs(v.reasons), t: num(v.t) ?? 0 };
+  if (!pattern || num(v.t) === null || !Array.isArray(v.reasons) || !v.reasons.every((r) => typeof r === 'string')) return null;
+  return { pattern, reasons: strs(v.reasons), ...parseTime(v), t: num(v.t)!,
+    ...(v.emergency === 'unresponsive' ? { emergency: 'unresponsive' as const } : {}) };
 }
 
 const HRV_STATES: readonly HrvState[] = ['warmup', 'valid', 'degraded', 'bad', 'stale'];
@@ -102,27 +109,20 @@ const QUALITIES: readonly SignalQuality[] = ['good', 'degraded', 'bad'];
 
 export function parsePhysio(v: unknown): PiPhysio | null {
   if (!isObj(v)) return null;
-  let hrv: PiPhysio['hrv'] = null;
-  if (isObj(v.hrv)) {
-    const state = oneOf(v.hrv.state, HRV_STATES);
-    const quality = oneOf(v.hrv.quality, QUALITIES);
-    if (state && quality)
-      hrv = {
-        state,
-        quality,
-        mean_hr_bpm: num(v.hrv.mean_hr_bpm),
-        rmssd_ms: num(v.hrv.rmssd_ms),
-        coverage: num(v.hrv.coverage) ?? 0,
-      };
-  }
-  const p = num(v.fatigue_probability);
+  if (typeof v.watch_connected !== 'boolean' || num(v.t) === null) return null;
   return {
-    watch_connected: bool(v.watch_connected),
+    watch_connected: v.watch_connected,
     hr_bpm: num(v.hr_bpm),
     rr_ms: Array.isArray(v.rr_ms) ? v.rr_ms.map(num).filter((x): x is number => x !== null) : [],
-    fatigue_probability: p !== null && p >= 0 && p <= 1 ? p : null,
-    hrv,
-    t: num(v.t) ?? 0,
+    worn: typeof v.worn === 'boolean' ? v.worn : null,
+    hr_baseline_bpm: num(v.hr_baseline_bpm),
+    hr_delta_bpm: num(v.hr_delta_bpm),
+    hr_trend_bpm_per_10min: num(v.hr_trend_bpm_per_10min),
+    quality: oneOf(v.quality, QUALITIES),
+    hrv_state: oneOf(v.hrv_state, HRV_STATES),
+    rmssd_ms: num(v.rmssd_ms),
+    ...parseTime(v),
+    t: num(v.t)!,
   };
 }
 
@@ -136,6 +136,10 @@ export function parseHealth(v: unknown): PiHealth | null {
   if (isObj(v.models))
     for (const [k, s] of Object.entries(v.models)) models[k] = oneOf(s, MODEL_STATES) ?? 'error';
   return {
+    ...(isObj(v.physio_diag) ? { physio_diag: Object.fromEntries(
+      ['watch_offset_spread_ms', 'late_packets', 'shadow_agree', 'shadow_disagree', 'shadow_only']
+        .filter((key) => key in (v.physio_diag as Obj)).map((key) => [key, num((v.physio_diag as Obj)[key])]),
+    ) } : {}),
     cpu_pct: cpu,
     temp_c: num(v.temp_c),
     throttled: num(v.throttled) ?? 0,

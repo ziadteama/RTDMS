@@ -1,4 +1,4 @@
-export type SosMessageKind = 'crash' | 'manual';
+export type SosMessageKind = 'crash' | 'manual' | 'unresponsive';
 
 export type SosMessageParams = {
   kind: SosMessageKind;
@@ -29,14 +29,15 @@ export function formatTimeAmPm(date: Date = new Date()): string {
 export function buildSosSms(params: SosMessageParams): string {
   const time = formatTimeAmPm(params.date);
   const prefix = params.kind === 'crash' ? `SAHI crash alert ${time}` : `SAHI alert ${time}`;
+  const message = params.kind === 'unresponsive' ? 'The driver is not responding.' : 'The driver may need help.';
   const hasCoords = typeof params.lat === 'number' && typeof params.lon === 'number' &&
     Number.isFinite(params.lat) && Number.isFinite(params.lon);
 
   if (hasCoords) {
     const latStr = (params.lat as number).toFixed(5);
     const lonStr = (params.lon as number).toFixed(5);
-    return `${prefix}. The driver may need help. Location (paste in Maps): ${latStr},${lonStr}`;
+    return `${prefix}. ${message} Location (paste in Maps): ${latStr},${lonStr}`;
   }
 
-  return `${prefix}. The driver may need help. Location unknown.`;
+  return `${prefix}. ${message} Location unknown.`;
 }

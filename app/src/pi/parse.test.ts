@@ -98,26 +98,26 @@ describe('parseStatus', () => {
 
 describe('other endpoints', () => {
   it('parses /alert and rejects unknown patterns', () => {
-    expect(parseAlert({ pattern: 'max', reasons: ['face drowsy', 'physio confirms'], t: 3 })).toEqual({
+    expect(parseAlert({ pattern: 'max', reasons: ['face drowsy'], t: 3 })).toEqual({
       pattern: 'max',
-      reasons: ['face drowsy', 'physio confirms'],
+      reasons: ['face drowsy'],
       t: 3,
     });
     expect(parseAlert({ pattern: 'LOUD' })).toBeNull();
   });
 
-  it('parses /physio and nulls an out-of-range probability', () => {
+  it('parses physio v2 and ignores the removed fatigue field', () => {
     const p = parsePhysio({
       watch_connected: true,
       hr_bpm: 71,
       rr_ms: [845, 'x', 850],
       fatigue_probability: 1.7,
-      hrv: { state: 'valid', mean_hr_bpm: 70.2, rmssd_ms: 35.1, quality: 'good', coverage: 0.93 },
+      hrv_state: 'valid', rmssd_ms: 35.1, quality: 'good',
       t: 5,
     });
     expect(p!.rr_ms).toEqual([845, 850]);
-    expect(p!.fatigue_probability).toBeNull();
-    expect(p!.hrv!.quality).toBe('good');
+    expect(p).not.toHaveProperty('fatigue_probability');
+    expect(p!.quality).toBe('good');
   });
 
   it('parses /health; unknown model state is an error, not running', () => {

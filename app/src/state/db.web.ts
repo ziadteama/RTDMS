@@ -28,6 +28,8 @@ export const db: Db = {
   deleteTrip(id) {
     trips = trips.filter((t) => t.id !== id);
     events = events.filter((e) => e.tripId !== id);
+    hr = hr.filter((h) => h.tripId !== id);
+    incidents = incidents.filter((i) => i.tripId !== id);
     bump();
   },
   addEvent(tripId, t, kind, value, detail = null) {

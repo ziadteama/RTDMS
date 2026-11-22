@@ -14,12 +14,8 @@ test('contract status populates HTTP-shaped drowsiness and phone fields', () => 
   });
 });
 
-test('contract physio populates HRV without inventing mean heart rate or coverage', () => {
-  const adapted = adaptPhysio(fixture('physio'));
-  expect(parsePhysio(adapted)).toMatchObject({ watch_connected: true, hr_bpm: 71, rr_ms: [845, 850],
-    fatigue_probability: 0.31, hrv: { state: 'valid', rmssd_ms: 35.1, quality: 'good', mean_hr_bpm: null } });
-  expect(adapted?.hrv).not.toHaveProperty('coverage');
-  expect(adapted?.hrv).not.toHaveProperty('mean_hr_bpm');
+test('contract physio preserves v2 fields', () => {
+  expect(parsePhysio(adaptPhysio(fixture('physio')))).toEqual(fixture('physio'));
 });
 
 test('contract alert already matches the HTTP shape', () => {
@@ -42,7 +38,7 @@ test.each([
 test('ignores unknown nested fields rather than accepting a second wire shape', () => {
   expect(adaptStatus({ fps: 1, face: true, state: 'alert', drowsiness: { perclos: 0.9 }, perclos_valid: true }))
     .toEqual({ fps: 1, face: true, drowsiness: { state: 'alert', face: true }, hybrid: { face: true } });
-  expect(parsePhysio(adaptPhysio({ watch_connected: true, t: 1 } ))?.hrv).toBeNull();
+  expect(parsePhysio(adaptPhysio({ watch_connected: true, t: 1 } ))?.hrv_state).toBeNull();
 });
 
 test('invalid required field types are dropped', () => {

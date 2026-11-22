@@ -70,9 +70,13 @@ function HeartMetrics() {
       watch: s.physio?.watch_connected ?? false,
       hr: s.physio?.hr_bpm ?? null,
       rr: s.physio?.rr_ms.at(-1) ?? null,
-      quality: s.physio?.hrv?.quality ?? null,
-      hrvState: s.physio?.hrv?.state ?? null,
-      fatigue: s.physio?.fatigue_probability ?? null,
+      quality: s.physio?.quality ?? null,
+      hrvState: s.physio?.hrv_state ?? null,
+      worn: s.physio?.worn ?? null,
+      baseline: s.physio?.hr_baseline_bpm ?? null,
+      delta: s.physio?.hr_delta_bpm ?? null,
+      trend: s.physio?.hr_trend_bpm_per_10min ?? null,
+      rmssd: s.physio?.rmssd_ms ?? null,
     })),
   );
   if (p.supported === false) return null;
@@ -87,8 +91,13 @@ function HeartMetrics() {
         <>
           <Metric label={dx('diag.raw.hr')} value={p.hr} unit={dx('diag.raw.bpm')} />
           <Metric label={dx('diag.raw.rr')} value={p.rr} unit={dx('diag.raw.ms')} />
-          <Metric label={dx('diag.raw.quality')} value={p.quality ?? p.hrvState} color={qualityColor} />
-          <Metric label={dx('diag.raw.fatigue')} value={p.fatigue === null ? null : Math.round(p.fatigue * 100)} unit="%" />
+          <Metric label={dx('diag.raw.quality')} value={p.quality} color={qualityColor} />
+          <Metric label={dx('diag.raw.worn')} value={p.worn === null ? null : p.worn ? 'Yes' : 'No'} />
+          <Metric label={dx('diag.raw.baseline')} value={p.baseline} unit="bpm" />
+          <Metric label={dx('diag.raw.delta')} value={p.delta} unit="bpm" />
+          <Metric label={dx('diag.raw.trend')} value={p.trend} unit="bpm/10 min" />
+          <Metric label={dx('diag.raw.prv')} value={p.hrvState} />
+          <Metric label="RMSSD" value={p.rmssd} unit="ms" />
         </>
       )}
     </MetricGroup>
