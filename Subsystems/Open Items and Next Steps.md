@@ -34,7 +34,7 @@ The single list of what is **not** done. Update it when something moves.
 
 | Item | State |
 |---|---|
-| Bluetooth transport (A3) behind `PiTransport` | **built and merged (#61/#63), partly checked on the phone**: connection and health read seen. Still to check: Diagnostics link row text, reconnect after a Pi restart, screen off 2 min on ColorOS, fallback to HTTP, BLE calibration sync |
+| Bluetooth transport (A3) behind `PiTransport` | **built, merged and checked on the phone (22 Nov, user)**: connects with no code, reconnects, falls back and returns. Bluetooth off now shows "Bluetooth is off" (#72) instead of the raw "device powered off" error. Not yet checked: BLE calibration sync to the Pi, screen off beyond 2 min on a long drive, reconnect after a Pi restart (user reported reconnect fine) |
 | Wi-Fi joined only during video sessions, then released (A4) | not started |
 | UI polish and redrawn screens with an `impeccable` critique (A5) | not started; the Stitch project still shows the old design |
 | Keep-awake guard on the Drive screen | fixed (PR #55, `suppressDeactivateWarnings`) |
