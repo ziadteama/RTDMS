@@ -5,6 +5,8 @@ import { Row } from '@/components/list';
 import { dx } from '@/i18n/diagnostics';
 import { getBleLink } from '@/pi/ble';
 import { useLive } from '@/state/live';
+import { useSecure } from '@/state/secure';
+import { useSettings } from '@/state/settings';
 
 const RSSI_MS = 5000;
 
@@ -15,6 +17,9 @@ const RSSI_MS = 5000;
  */
 export function useLinkRows() {
   const link = useLive((s) => s.link);
+  const paired = useSettings((s) => !!s.bleName);
+  const hasToken = useSecure((s) => !!s.piToken);
+  const openLink = paired && !hasToken;
   const [rssi, setRssi] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -37,7 +42,7 @@ export function useLinkRows() {
 
   const last = getBleLink().lastNotifyAt;
   const unknown = dx('diag.link.unknown');
-  const linkLabel = link === 'ble' ? dx('diag.link.ble') : link === 'http' ? dx('diag.link.http') : dx('diag.link.none');
+  const linkLabel = link === 'ble' ? dx(openLink ? 'diag.link.open' : 'diag.link.ble') : link === 'http' ? dx('diag.link.http') : dx('diag.link.none');
   return [
     <Row key="link" label={dx('diag.link.label')} icon="bluetooth" value={linkLabel} accessibilityRole="text" />,
     <Row
