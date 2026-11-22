@@ -119,7 +119,8 @@ class Notifier:
         payload = physio_payload(snapshot)
         key = _physio_key(payload)
         stale = now - self._sent_at[Char.PHYSIO] >= STATUS_KEEPALIVE_S / self.factor - EPS
-        if stale or key != self._key.get(Char.PHYSIO):  # keep-alive: a late subscriber needs a state
+        # keep-alive: a late subscriber needs a state
+        if stale or key != self._key.get(Char.PHYSIO):
             self._send(Char.PHYSIO, "physio", payload, key, now)
 
     def step(self) -> None:
