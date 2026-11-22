@@ -120,6 +120,17 @@ stateDiagram-v2
 
 ---
 
+## 3. BLE link rules (app side, v1.2)
+
+- Transport choice: while the BLE link is `online` the app sends no HTTP polls; alert, status and physio notifications update the live store directly. More than 3 s without any notify marks the unit offline.
+- Fallback: if BLE is configured but not online, `/status` and `/alert` are polled over HTTP at 1 Hz. If no BLE name is stored (dev or mock Pi), the old 5 Hz HTTP poll applies. When BLE returns, HTTP polling stops at the first notify. Video, clips and frames always use HTTP.
+- Link states: `idle` (no target, demo, or stopped: no timers, no scan), `scanning`, `connecting`, `online`, `offline` (reconnect with 1 s to 15 s backoff, jittered; a rejected token keeps retrying at the longest delay so a re-pair can recover).
+- On connect: request MTU 247, write `auth` (token) first, then `clock`, then subscribe to 01, 02, 03 and 06.
+- Pairing fields: QR `B` (BLE name, up to 29 chars), `K` (token, 16+ chars), `V` (contract version). Name goes to settings (`bleName`, `bleDeviceId` once known); the token only to secure storage. A BLE-only QR (no Wi-Fi) is valid. Manual entry exists for development.
+- Permissions: `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` (Android 12+) or location (Android 11 and below), requested in onboarding and before the first link start.
+- Retries: only reads, `PUT /settings` and incident writes with a `client_id` fall back to HTTP automatically; calibrate, test alert and system commands are never replayed.
+- Not verified on a device yet: background behaviour with the screen off (ColorOS), MTU actually granted, reconnect after the Pi restarts.
+
 ## Contents
 
 - [Lifecycle states 1-8: install to driving](lifecycle/states-setup.md)
