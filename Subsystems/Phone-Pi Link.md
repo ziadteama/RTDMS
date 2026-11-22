@@ -256,6 +256,17 @@ Later app changes this implies (not built here): `BleTransport` behind `PiTransp
 `react-native-ble-plx` with Android 12+ BLUETOOTH_SCAN/CONNECT permissions; unbind after a video
 session; incident retry queue; onboarding that checks the dashcam pitfalls above.
 
+## Pairing
+
+**Today (token mode, the default).** The Pi creates a random token at first start (`~/.local/state/rtdms/token`, mode 0600). The phone gets it through the pairing QR (`K`) or by typing the code, and writes it to the `auth` characteristic before anything else. Until then every other write is rejected (ATT 0x08).
+
+**DEV open mode (22 Nov, user decision: "for now make it with no codes").** `rtdms-pi --ble-open` or `RTDMS_BLE_OPEN=1` (default off; `install-user-service.sh --open` adds a systemd drop-in). The Pi then treats every connection as authenticated and an `auth` write with any or empty token is a no-op; it logs one WARNING at startup ("BLE open mode: no token required (dev only)"). The app's "Find my Sahi unit" scans for `RTDMS-Pi`, lists the units with signal strength and connects on tap with no token; if the unit is in token mode the app says "This unit needs a pairing code" and opens code entry. The Diagnostics link row reads "Open link (no code)". No contract or schema change (`health` has no `pairing` field: its schema is closed).
+
+> [!danger] Never ship open mode
+> Anyone within Bluetooth range can read the driver's data (alert, status, heart rate) and send commands (test alert, incident requests, settings). It exists only so development is not blocked by QR scanning. The release unit must run in token mode or the pairing mode below.
+
+**Planned: pairing mode (replaces open mode).** The Pi accepts the first phone for 2 minutes after a physical button press or `rtdms-pair --open`; in that window the app's "Find my Sahi unit" connects, the Pi issues a server-side token for that phone and the app stores it in secure storage. Outside the window an unknown phone is rejected as in token mode. Acceptance criteria: (1) with no window open, a phone without a token cannot write or read private characteristics; (2) the window closes after 2 minutes or after the first successful pairing; (3) the app stores the issued token and reconnects silently afterwards; (4) unpairing a phone invalidates its token on the Pi; (5) no QR or typed code needed; (6) no extra per-notify work on the Pi. Tracked in [[Open Items and Next Steps]].
+
 ## Bench spike
 
 **Goal:** go / no-go on the hybrid. **Status: not run.** Results go in [[#Results]] as measured
