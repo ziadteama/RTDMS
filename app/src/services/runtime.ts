@@ -7,6 +7,7 @@ import { useSecure } from '@/state/secure';
 import { useSettings } from '@/state/settings';
 
 import { startAlertEngine } from './alerts';
+import { startCalibrationSync } from './calibration-sync';
 import { startIncidentDelivery } from './incident-delivery';
 import { startMonitor } from './monitor';
 import { startPoller } from './poller';
@@ -39,6 +40,10 @@ export function useRuntime(): void {
   useEffect(() => {
     if (onboarded) return startIncidentDelivery();
   }, [onboarded]);
+
+  useEffect(() => {
+    return startCalibrationSync();
+  }, []);
 
   useEffect(() => {
     const { contacts, setContacts } = useSecure.getState();

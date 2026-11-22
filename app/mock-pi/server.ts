@@ -33,6 +33,7 @@ import type {
   PiStatus,
 } from '../src/pi/types.ts';
 import { ALERT_PATTERNS } from '../src/pi/types.ts';
+import { validatePhoneCalibration } from './calibrate-validator.ts';
 import { handleRelayRequest } from './relay-stub.ts';
 
 const { values: args } = parseArgs({
@@ -60,6 +61,7 @@ const replay: PiStatus[] | null = args.replay
 
 let calibration: { until: number } | null = null;
 let calibrated = true;
+let calibrationMessage = 'calibrated';
 let testAlert: { pattern: AlertPattern; until: number } | null = null;
 const settings: PiSettings = {
   profile: 'default',
@@ -75,12 +77,13 @@ const incidents: (PiIncident & { frames: IncidentFrame[] })[] = [];
 function status(): PiStatus {
   const t = now();
   if (replay && replay.length) return replay[Math.floor(t * 5) % replay.length]!; // recorded at 5 Hz
-  let cal = { message: calibrated ? 'calibrated' : 'not calibrated: press Calibrate', calibrated };
+  let cal = { message: calibrated ? calibrationMessage : 'not calibrated: press Calibrate', calibrated };
   if (calibration) {
     if (t < calibration.until) cal = { message: 'calibrating', calibrated };
     else {
       calibration = null;
       calibrated = true;
+      calibrationMessage = 'calibrated';
       cal = { message: 'calibrated', calibrated: true };
     }
   }
@@ -173,6 +176,17 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'POST') {
       if (path === '/calibrate') {
+        const b = (await body(req)) as Record<string, unknown>;
+        if (b && typeof b === 'object' && b.source === 'phone') {
+          const validation = validatePhoneCalibration(b);
+          if (!validation.ok) {
+            return json(res, { error: validation.error }, 400);
+          }
+          calibration = null;
+          calibrated = true;
+          calibrationMessage = 'calibrated (phone)';
+          return json(res, { ok: true });
+        }
         calibration = { until: now() + 13 }; // stream.py: 10 s eyes open + 3 s closed
         return json(res, { ok: true });
       }

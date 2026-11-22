@@ -11,6 +11,18 @@ export type Units = 'kmh' | 'mph';
 export type Vibration = 'off' | 'light' | 'strong';
 export type CallTarget = 'ambulance' | 'contact';
 
+export type EyeCalibration = {
+  closedRatio: number;
+  earOpen: number;
+  earClosed: number;
+  snr: number;
+  quality: 'good' | 'fair' | 'poor';
+  at: number;
+  syncedAt: number | null;
+  samplesOpen?: number;
+  samplesClosed?: number;
+};
+
 /** App-side settings only. Detection thresholds live on the Pi (GET / PUT /settings). */
 export type Settings = {
   consentedAt: number | null;
@@ -30,6 +42,7 @@ export type Settings = {
   relayUrl?: string;
   relayKey?: string;
   driverName?: string;
+  eyeCalibration: EyeCalibration | null;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -50,10 +63,12 @@ export const DEFAULT_SETTINGS: Settings = {
   relayUrl: undefined,
   relayKey: undefined,
   driverName: 'Driver',
+  eyeCalibration: null,
 };
 
 type SettingsStore = Settings & {
   set: (patch: Partial<Settings>) => void;
+  setEyeCalibration: (eyeCalibration: EyeCalibration | null) => void;
   reset: () => void;
 };
 
@@ -65,6 +80,7 @@ export const useSettings = create<SettingsStore>()(
         const { emergencyNumber: _number, sosCountdownSeconds: _seconds, ...rest } = patch;
         set({ ...rest, ...emergencySettings(patch) });
       },
+      setEyeCalibration: (eyeCalibration) => set({ eyeCalibration }),
       reset: () => set(DEFAULT_SETTINGS),
     }),
     {
