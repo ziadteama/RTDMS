@@ -52,7 +52,7 @@ class BlessGatt:
         await self.server.add_new_service(SERVICE_UUID)
         props, perms = bless.GATTCharacteristicProperties, bless.GATTAttributePermissions
         for uuid, char in self.characteristics.items():
-            flags, permissions = 0, 0
+            flags, permissions = props(0), perms(0)  # real bless enums are Flag, not int
             for prop in char.props:
                 flags |= getattr(
                     props, "write_without_response" if prop == "write_no_response" else prop
@@ -70,5 +70,9 @@ class BlessGatt:
             self.server.update_value(SERVICE_UUID, uuid)
 
     async def stop(self) -> None:
-        if self.server is not None:
-            await self.server.stop()
+        server, self.server = self.server, None
+        if server is not None:
+            try:
+                await server.stop()
+            except IndexError:  # bless pops its advertisement list; empty if start() never got there
+                pass

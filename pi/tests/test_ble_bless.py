@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from enum import IntFlag
+from enum import Flag, auto
 from types import SimpleNamespace
 
 import pytest
@@ -16,11 +16,16 @@ from rtdms_pi.runtime import Runtime
 from rtdms_pi.sources import ScriptedFrameSource
 
 
-class Props(IntFlag):
-    read = 1
-    write = 2
-    write_without_response = 4
-    notify = 8
+class Props(Flag):  # real bless enums are Flag: `0 | Props.x` raises TypeError
+    read = auto()
+    write = auto()
+    write_without_response = auto()
+    notify = auto()
+
+
+class Perms(Flag):
+    readable = auto()
+    writeable = auto()
 
 
 class Server:
@@ -61,7 +66,7 @@ async def test_one_service_and_dispatch(monkeypatch, service) -> None:
         SimpleNamespace(
             BlessServer=Server,
             GATTCharacteristicProperties=Props,
-            GATTAttributePermissions=SimpleNamespace(readable=1, writeable=2),
+            GATTAttributePermissions=Perms,
         ),
     )
     port = BlessGatt()
