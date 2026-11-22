@@ -122,6 +122,10 @@ export const en = {
   'settings.status': 'Status',
   'settings.connected': 'Connected',
   'settings.notConnected': 'Not connected. Check that it is powered on.',
+  'settings.eyeCalibration': 'Eye calibration',
+  'settings.eyeCalNotDone': 'Not done',
+  'settings.drivingPosition': 'Driving position',
+  'settings.drivingPositionDetail': 'Where you sit, for gaze and head angle',
   'settings.calibrate': 'Set up driving position',
   'settings.forget': 'Forget this unit',
   'settings.forgetConfirm': 'Forget this Sahi unit? You will need to pair again to reconnect.',
@@ -221,6 +225,69 @@ export const en = {
   'cal.again': 'Try again',
   'cal.close': 'Done',
   'cal.offline': 'Connect to your Sahi unit first.',
+
+  // Eye calibration
+  'cal.eye.title': 'Eye calibration',
+  'cal.eye.subtitle': 'Personalise eye-closure detection for your eyes.',
+  'cal.eye.duration': 'Takes about 20 seconds.',
+  'cal.eye.mount': 'Park first and hold the phone at eye level or put it in its mount.',
+  'cal.eye.start': 'Start',
+  'cal.eye.later': 'Later',
+  'cal.eye.cancel': 'Cancel',
+  'cal.eye.retry': 'Retry',
+  'cal.eye.save': 'Save',
+  'cal.eye.done': 'Done',
+  'cal.eye.continue': 'Continue',
+  'cal.eye.perm.denied': 'Camera access is needed to measure your eyes.',
+  'cal.eye.perm.openSettings': 'Open settings',
+
+  // Framing
+  'cal.eye.framing.title': 'Fit your face in the oval',
+  'cal.eye.framing.face': 'Face in the oval',
+  'cal.eye.framing.light': 'Good lighting',
+  'cal.eye.framing.head': 'Looking straight ahead',
+  'cal.eye.framing.hold': 'Hold still…',
+
+  // Measure steps
+  'cal.eye.open.title': 'Look at the road, eyes open',
+  'cal.eye.open.subtitle': 'Keep looking straight ahead with your eyes naturally open.',
+  'cal.eye.closed.title': 'Close your eyes',
+  'cal.eye.closed.subtitle': 'Keep your eyes gently closed until you hear the chime.',
+  'cal.eye.seconds': '{s} s',
+
+  // Voice cues
+  'cal.eye.voice.open': 'Look at the road, eyes open.',
+  'cal.eye.voice.closed': 'Close your eyes.',
+  'cal.eye.voice.done': 'Open.',
+
+  // Results
+  'cal.eye.result.good': 'Good calibration',
+  'cal.eye.result.goodDesc': 'Your eye baseline is ready to track fatigue.',
+  'cal.eye.result.fair': 'Fair calibration',
+  'cal.eye.result.fairDesc': 'Eye tracking is ready. Lighting or head angle was slightly off.',
+  'cal.eye.result.poor': 'Poor calibration',
+  'cal.eye.result.poorDesc': 'Low contrast between open and closed eyes. Ensure good lighting and keep eyes fully closed during the second step.',
+
+  // Sync status
+  'cal.eye.sync.saved': 'Saved to your Sahi unit',
+  'cal.eye.sync.pending': 'Will be sent when your unit connects',
+
+  // Failures
+  'cal.eye.fail.noFace': 'No face found',
+  'cal.eye.fail.noFaceDesc': 'Hold the phone steady and keep your face in view.',
+  'cal.eye.fail.tooDark': 'Too dark',
+  'cal.eye.fail.tooDarkDesc': 'Ensure your face is well-lit and avoid harsh backlighting.',
+  'cal.eye.fail.headTurned': 'Head turned',
+  'cal.eye.fail.headTurnedDesc': 'Look straight ahead without tilting or turning your head.',
+  'cal.eye.fail.eyesNotShut': 'Eyes did not close',
+  'cal.eye.fail.eyesNotShutDesc': 'Hold still and close your eyes completely during the second step.',
+  'cal.eye.fail.tooFewSamples': 'Not enough data',
+  'cal.eye.fail.tooFewSamplesDesc': 'Hold steady for the full duration of each step.',
+
+  // Quality grades
+  'cal.eye.quality.good': 'Good',
+  'cal.eye.quality.fair': 'Fair',
+  'cal.eye.quality.poor': 'Poor',
 
   // Onboarding
   'onb.consent.title': 'Before you start',

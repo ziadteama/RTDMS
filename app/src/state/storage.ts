@@ -1,13 +1,37 @@
 import { Storage } from 'expo-sqlite/kv-store';
 import type { StateStorage } from 'zustand/middleware';
 
+const inMemory = new Map<string, string>();
+
 /** Synchronous on-device key-value storage (SQLite), so settings are ready on the first frame. */
 export const kv: StateStorage = {
-  getItem: (k) => Storage.getItemSync(k),
-  setItem: (k, v) => Storage.setItemSync(k, v),
-  removeItem: (k) => void Storage.removeItemSync(k),
+  getItem: (k) => {
+    try {
+      return Storage.getItemSync(k);
+    } catch {
+      return inMemory.get(k) ?? null;
+    }
+  },
+  setItem: (k, v) => {
+    try {
+      Storage.setItemSync(k, v);
+    } catch {
+      inMemory.set(k, v);
+    }
+  },
+  removeItem: (k) => {
+    try {
+      Storage.removeItemSync(k);
+    } catch {
+      inMemory.delete(k);
+    }
+  },
 };
 
 export function clearKv(): void {
-  Storage.clearSync();
+  try {
+    Storage.clearSync();
+  } catch {
+    inMemory.clear();
+  }
 }

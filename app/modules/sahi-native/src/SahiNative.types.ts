@@ -14,3 +14,16 @@ export type SahiNativeModuleEvents = {
 };
 
 export type NotifyChannel = 'alerts' | 'sos';
+
+export type FaceSample = {
+  faceFound: boolean;
+  ear: number | null;
+  earLeft: number | null;
+  earRight: number | null;
+  earValid: boolean;
+  yaw: number | null;
+  pitch: number | null;
+  faceBoxFraction: number;
+  luma: number;
+  t: number;
+};

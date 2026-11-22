@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
@@ -81,13 +82,24 @@ function StatusPill() {
 function State({ size }: { size: 'compact' | 'full' }) {
   const t = useT();
   const paused = useSettings((s) => s.paused);
+  const eyeCal = useSettings((s) => s.eyeCalibration);
   const state = useDriverState();
   const pattern = useLive((s) => s.alert?.pattern ?? null);
   const reasons = useLive(useShallow((s) => s.alert?.reasons ?? EMPTY));
   const calMessage = useLive((s) => (s.status?.drowsiness && !s.status.drowsiness.calibrated ? s.status.drowsiness.message : null));
-  const detail = reasons.length ? reasons.map((r) => translateReason(r)).join(' · ') : calMessage ? t('live.calibrate') : undefined;
+  const showCalHint = !reasons.length && (!eyeCal || Boolean(calMessage));
+  const detail = reasons.length ? reasons.map((r) => translateReason(r)).join(' · ') : showCalHint ? t('live.calibrate') : undefined;
+  const onDetailPress = showCalHint && !reasons.length ? () => router.push('/eye-calibration') : undefined;
 
-  return <StateIndicator state={paused ? 'paused' : state} pattern={paused ? null : pattern} size={size} detail={detail} />;
+  return (
+    <StateIndicator
+      state={paused ? 'paused' : state}
+      pattern={paused ? null : pattern}
+      size={size}
+      detail={detail}
+      onDetailPress={onDetailPress}
+    />
+  );
 }
 
 function useNow(intervalMs = 5000): number {
