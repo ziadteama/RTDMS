@@ -9,6 +9,14 @@ Pi 5 with the Active Cooler lying flat, the IR camera on the front wall. Opening
 |---|---|---|
 | ![front](renders/front.png) | ![back](renders/back.png) | ![exploded](renders/exploded.png) |
 
+## Parts to print
+
+| Part | File | **Print how many** |
+|---|---|---|
+| Shell | `out/shell.stl` | **1** |
+| Lid | `out/lid.stl` | **1** |
+| Camera clip | `out/camera_clip.stl` | **2** (the same file twice; the file holds only one clip) |
+
 ## Files
 
 - `brick.py`: the parametric CadQuery model. `python brick.py` writes `out/` (STEP + STL per part);
@@ -66,7 +74,11 @@ The screws cut their own thread into the printed holes. No nuts or inserts neede
 ## Assembly
 
 1. Put the camera into the front from inside, lens and IR lights through their holes.
-2. Screw the two clips on over the IR boards.
+2. Screw the two clips on over the IR boards, **before the Pi goes in** (the Pi blocks the screwdriver).
+   For each clip: pad facing the front wall, pad against the back of the IR board, screw hole over the
+   post on the front wall, one M2.5 screw. Right side: the clip as printed. Left side: the same clip
+   turned upside down (pad still facing the front). Tighten gently until the clip touches the post,
+   then shake the box.
 3. Screw the Pi onto the standoffs (USB-C at the back) and connect the camera ribbon. **The ribbon
    path is not verified**: it must go back over the board, turn in the 10 mm gap behind the Pi and
    enter the connector pointing forward. Check it on the test print before closing the lid.
