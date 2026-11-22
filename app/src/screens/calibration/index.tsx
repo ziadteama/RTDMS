@@ -153,7 +153,7 @@ export function EyeCalibrationScreen({
   isOnboarding?: boolean;
   onDone: () => void;
 }) {
-  useKeepAwake();
+  useKeepAwake(undefined, { suppressDeactivateWarnings: true }); // Android rejects deactivate once the activity is gone
   const face = useFaceSamples();
   const machine = useCalibrationMachine({ subscribe: face.subscribe });
 

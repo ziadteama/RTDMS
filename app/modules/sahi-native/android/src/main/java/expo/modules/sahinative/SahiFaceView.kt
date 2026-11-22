@@ -31,6 +31,8 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
   val onFace by EventDispatcher<Map<String, Any?>>()
 
   private val previewView = PreviewView(context).apply {
+    // TextureView: the default SurfaceView renders black inside RN's clipped, rounded containers.
+    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
     scaleType = PreviewView.ScaleType.FILL_CENTER
     layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
   }
@@ -45,8 +47,13 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
   private var lastLandmarkerTimestampMs = 0L
   @Volatile private var latestLuma = 0.0
 
+  // False while the superclass constructor runs (it calls requestLayout before previewView exists).
+  // Declared above init: Kotlin runs initializers in source order.
+  private var ready = false
+
   init {
     addView(previewView)
+    ready = true
   }
 
   fun setActive(isActive: Boolean) {
@@ -55,9 +62,25 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
 
   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
     super.onLayout(changed, left, top, right, bottom)
-    val width = right - left
-    val height = bottom - top
+    layoutPreview(right - left, bottom - top)
+  }
+
+  // React Native lays out its own views and never measures native children, so PreviewView's inner
+  // TextureView stays 0x0, never creates a Surface, and CameraX waits forever ("Failed to get
+  // Surfaces"): black preview and no frames for the landmarker. Measure + lay out by hand.
+  private fun layoutPreview(width: Int, height: Int) {
+    if (width <= 0 || height <= 0) return
+    previewView.measure(
+      MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+      MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY)
+    )
     previewView.layout(0, 0, width, height)
+  }
+
+  override fun requestLayout() {
+    super.requestLayout()
+    // PreviewView swaps in its TextureView after binding; RN ignores that request, so re-run it.
+    if (ready) post { layoutPreview(width, height) }
   }
 
   override fun onAttachedToWindow() {
@@ -163,6 +186,7 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
             return@execute
           }
           faceLandmarker = created
+          Log.i(TAG, "FaceLandmarker ready")
         } catch (e: Exception) {
           Log.e(TAG, "Failed to initialize FaceLandmarker", e)
         }
@@ -227,6 +251,7 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
 
         provider.unbindAll()
         provider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, analysis)
+        Log.i(TAG, "camera bound")
       } catch (e: Exception) {
         Log.e(TAG, "Failed to bind CameraX", e)
       }
@@ -275,7 +300,10 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
     }
   }
 
+  private var resultCount = 0
+
   private fun handleResult(result: FaceLandmarkerResult, inputImage: MPImage) {
+    if (resultCount++ % 60 == 0) Log.i(TAG, "result #$resultCount faces=${result.faceLandmarks().size} luma=$latestLuma")
     val landmarksList = result.faceLandmarks()
     if (landmarksList.isEmpty()) {
       emitSample(

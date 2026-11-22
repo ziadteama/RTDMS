@@ -141,7 +141,7 @@ function Sos() {
 }
 
 export function Live() {
-  useKeepAwake();
+  useKeepAwake(undefined, { suppressDeactivateWarnings: true }); // Android rejects deactivate once the activity is gone
   const t = useT();
   const locked = useDrivingLock();
 
