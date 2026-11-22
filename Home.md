@@ -28,7 +28,8 @@ Project 2 (the build phase this repo is for).
 - [[Models Index]] — status of all models + fusion/alert/firmware
   - [[Physiology Subsystem]] — HR/PRV fatigue inference · `models/physiology/` · **implemented**
     - [[Physiology Decision Log]] — Nov 2026: is the HR/HRV fatigue model usable? MPD-DF results, Codex reviews, next steps
-    - [[Physiology Fusion Approach]] — Garmin confirm role + training tiers for fusion
+    - [[Physiology New Approach]] — **current plan (23 Nov)**: HR from the Garmin, vital signs + shadow score, watch–Pi–phone sync
+    - [[Physiology Fusion Approach]] — superseded: Garmin confirm role + training tiers for fusion
   - [[Face Subsystem]] — EAR/PERCLOS/gaze/head-pose · `models/face/` · **implemented (core)** · live on the Pi via LiteRT, 2026-10-10 ([[Face Subsystem#Running on the Pi|status]])
   - [[Phone Subsystem]] — phone/eating distraction · `models/phone/` · **ONNX wired**
 - [[Mobile App End-User Scope]] — Sahi is an end-user product (not admin): audience, needs, audit, target tabs, open product questions · **decided**

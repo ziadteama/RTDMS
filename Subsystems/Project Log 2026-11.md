@@ -72,6 +72,10 @@ archived in [[Coordination Board 2026-11]].
 | D20 | 22 Nov | **Dev BLE open mode: no code, for now.** Pairing mode later (Pi accepts the first phone for 2 minutes after a button press; the app stores a server-issued token) | User: "for now make it with no codes… doc that we will make pairing mode later" | [[Phone-Pi Link]] |
 | D21 | 22 Nov | The Pi camera stays detached for now; `rtdms-camera` is disabled until the ribbon is back | User | [[Open Items and Next Steps]] |
 | D22 | 22 Nov | The WhatsApp relay runs as a systemd **user** service on the dev machine | It was a hand-started process with no restart | [[WhatsApp SOS Relay]] |
+| D24 | 23 Nov | **Heart rate is not a fatigue detector.** Live roles: vital-sign check (emergency path) and quality gate; the MPD-DF fatigue score runs in shadow mode (weight 0); fusion never alerts on physiology alone; 2 h drive-time break reminder | MPD-DF: HR 0.76, drive time 0.84, HR on top of time +0.006 | [[Physiology New Approach]] |
+| D25 | 23 Nov | **Two clocks:** phone = what time it is (all payload `t` = UTC epoch ms in phone time), Pi monotonic = how long and which came first; watch samples timed from `watch_ms`, not arrival | Payload `t` used three clocks; buffered watch packets were stamped on arrival | [[Physiology New Approach]] |
+| D26 | 23 Nov | Pi saves no heart data (research CSV only with `--csv` / `RESEARCH_LOG=1`); phone keeps trip HR on the phone with an off switch and delete-with-trip | Report §4.3; user choice | [[Physiology New Approach]] |
+| D27 | 23 Nov | The Garmin FR265 replaces the MAX30102 bracelet and the vibration motor (wrist vibration + "I'm OK"); unresponsive-driver SOS in scope | User | [[Physiology New Approach]] |
 
 ## Evidence collected
 
@@ -122,6 +126,13 @@ archived in [[Coordination Board 2026-11]].
 - Cleanup: 12 agent worktrees and about 60 merged branches removed; only `main` remains. Root-owned Docker files in worktrees are removed through an alpine container.
 - New note [[MVP Readiness]]: phone side is enough for a demo; the full chain still needs camera + Bluetooth + buzzer on the Pi, a real alert session, the real test SOS, pairing mode and a car test.
 - Decision D23: the phone work is parked; next focus is heart rate / HRV (`models/physiology/`).
+
+### 23 Nov: physiology pivot
+
+- Reviewed the HR/HRV work end to end: the model and code are sound; the fatigue claim is not supported (D24).
+- P0 done on two branches, not merged: `fusion/physio-guard` (physiology no longer changes live alerts; fusion 8, Pi 207 tests pass) and `physio/no-default-log` (physiology 132 pass; 5 pre-existing ruff errors in `tools/mpddf_*.py` left alone).
+- Watch on the dev machine's USB is in Garmin mode (`091e:0003`, `garmin_gps` driver), not MTP; no Connect IQ SDK, Java or MTP client here yet.
+- Plan: [[Physiology New Approach]].
 
 ## Open product and technical questions
 

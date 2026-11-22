@@ -163,6 +163,10 @@ new model must follow (including **ownership zones for parallel work**).
   2026-08-28 from `Z:\Programming\Grad\HR&HRV` (standalone repo `ziadteama/HR-HRV`, commit
   `3339d58`); stray unrelated files (a physics-textbook audit, two mockup PNGs) were dropped in the
   copy. Notes: [Subsystems/Physiology Subsystem.md](Subsystems/Physiology%20Subsystem.md).
+  **Pivot 2026-11-23:** heart rate is *not* a fatigue detector (MPD-DF: no gain beyond drive
+  time). Live roles are vital signs + a quality gate; the fatigue score is shadow only. The Garmin
+  FR265 is the wearable and the wrist vibration. Plan and sync design:
+  [Subsystems/Physiology New Approach.md](Subsystems/Physiology%20New%20Approach.md).
 - `models/face/` — EAR / blink / PERCLOS / gaze / head pose from one MediaPipe inference.
   **Implemented** (core suite + demo `run.py`). Adopted 2026-09-20 from
   `github.com/youssefmedhat4/dms-face` commit `65e3afd`. Phone detection stays a future
