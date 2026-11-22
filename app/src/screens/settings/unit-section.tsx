@@ -12,6 +12,7 @@ export function UnitSection() {
   const t = useT();
   const { colors } = useTheme();
   const online = useLive((s) => s.connection === 'online');
+  const link = useLive((s) => s.link);
   const eyeCal = useSettings((s) => s.eyeCalibration);
 
   const forget = () => {
@@ -32,7 +33,7 @@ export function UnitSection() {
     <Section title={t('settings.unit')}>
       <Row
         label={t('settings.status')}
-        value={online ? t('settings.connected') : t('settings.notConnected')}
+        value={online ? t(link === 'ble' ? 'settings.viaBluetooth' : link === 'http' ? 'settings.viaWifi' : 'settings.connected') : t('settings.notConnected')}
         valueColor={online ? colors.alert.none : undefined}
       />
       <Row
@@ -50,6 +51,7 @@ export function UnitSection() {
         disabled={!online}
         onPress={() => router.push('/calibrate')}
       />
+      <Row label={t('settings.connectOther')} icon="qr" chevron onPress={() => router.push('/pair')} />
       <Row label={t('settings.forget')} icon="delete" destructive onPress={forget} />
     </Section>
   );

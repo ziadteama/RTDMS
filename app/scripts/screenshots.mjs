@@ -44,6 +44,7 @@ const SHOTS = [
   ['07-trips', '/trips', { demo: true }],
   ['08-trip', '/trips', { demo: true }, async (p) => { await p.getByRole('button').filter({ hasText: /\d+ min/ }).nth(1).click(); await p.waitForTimeout(2500); }],
   ['09-settings', '/settings', {}],
+  ['09b-settings-unit', '/settings', {}, async (p) => { await p.getByText('Connect a different unit').first().scrollIntoViewIfNeeded(); await p.waitForTimeout(500); }],
   ['10-calibrate', '/calibrate', {}],
   ['10b-eye-cal-intro', '/eye-calibration?cal=intro', {}],
   ['10c-eye-cal-framing', '/eye-calibration?cal=framing', {}],
