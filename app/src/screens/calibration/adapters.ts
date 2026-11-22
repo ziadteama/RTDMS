@@ -26,7 +26,6 @@ import { useLive } from '@/state/live';
 import { useSettings, type EyeCalibration } from '@/state/settings';
 
 const SETTLE_MS = 2000;
-const SETTLE_S = 2;
 
 export {
   SahiFaceView,
@@ -36,7 +35,6 @@ export {
   buildProfile,
   framingStatus,
   SETTLE_MS,
-  SETTLE_S,
   useSettings,
   syncEyeCalibration,
   useLive,

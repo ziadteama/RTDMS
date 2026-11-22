@@ -14,11 +14,13 @@ export function FramingStep({
   status,
   isStable,
   onCancel,
+  children,
 }: {
   isNative: boolean;
   status: FramingStatus;
   isStable: boolean;
   onCancel: () => void;
+  children?: React.ReactNode;
 }) {
   const t = useT();
   const { colors } = useTheme();
@@ -35,12 +37,13 @@ export function FramingStep({
             height: 280,
             borderRadius: radius.lg,
             borderCurve: 'continuous',
-            backgroundColor: isNative ? 'transparent' : colors.surface,
+            backgroundColor: colors.surface,
             overflow: 'hidden',
             justifyContent: 'center',
             alignItems: 'center',
           }}
         >
+          {children}
           {isNative ? null : (
             <View style={{ alignItems: 'center', gap: spacing.sm }}>
               <Icon name="camera" size={36} color={colors.textTertiary} />

@@ -22,10 +22,6 @@ export class PhaseCollector {
     this.settleMs = settleMs;
   }
 
-  get settleS(): number {
-    return this.settleMs / 1000;
-  }
-
   /**
    * Push a sample. Timestamps sample.t are relative to phase start in milliseconds.
    * Discards samples where sample.t < settleMs (default 2000 ms).

@@ -20,20 +20,15 @@ async function android(pick: (p: typeof PermissionsAndroid.PERMISSIONS) => Andro
 }
 
 export async function permission(key: PermissionKey, ask: boolean): Promise<PermissionState> {
-  if (Platform.OS === 'web') return key === 'camera' ? 'granted' : 'unsupported';
+  if (Platform.OS === 'web') return 'unsupported';
   switch (key) {
     case 'location': {
       const r = ask ? await Location.requestForegroundPermissionsAsync() : await Location.getForegroundPermissionsAsync();
       return r.granted ? 'granted' : r.canAskAgain ? 'undetermined' : 'denied';
     }
     case 'camera': {
-      try {
-        if (!Camera || typeof Camera.requestCameraPermissionsAsync !== 'function') return 'granted';
-        const r = ask ? await Camera.requestCameraPermissionsAsync() : await Camera.getCameraPermissionsAsync();
-        return r.granted ? 'granted' : (ask || !r.canAskAgain ? 'denied' : 'undetermined');
-      } catch {
-        return 'granted';
-      }
+      const r = ask ? await Camera.requestCameraPermissionsAsync() : await Camera.getCameraPermissionsAsync();
+      return r.granted ? 'granted' : r.canAskAgain ? 'undetermined' : 'denied';
     }
     case 'notifications':
       if (Platform.OS === 'android' && Number(Platform.Version) < 33) return 'granted';

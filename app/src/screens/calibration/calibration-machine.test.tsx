@@ -3,6 +3,7 @@ import React from 'react';
 import { Linking } from 'react-native';
 
 import { createFakeFaceSource, type FaceSample, type CalibrationTransport } from './adapters';
+import { EyeCalibrationScreen } from './index';
 import { IntroStep } from './intro-step';
 import { ResultStep } from './result-step';
 import {
@@ -43,6 +44,39 @@ jest.mock('expo-haptics', () => ({
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 
+jest.mock('expo-keep-awake', () => ({
+  useKeepAwake: jest.fn(),
+  activateKeepAwakeAsync: jest.fn(),
+  deactivateKeepAwake: jest.fn(),
+}));
+
+let mockNativeAvailable = false;
+let mockMountCount = 0;
+let mockUnmountCount = 0;
+let mockFaceListener: ((sample: FaceSample) => void) | null = null;
+
+jest.mock('@modules/sahi-native', () => {
+  const actual = jest.requireActual<typeof import('@modules/sahi-native')>('@modules/sahi-native');
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const { View: RNView } = jest.requireActual<typeof import('react-native')>('react-native');
+
+  return {
+    ...actual,
+    isFaceViewAvailable: () => mockNativeAvailable,
+    SahiFaceView: (props: { active?: boolean; onFace: (sample: FaceSample) => void }) => {
+      ReactActual.useEffect(() => {
+        mockMountCount++;
+        mockFaceListener = props.onFace;
+        return () => {
+          mockUnmountCount++;
+          mockFaceListener = null;
+        };
+      }, [props.onFace]);
+      return <RNView testID="mock-sahi-face-view" />;
+    },
+  };
+});
+
 jest.mock('react-native-reanimated', () => {
   const { View: RNView } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
@@ -52,6 +86,17 @@ jest.mock('react-native-reanimated', () => {
     },
     useReducedMotion: () => true,
     cubicBezier: () => () => 0,
+    useSharedValue: (init: unknown) => ({
+      value: init,
+      set: jest.fn(),
+      get: () => init,
+    }),
+    useAnimatedStyle: () => ({}),
+    withTiming: (toValue: unknown) => toValue,
+    cancelAnimation: jest.fn(),
+    Easing: {
+      linear: (v: unknown) => v,
+    },
   };
 });
 
@@ -641,28 +686,163 @@ describe('useCalibrationMachine', () => {
   it('IntroStep requests camera permission: starts if granted, shows message and settings if denied', async () => {
     const onStart = jest.fn();
     const openSettingsSpy = jest.spyOn(Linking, 'openSettings').mockImplementation(async () => {});
-
-    jest.spyOn(permissions, 'permission').mockResolvedValueOnce('denied');
+    const permSpy = jest.spyOn(permissions, 'permission').mockResolvedValue('denied');
 
     const view = await render(<IntroStep onStart={onStart} />);
     const startBtn = view.getByText('Start');
 
-    fireEvent.press(startBtn);
-    await act(async () => {});
+    await act(async () => {
+      fireEvent.press(startBtn);
+      await Promise.resolve();
+    });
 
     expect(onStart).not.toHaveBeenCalled();
     expect(view.getByText('Camera access is needed to measure your eyes.')).toBeTruthy();
     const settingsBtn = view.getByText('Open settings');
     expect(settingsBtn).toBeTruthy();
 
-    fireEvent.press(settingsBtn);
+    await act(async () => {
+      fireEvent.press(settingsBtn);
+    });
     expect(openSettingsSpy).toHaveBeenCalledTimes(1);
 
-    jest.spyOn(permissions, 'permission').mockResolvedValueOnce('granted');
-    fireEvent.press(view.getByText('Start'));
-    await act(async () => {});
+    permSpy.mockResolvedValue('granted');
+    await act(async () => {
+      fireEvent.press(view.getByText('Start'));
+      await Promise.resolve();
+    });
 
     expect(onStart).toHaveBeenCalledTimes(1);
     openSettingsSpy.mockRestore();
+    permSpy.mockRestore();
+  });
+
+  it('save() refuses when result quality is poor or there is no payload', async () => {
+    // 1. No payload
+    const harnessNoPayload = await setupHarness({
+      subscribe: () => () => {},
+    });
+    expect(harnessNoPayload.machine.resultPayload).toBeNull();
+    await act(async () => {
+      harnessNoPayload.machine.save();
+    });
+    expect(harnessNoPayload.machine.isSaved).toBe(false);
+    expect(useSettings.getState().eyeCalibration).toBeNull();
+
+    // 2. Poor quality payload via override
+    const harnessPoor = await setupHarness({
+      subscribe: () => () => {},
+      calOverride: 'poor',
+    });
+    expect(harnessPoor.machine.resultPayload?.quality).toBe('poor');
+    await act(async () => {
+      harnessPoor.machine.save();
+    });
+    expect(harnessPoor.machine.isSaved).toBe(false);
+    expect(useSettings.getState().eyeCalibration).toBeNull();
+  });
+
+  it('IntroStep fails open when camera permission module is unavailable or throws', async () => {
+    const onStart = jest.fn();
+    const permSpy = jest.spyOn(permissions, 'permission').mockRejectedValue(new Error('Native module not found'));
+
+    const view = await render(<IntroStep onStart={onStart} />);
+    const startBtn = view.getByText('Start');
+
+    await act(async () => {
+      fireEvent.press(startBtn);
+      await Promise.resolve();
+    });
+
+    expect(onStart).toHaveBeenCalledTimes(1);
+    permSpy.mockRestore();
+  });
+
+  it('calibration screen keeps SahiFaceView mounted once across framing -> open -> closed, unmounts on result, and samples reach collectors', async () => {
+    jest.useFakeTimers();
+    mockNativeAvailable = true;
+    mockMountCount = 0;
+    mockUnmountCount = 0;
+    mockFaceListener = null;
+
+    let fakeTime = 10000;
+    const fakeSource = createFakeFaceSource({
+      script: 'openThenClosed',
+      now: () => fakeTime,
+    });
+
+    fakeSource.subscribe((sample) => {
+      mockFaceListener?.(sample);
+    });
+
+    const permSpy = jest.spyOn(permissions, 'permission').mockResolvedValue('granted');
+
+    const screen = await render(<EyeCalibrationScreen onDone={jest.fn()} />);
+
+    // 1. Intro step: face view not mounted yet
+    expect(mockMountCount).toBe(0);
+    expect(mockUnmountCount).toBe(0);
+
+    // 2. Press start -> transition to framing
+    const startButton = screen.getByText('Start');
+    await act(async () => {
+      fireEvent.press(startButton);
+    });
+
+    // Face view should now be mounted ONCE
+    expect(mockMountCount).toBe(1);
+    expect(mockUnmountCount).toBe(0);
+
+    // 3. Advance fake timers to satisfy framing stability (1200ms of ~66ms intervals)
+    for (let t = 0; t < 1200; t += 66) {
+      fakeTime += 66;
+      await act(async () => {
+        jest.advanceTimersByTime(66);
+      });
+    }
+
+    // Step should now be 'open' - face view must STILL be mounted once with 0 unmounts
+    expect(mockMountCount).toBe(1);
+    expect(mockUnmountCount).toBe(0);
+
+    // 4. Advance through 10s of open phase
+    for (let t = 0; t < 10000; t += 66) {
+      fakeTime += 66;
+      await act(async () => {
+        jest.advanceTimersByTime(66);
+      });
+    }
+    await act(async () => {
+      jest.advanceTimersByTime(250);
+    });
+
+    // Step should now be 'closed' - face view must STILL be mounted once with 0 unmounts
+    expect(mockMountCount).toBe(1);
+    expect(mockUnmountCount).toBe(0);
+
+    // 5. Advance through 3s of closed phase
+    for (let t = 0; t < 3000; t += 66) {
+      fakeTime += 66;
+      await act(async () => {
+        jest.advanceTimersByTime(66);
+      });
+    }
+    await act(async () => {
+      jest.advanceTimersByTime(250);
+    });
+
+    // 6. Step should now be 'result'
+    // Face view must now be UNMOUNTED on result step
+    expect(mockMountCount).toBe(1);
+    expect(mockUnmountCount).toBe(1);
+
+    // Verify samples reached open and closed collectors:
+    // Successful profile build shows Save button and good result title
+    expect(screen.getByText('Save')).toBeTruthy();
+    expect(screen.getByText('Good calibration')).toBeTruthy();
+
+    permSpy.mockRestore();
+    mockNativeAvailable = false;
+    jest.useRealTimers();
   });
 });

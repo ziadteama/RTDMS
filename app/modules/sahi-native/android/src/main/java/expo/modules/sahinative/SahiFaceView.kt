@@ -37,7 +37,8 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
 
   private var cameraProvider: ProcessCameraProvider? = null
   private var cameraExecutor: ExecutorService? = null
-  private var faceLandmarker: FaceLandmarker? = null
+  @Volatile private var faceLandmarker: FaceLandmarker? = null
+  @Volatile private var released = false
 
   private var active: Boolean = true
   private var lastAnalyzedMs = 0L
@@ -61,6 +62,7 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
 
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
+    released = false
     initLandmarkerAndCamera()
   }
 
@@ -74,6 +76,8 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
   }
 
   private fun releaseResources() {
+    released = true
+
     try {
       cameraProvider?.unbindAll()
       cameraProvider = null
@@ -81,18 +85,41 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
       Log.e(TAG, "Error unbinding camera", e)
     }
 
-    try {
-      faceLandmarker?.close()
-      faceLandmarker = null
-    } catch (e: Exception) {
-      Log.e(TAG, "Error closing face landmarker", e)
-    }
+    val landmarker = faceLandmarker
+    faceLandmarker = null
+    val executor = cameraExecutor
+    cameraExecutor = null
 
-    try {
-      cameraExecutor?.shutdown()
-      cameraExecutor = null
-    } catch (e: Exception) {
-      Log.e(TAG, "Error shutting down camera executor", e)
+    if (executor != null && !executor.isShutdown) {
+      if (landmarker != null) {
+        try {
+          executor.execute {
+            try {
+              landmarker.close()
+            } catch (e: Exception) {
+              Log.e(TAG, "Error closing face landmarker on executor", e)
+            }
+          }
+        } catch (e: Exception) {
+          Log.e(TAG, "Error submitting landmarker close to executor", e)
+          try {
+            landmarker.close()
+          } catch (closeEx: Exception) {
+            Log.e(TAG, "Error closing face landmarker directly", closeEx)
+          }
+        }
+      }
+      try {
+        executor.shutdown()
+      } catch (e: Exception) {
+        Log.e(TAG, "Error shutting down camera executor", e)
+      }
+    } else if (landmarker != null) {
+      try {
+        landmarker.close()
+      } catch (e: Exception) {
+        Log.e(TAG, "Error closing face landmarker", e)
+      }
     }
   }
 
@@ -104,6 +131,7 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
     }
 
     executor.execute {
+      if (released) return@execute
       if (faceLandmarker == null) {
         try {
           val baseOptions = BaseOptions.builder()
@@ -125,14 +153,27 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
             }
             .build()
 
-          faceLandmarker = FaceLandmarker.createFromOptions(context, options)
+          val created = FaceLandmarker.createFromOptions(context, options)
+          if (released) {
+            try {
+              created.close()
+            } catch (e: Exception) {
+              Log.e(TAG, "Error closing face landmarker after release", e)
+            }
+            return@execute
+          }
+          faceLandmarker = created
         } catch (e: Exception) {
           Log.e(TAG, "Failed to initialize FaceLandmarker", e)
         }
       }
 
+      if (released) return@execute
+
       ContextCompat.getMainExecutor(context).execute {
-        bindCamera()
+        if (!released) {
+          bindCamera()
+        }
       }
     }
   }
@@ -149,15 +190,23 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
   }
 
   private fun bindCamera() {
+    if (released) return
+
     val lifecycleOwner = getLifecycleOwner() ?: run {
-      post { bindCamera() }
+      post {
+        if (!released) {
+          bindCamera()
+        }
+      }
       return
     }
 
     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
     cameraProviderFuture.addListener({
+      if (released) return@addListener
       try {
         val provider = cameraProviderFuture.get()
+        if (released) return@addListener
         cameraProvider = provider
 
         val preview = Preview.Builder().build().also {
@@ -186,7 +235,7 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
 
   private fun processImageProxy(imageProxy: ImageProxy) {
     try {
-      if (!active) {
+      if (released || !active) {
         return
       }
 

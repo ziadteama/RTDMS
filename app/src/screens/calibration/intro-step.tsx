@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Linking, View } from 'react-native';
+import { Linking, Platform, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Row, Section } from '@/components/list';
@@ -21,10 +21,19 @@ export function IntroStep({
   const [permissionDenied, setPermissionDenied] = useState(false);
 
   const handleStart = async () => {
-    const status = await permission('camera', true);
-    if (status === 'denied') {
-      setPermissionDenied(true);
+    if (Platform.OS === 'web') {
+      setPermissionDenied(false);
+      onStart();
       return;
+    }
+    try {
+      const status = await permission('camera', true);
+      if (status === 'denied') {
+        setPermissionDenied(true);
+        return;
+      }
+    } catch {
+      // Camera permission module unavailable on web/Jest -> fail open
     }
     setPermissionDenied(false);
     onStart();

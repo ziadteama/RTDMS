@@ -241,7 +241,7 @@ export function useCalibrationMachine({
   }, []);
 
   const save = useCallback(() => {
-    if (!resultPayload) return;
+    if (!resultPayload || resultPayload.quality === 'poor') return;
     const at = nowRef.current();
 
     useSettings.getState().setEyeCalibration({
@@ -280,7 +280,7 @@ export function useCalibrationMachine({
     resultPayload,
     failureReason,
     isSaved,
-    isSynced: !useSettings.getState().demo && syncedAt !== null,
+    isSynced: syncedAt !== null,
     start,
     cancel,
     retry,
