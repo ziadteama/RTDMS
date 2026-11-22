@@ -293,9 +293,9 @@ tables, raw files and the findings are in `pi/tools/link_spike/results/README.md
 | Check | Budget | Measured |
 |---|---|---|
 | Characteristics | 11 visible | 11 (10 phone + Garmin) |
-| Write before auth | rejected | rejected |
-| Alert notify, nothing changing | 1 Hz keep-alive | 0.99 Hz, max gap 1.04 s; status keep-alive 5 s |
-| Command round trip | p95 under 100 ms | p50 91 ms, p95 96 ms, max 136 ms (n=100): narrow, set by the connection interval the central picks |
+| Write before auth | rejected | rejected with `NotAuthorized` (ATT 0x08), link stays up |
+| Alert notify, nothing changing | 1 Hz keep-alive | 0.99 Hz, max gap 1.04 s; status and physio keep-alive 5 s |
+| Command round trip | p95 under 100 ms | run 1 p95 96 ms, re-run p95 135 ms (p50 91 ms, max 136 ms, n=100 each): bimodal, set by the connection interval the laptop's BlueZ chose. **Not reliably met; re-measure with the phone** |
 | Alert change reaches the central | p95 up to 300 ms | p50 95 ms, p95 113 ms (n=31, clock offset removed, about +-55 ms) |
 | Reconnect to a known address | under 5 s | 1.6-1.8 s (n=8) |
 | Reconnect including a scan | under 5 s | 2.8-6.6 s: 2 of 5 cycles over, the scan varies |
@@ -317,8 +317,9 @@ before auth (unit-tested only). The go / no-go for run D stays open.
   pairing failed and the link dropped. Symptoms: ATT 0x0e, "device disconnected" during service
   discovery. Fix: `~/.config/wireplumber/wireplumber.conf.d/90-rtdms-no-ble-midi.conf` with
   `monitor.bluez-midi = disabled`. A headless production image without wireplumber does not need it.
-- A write before auth was ATT 0x0e; the service now raises `org.bluez.Error.NotAuthorized`
-  (BlueZ maps it to ATT 0x08). **App note:** treat any rejected write as "authenticate again".
+- A write before auth was ATT 0x0e; the service now raises `org.bluez.Error.NotAuthorized` (read on
+  air as "Operation Not Authorized"). bless 0.2.x serves D-Bus through `dbus_next`, so the error has to
+  be the `dbus_next` class; a first version with `dbus_fast` would not have been named (found in review). **App note:** treat any rejected write as "authenticate again".
 - Disconnects are now seen through a D-Bus watch on `org.bluez.Device1.Connected`, which resets auth.
   Any peer disconnect resets it, so a Garmin watch dropping also asks the phone to re-auth.
 - The advertised name is `RTDMS-Pi` and equals the QR `B` field.
