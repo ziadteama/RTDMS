@@ -30,7 +30,7 @@ SMS, a screen), and turns a crash into an emergency call with a recorded clip.
 > paired with the Pi's running camera server by typing its address. **English only; an end-user
 > product** ([[Mobile App End-User Scope]]); tabs Drive / Trips / Settings, hidden Diagnostics. Crash
 > and SOS hardened; SOS goes WhatsApp first through the relay ([[WhatsApp SOS Relay]]) plus a
-> link-free SMS. **Not built:** Bluetooth transport, Wi-Fi-only-for-video, UI polish. **Not verified:**
+> link-free SMS. **Bluetooth transport:** built (branch `app/ble-transport`, see "Bluetooth link (app side)"), **not verified on the phone or against the real Pi yet**. **Not built:** Wi-Fi-only-for-video, UI polish. **Not verified:**
 > crash detector on real motion, background kill on ColorOS. Full list: [[Open Items and Next Steps]].
 > Decisions and evidence: [[Project Log 2026-11]].
 
@@ -87,6 +87,25 @@ All 15 screens × dark / light × English / Arabic: `app/docs/screenshots/`.
 > state, trips, plain settings and emergency. The app is also **English only**: no Arabic, no RTL,
 > no language switch (voice alerts in feature 2 are English only). The table is kept as the original
 > MVP record.
+
+## Bluetooth link (app side)
+
+Contract: `contracts/pi-link/CONTRACT.md` v1.2. Code in `app/src/pi/ble/` (`react-native-ble-plx` 3.5.1 plus its Expo config plugin; permissions `BLUETOOTH_SCAN` with `neverForLocation` and `BLUETOOTH_CONNECT`).
+
+| Piece | File | Notes |
+|---|---|---|
+| UUIDs, codec | `uuids.ts`, `codec.ts` | mirror of `pi/src/rtdms_pi/ble/uuids.py`; compact JSON in base64; tested against `contracts/pi-link/fixtures` with ajv |
+| Link | `link.ts`, `link-util.ts` | scan by name (or the remembered id), MTU 247, auth write first then clock, subscribe alert/status/physio/result, one shared command/incident slot, reconnect with 1-15 s backoff, session guard so `stop()` leaves no timers |
+| Transport | `transport.ts`, `adapt.ts` | `BleTransport implements PiTransport`; notified values are adapted from the Pi's flat payloads to the app's parsed shape |
+| Selection | `src/pi/linked-transport.ts`, `src/services/pi.ts` | BLE while online, HTTP otherwise; automatic HTTP retry only for reads, `PUT /settings` and incidents with a `client_id` |
+| Live data | `src/services/poller-ble.ts`, `poller.ts` | BLE online: zero HTTP polls, notifications go straight into `useLive` (only changed values), 3 s without a notify is stale. BLE configured but down: HTTP poll 1 Hz. No BLE configured: 5 Hz as before. `useLive.link` = `ble`, `http` or null |
+| Calibration | `src/services/calibration-sync.ts` | `BleCalibrationTransport` (command 05, result 06) preferred while BLE is online |
+| Pairing | `src/pi/parse.ts`, `src/screens/pair*.tsx` | QR fields `B` (name), `K` (token), `V`; token in secure storage, name in settings; manual "Pair with a code" entry; success = HTTP check or BLE online within 10 s |
+| Diagnostics | `src/screens/diagnostics/link-row.tsx` | link type, signal (RSSI, 5 s while visible), last update age (1 s tick while visible) |
+
+Efficiency (phone): no timers while the link is idle or online except the single staleness timeout; no HTTP while BLE is up; no store write for an unchanged notify. Pi-side budgets live in [[Phone-Pi Link]].
+
+Verification: Jest with `FakeBleLink` and a fake `BleManager` (684 tests at the time of writing), plus an EAS dev build that compiles the native module. **Not verified:** a real phone to the real Pi (MTU granted, auth, reconnect after the Pi restarts, screen-off behaviour on ColorOS), and that the Pi's unauthenticated HTTP stream and clip URLs still work when the Pi enforces the token (they carry no header).
 
 ## Why a phone app
 
