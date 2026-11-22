@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
 
+import { useLinkRows } from './link-row';
+
 import { Row, Section } from '@/components/list';
 import { Text } from '@/components/text';
 import { Toggle } from '@/components/controls';
@@ -23,6 +25,7 @@ export function ConnectionDiag() {
     })),
   );
   const set = useSettings((x) => x.set);
+  const linkRows = useLinkRows();
 
   const [addressDraft, setAddressDraft] = useState(s.baseUrl);
   const [addressBad, setAddressBad] = useState(false);
@@ -77,6 +80,7 @@ export function ConnectionDiag() {
           </Text>
         ) : null}
       </View>
+      {linkRows}
       <Row label={dx('diag.conn.pair')} icon="qr" chevron onPress={() => router.push('/pair')} />
       <Row label={dx('diag.conn.demo')} icon="play" right={<Toggle label={dx('diag.conn.demo')} value={s.demo} onChange={(v) => set({ demo: v })} />} />
       {s.demo ? <Row label={dx('diag.conn.fakeCrash')} icon="crash" chevron onPress={simulateCrash} /> : null}

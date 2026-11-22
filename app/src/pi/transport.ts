@@ -28,7 +28,7 @@ export const isNotSupported = (e: unknown) => e instanceof PiHttpError && (e.sta
 export type ClipSource = { uri: string } | { asset: number };
 
 export interface PiTransport {
-  readonly kind: 'http' | 'demo';
+  readonly kind: 'http' | 'demo' | 'ble';
   get(path: string, timeoutMs?: number): Promise<unknown>;
   send(method: 'POST' | 'PUT', path: string, body?: unknown, timeoutMs?: number): Promise<unknown>;
   /** MJPEG URL for the live view, or null (demo). */
@@ -39,12 +39,19 @@ export interface PiTransport {
 
 export class HttpTransport implements PiTransport {
   readonly kind = 'http';
-  constructor(readonly baseUrl: string) {}
+  constructor(readonly baseUrl: string, private readonly getToken: () => string | null = () => null) {}
+
+  private headers(body?: unknown): Record<string, string> | undefined {
+    const token = this.getToken();
+    if (!token && body === undefined) return undefined;
+    return { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  }
 
   private async request(method: string, path: string, body: unknown, timeoutMs: number): Promise<unknown> {
     const res = await fetch(this.baseUrl + path, {
       method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers: this.headers(body),
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -71,6 +78,7 @@ export class HttpTransport implements PiTransport {
   async frames(id: string): Promise<IncidentFrame[]> {
     const res = await fetch(`${this.baseUrl}/incidents/${encodeURIComponent(id)}/data.jsonl`, {
       signal: AbortSignal.timeout(8000),
+      headers: this.headers(),
     });
     if (!res.ok) throw new PiHttpError(res.status, '/incidents/data.jsonl');
     const text = await res.text();

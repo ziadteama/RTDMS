@@ -9,6 +9,7 @@ export type WifiCredentials = { ssid: string; password: string };
 const CONTACTS = 'sahi.contacts';
 const WIFI = 'sahi.wifi';
 const INSTALL_ID = 'sahi.install_id';
+const PI_TOKEN = 'sahi.pi_token';
 
 // Web has no keystore: localStorage keeps the UI checkable in a browser.
 const read = (k: string): string | null => {
@@ -36,8 +37,11 @@ function load<T>(k: string, fallback: T): T {
 type SecureState = {
   contacts: Contact[];
   wifi: WifiCredentials | null;
+  /** BLE pairing token from the unit's QR (`K`). Secure store only; never logged. */
+  piToken: string | null;
   setContacts: (c: Contact[]) => void;
   setWifi: (w: WifiCredentials | null) => void;
+  setPiToken: (t: string | null) => void;
   wipe: () => void;
 };
 
@@ -45,6 +49,7 @@ type SecureState = {
 export const useSecure = create<SecureState>((set) => ({
   contacts: load<Contact[]>(CONTACTS, []),
   wifi: load<WifiCredentials | null>(WIFI, null),
+  piToken: load<string | null>(PI_TOKEN, null),
   setContacts: (contacts) => {
     write(CONTACTS, JSON.stringify(contacts));
     set({ contacts });
@@ -53,11 +58,16 @@ export const useSecure = create<SecureState>((set) => ({
     write(WIFI, wifi ? JSON.stringify(wifi) : null);
     set({ wifi });
   },
+  setPiToken: (piToken) => {
+    write(PI_TOKEN, piToken === null ? null : JSON.stringify(piToken));
+    set({ piToken });
+  },
   wipe: () => {
     write(CONTACTS, null);
     write(WIFI, null);
     write(INSTALL_ID, null);
-    set({ contacts: [], wifi: null });
+    write(PI_TOKEN, null);
+    set({ contacts: [], wifi: null, piToken: null });
   },
 }));
 

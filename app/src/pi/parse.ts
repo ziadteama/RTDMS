@@ -213,16 +213,41 @@ export function decodeThrottled(mask: number) {
   };
 }
 
-export type PairingInfo = { ssid: string | null; password: string | null; baseUrl: string };
+export type PairingInfo = {
+  ssid: string | null;
+  password: string | null;
+  baseUrl: string;
+  /** Advertised BLE name (`B`), null when absent or invalid. */
+  bleName: string | null;
+  /** Pairing token (`K`, >= 16 chars), null when absent or too short. */
+  token: string | null;
+  /** Contract version (`V`), null when absent or not a number. */
+  version: number | null;
+};
+
+/** BLE name limit (advertising payload) and the token floor from contracts/pi-link. */
+export const BLE_NAME_MAX = 29;
+export const BLE_TOKEN_MIN = 16;
+export const validBleName = (v: string | null | undefined): string | null => {
+  const n = v?.trim() ?? '';
+  return n.length > 0 && n.length <= BLE_NAME_MAX ? n : null;
+};
+export const validBleToken = (v: string | null | undefined): string | null => {
+  const k = v?.trim() ?? '';
+  return k.length >= BLE_TOKEN_MIN ? k : null;
+};
 
 /**
- * The Pi's QR code: a standard Wi-Fi QR plus a `U:` field for the API base URL, e.g.
- * `WIFI:T:WPA;S:RTDMS-Pi;P:secret;U:http://10.42.0.1:8080;;`. Any phone camera can join the
- * hotspot from it; Sahi also reads the URL. A bare `http(s)://` URL is accepted too.
+ * The Pi's QR code: a standard Wi-Fi QR plus `U:` (API base URL), `B:` (BLE name), `K:` (pairing
+ * token) and `V:` (contract version), e.g.
+ * `WIFI:T:WPA;S:RTDMS-Pi;P:secret;U:http://10.42.0.1:8080;B:RTDMS-Pi;K:<token>;V:1;;`. Any phone
+ * camera can join the hotspot from it; Sahi also reads the rest. A QR with `B` and `K` but no `S`
+ * is a Bluetooth-only pairing. A bare `http(s)://` URL is accepted too.
  */
 export function parseQr(text: string, defaultBaseUrl: string): PairingInfo | null {
   const s = text.trim();
-  if (/^https?:\/\/[^\s]+$/i.test(s)) return { ssid: null, password: null, baseUrl: s.replace(/\/+$/, '') };
+  const noBle = { bleName: null, token: null, version: null };
+  if (/^https?:\/\/[^\s]+$/i.test(s)) return { ssid: null, password: null, baseUrl: s.replace(/\/+$/, ''), ...noBle };
   if (!s.startsWith('WIFI:')) return null;
   const fields: Record<string, string> = {};
   // Fields are `K:value;` with `\` escaping `;`, `,`, `:`, `\` and `"`.
@@ -230,9 +255,12 @@ export function parseQr(text: string, defaultBaseUrl: string): PairingInfo | nul
   let m: RegExpExecArray | null;
   while ((m = re.exec(s.slice(5))) !== null) fields[m[1]!] = m[2]!.replace(/\\(.)/g, '$1');
   const ssid = fields.S ?? null;
-  if (!ssid) return null;
+  const bleName = validBleName(fields.B);
+  const token = validBleToken(fields.K);
+  if (!ssid && !(bleName && token)) return null;
   const url = fields.U && /^https?:\/\//i.test(fields.U) ? fields.U.replace(/\/+$/, '') : defaultBaseUrl;
-  return { ssid, password: fields.P ?? null, baseUrl: url };
+  const version = fields.V !== undefined && /^\d+$/.test(fields.V) ? Number(fields.V) : null;
+  return { ssid, password: fields.P ?? null, baseUrl: url, bleName, token, version };
 }
 
 /** Normalize a typed base URL: add http://, drop trailing slashes. null if it cannot be a URL. */

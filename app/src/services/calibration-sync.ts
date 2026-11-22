@@ -1,4 +1,5 @@
 import type { PhoneCalibrationPayload } from '@/calibration/types';
+import { getBleLink } from '@/pi/ble';
 import { useLive } from '@/state/live';
 import { useSettings } from '@/state/settings';
 
@@ -8,13 +9,7 @@ export type CalibrationTransport = {
   send(payload: PhoneCalibrationPayload): Promise<CalibrationSyncStatus>;
 };
 
-/**
- * Extension point for BLE transport:
- * When BLE GATT connection is available, implement CalibrationTransport by sending:
- *   await ble.writeCommand({ cmd: 'calibrate', profile: payload });
- * over the command characteristic (0x05) and listening for command_result on (0x06).
- * Return 'ok' on accepted result, 'rejected' on ATT/command error, or 'unreachable' on link loss.
- */
+/** Plain Wi-Fi/HTTP path: POST /calibrate with the profile as the body. */
 export class HttpCalibrationTransport implements CalibrationTransport {
   constructor(private getBaseUrl: () => string = () => useSettings.getState().baseUrl) {}
 
@@ -43,6 +38,31 @@ export class HttpCalibrationTransport implements CalibrationTransport {
   }
 }
 
+/**
+ * Bluetooth path: the profile travels in a `calibrate` command on characteristic 05 and the answer
+ * is the next command_result on 06 (contracts/pi-link). ok:true -> 'ok', ok:false -> 'rejected',
+ * a timeout or link loss -> 'unreachable' (retried on the next reconnect).
+ */
+export class BleCalibrationTransport implements CalibrationTransport {
+  async send(payload: PhoneCalibrationPayload): Promise<CalibrationSyncStatus> {
+    try {
+      const result = await getBleLink().command({ cmd: 'calibrate', profile: payload });
+      if (typeof result === 'object' && result !== null && 'ok' in result) return result.ok === true ? 'ok' : 'rejected';
+      return 'rejected';
+    } catch {
+      return 'unreachable';
+    }
+  }
+}
+
+/** Bluetooth while the link is online, otherwise HTTP. Chosen per send, not at start-up. */
+export function defaultCalibrationTransport(): CalibrationTransport {
+  return {
+    send: (payload) =>
+      (getBleLink().state === 'online' ? new BleCalibrationTransport() : new HttpCalibrationTransport()).send(payload),
+  };
+}
+
 export let lastError: string | null = null;
 let lastRejectedAt: number | null = null;
 
@@ -68,7 +88,7 @@ export function clearCalibrationSyncState(): void {
  * network error => retry later on reconnect
  */
 export async function syncEyeCalibration(
-  transport: CalibrationTransport = new HttpCalibrationTransport(),
+  transport: CalibrationTransport = defaultCalibrationTransport(),
 ): Promise<CalibrationSyncStatus | 'skipped'> {
   const { demo, eyeCalibration } = useSettings.getState();
   if (demo) {

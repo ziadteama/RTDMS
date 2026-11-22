@@ -14,6 +14,7 @@ const ITEMS: { key: PermissionKey; icon: IconName; label: StringKey; why: String
   { key: 'location', icon: 'location', label: 'onb.perm.location', why: 'onb.perm.locationWhy' },
   { key: 'notifications', icon: 'notifications', label: 'onb.perm.notifications', why: 'onb.perm.notificationsWhy' },
   { key: 'sms', icon: 'sms', label: 'onb.perm.sms', why: 'onb.perm.smsWhy' },
+  { key: 'bluetooth', icon: 'bluetooth', label: 'onb.perm.bluetooth', why: 'onb.perm.bluetoothWhy' },
   { key: 'camera', icon: 'camera', label: 'onb.perm.camera', why: 'onb.perm.cameraWhy' },
 ];
 

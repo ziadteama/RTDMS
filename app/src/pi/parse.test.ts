@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import Ajv2020 from 'ajv/dist/2020';
+
 import { statusAt } from '@/demo/scenario';
 
 import {
@@ -154,15 +158,61 @@ describe('pairing', () => {
       ssid: 'RTDMS-Pi',
       password: 'se;cret',
       baseUrl: 'http://10.42.0.1:8080',
+      bleName: null,
+      token: null,
+      version: null,
     });
   });
   it('falls back to the default base URL for a plain Wi-Fi QR', () => {
-    expect(parseQr('WIFI:S:car;T:nopass;;', DEF)).toEqual({ ssid: 'car', password: null, baseUrl: DEF });
+    expect(parseQr('WIFI:S:car;T:nopass;;', DEF)).toEqual({
+      ssid: 'car',
+      password: null,
+      baseUrl: DEF,
+      bleName: null,
+      token: null,
+      version: null,
+    });
   });
   it('accepts a bare URL and rejects other QR codes', () => {
     expect(parseQr('http://192.168.1.20:8080', DEF)!.baseUrl).toBe('http://192.168.1.20:8080');
     expect(parseQr('https://example.com/menu pdf', DEF)).toBeNull();
     expect(parseQr('hello', DEF)).toBeNull();
+  });
+  describe('BLE fields (contracts/pi-link qr)', () => {
+    const dir = resolve(__dirname, '../../../contracts/pi-link');
+    const fixture = JSON.parse(readFileSync(resolve(dir, 'fixtures/qr.json'), 'utf8')) as Record<string, string | number>;
+    const schema = JSON.parse(readFileSync(resolve(dir, 'schemas/qr.schema.json'), 'utf8'));
+    const esc = (v: string | number) => String(v).replace(/([\\;,:"])/g, '\\$1');
+    const f = fixture;
+    const qr = `WIFI:T:WPA;S:${esc(f.ssid!)};P:${esc(f.psk!)};U:${esc(f.url!)};B:${esc(f.ble!)};K:${esc(f.token!)};V:${f.contract};;`;
+
+    it('the fixture is valid against the qr schema', () => {
+      const validate = new Ajv2020({ allErrors: true }).compile(schema);
+      expect(validate(fixture)).toBe(true);
+    });
+    it('reads B, K and V from the contract QR string', () => {
+      expect(parseQr(qr, DEF)).toEqual({
+        ssid: f.ssid,
+        password: f.psk,
+        baseUrl: f.url,
+        bleName: f.ble,
+        token: f.token,
+        version: f.contract,
+      });
+    });
+    it('accepts a Bluetooth-only QR (no S)', () => {
+      const info = parseQr(`WIFI:B:RTDMS-Pi;K:${f.token};V:1;;`, DEF);
+      expect(info).toEqual({ ssid: null, password: null, baseUrl: DEF, bleName: 'RTDMS-Pi', token: f.token, version: 1 });
+    });
+    it('rejects a short token or bad name, keeping the Wi-Fi part', () => {
+      expect(parseQr('WIFI:B:RTDMS-Pi;K:short;;', DEF)).toBeNull();
+      expect(parseQr('WIFI:S:car;B:RTDMS-Pi;K:short;;', DEF)).toMatchObject({ ssid: 'car', bleName: 'RTDMS-Pi', token: null });
+      expect(parseQr(`WIFI:S:car;B:${'x'.repeat(30)};K:${f.token};;`, DEF)).toMatchObject({ bleName: null, token: f.token });
+      expect(parseQr(`WIFI:B:;K:${f.token};;`, DEF)).toBeNull();
+    });
+    it('ignores a non-numeric V', () => {
+      expect(parseQr('WIFI:S:car;V:x;;', DEF)!.version).toBeNull();
+    });
   });
   it('normalizes a typed address', () => {
     expect(normalizeBaseUrl(' 192.168.1.20:8080/ ')).toBe('http://192.168.1.20:8080');

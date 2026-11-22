@@ -71,6 +71,15 @@ export const diagnostics = {
   'diag.conn.relayUrl': 'Relay service URL',
   'diag.conn.relayKey': 'Relay auth key',
   'diag.conn.badUrl': 'Invalid URL',
+  'diag.link.label': 'Link',
+  'diag.link.ble': 'Bluetooth',
+  'diag.link.http': 'Wi-Fi',
+  'diag.link.none': 'none',
+  'diag.link.signal': 'Signal',
+  'diag.link.dbm': '{dbm} dBm',
+  'diag.link.last': 'Last update',
+  'diag.link.ago': '{s} s ago',
+  'diag.link.unknown': '-',
 
   // Raw Metrics
   'diag.raw.eyes': 'Raw eye metrics',

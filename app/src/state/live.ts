@@ -11,6 +11,8 @@ export type Connection = 'connecting' | 'online' | 'offline';
  */
 export type LiveState = {
   connection: Connection;
+  /** Which link feeds the data right now: Bluetooth or the HTTP fallback; null until known. */
+  link: 'ble' | 'http' | null;
   lastOkAt: number | null;
   status: PiStatus | null;
   alert: PiAlert | null;
@@ -29,6 +31,7 @@ export type LiveState = {
 
 export const INITIAL_LIVE: LiveState = {
   connection: 'connecting',
+  link: null,
   lastOkAt: null,
   status: null,
   alert: null,
