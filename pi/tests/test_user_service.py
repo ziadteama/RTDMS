@@ -63,3 +63,18 @@ def test_uninstall(tmp_path: Path) -> None:
     calls = _calls(tmp_path)
     assert "--user disable --now rtdms-pi-user.service" in calls
     assert calls[-1] == "--user daemon-reload"
+
+
+def test_open_flag_writes_dropin_and_default_removes_it(tmp_path: Path) -> None:
+    dropin = tmp_path / "units" / "rtdms-pi-user.service.d" / "open.conf"
+    _run(tmp_path, "--open", fake=True)
+    assert dropin.read_text() == "[Service]\nEnvironment=RTDMS_BLE_OPEN=1\n"
+    _run(tmp_path, fake=True)
+    assert not dropin.exists()
+    _run(tmp_path, "--open", fake=True)
+    _run(tmp_path, "--uninstall", fake=True)
+    assert not dropin.exists()
+
+
+def test_unit_has_no_open_mode_by_default() -> None:
+    assert "RTDMS_BLE_OPEN" not in UNIT.read_text()

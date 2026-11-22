@@ -1,6 +1,7 @@
 """BLE lifecycle shared by the runtime and simulated deployments."""
 
 import asyncio
+import logging
 import signal
 import time
 from collections.abc import Callable
@@ -54,6 +55,8 @@ async def run_ble(
         if settings is not None
         else SettingsStore(config.state_dir / "settings.json")
     )
+    if config.ble_open:
+        logging.getLogger(__name__).warning("BLE open mode: no token required (dev only)")
     service = PhoneService(
         port,
         runtime.state,
@@ -61,7 +64,9 @@ async def run_ble(
         settings_store,
         incident_sink,
         time.time,
-        AuthGate(load_or_create_token(config.state_dir / "token")),
+        AuthGate(
+            load_or_create_token(config.state_dir / "token"), open_mode=config.ble_open
+        ),
         health_reader(runtime, config, settings_store),
         garmin=garmin if isinstance(garmin, GarminPhysioSource) else None,
         start_calibration=runtime.frame_source.start_calibration,

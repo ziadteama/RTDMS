@@ -16,7 +16,10 @@ class AuthGate:
         token: str,
         ttl_s: float = 300.0,
         clock: Callable[[], float] = time.monotonic,
+        open_mode: bool = False,
     ) -> None:
+        # DEV ONLY: open mode treats every connection as authenticated (no token needed).
+        self.open_mode = open_mode
         self._token = token.encode("utf-8")
         self.ttl_s = float(ttl_s)
         self._clock = clock
@@ -24,6 +27,8 @@ class AuthGate:
 
     @property
     def authed(self) -> bool:
+        if self.open_mode:
+            return True
         if self._last_auth_time is None:
             return False
         if (self._clock() - self._last_auth_time) > self.ttl_s:

@@ -115,6 +115,8 @@ class PhoneService:
         return encoded
 
     def write(self, char: Char, raw: bytes) -> None:
+        if char == Char.AUTH and self.auth.open_mode:
+            return  # dev open mode: any (or empty) token is accepted, nothing to check
         if char != Char.AUTH and not self.auth.authed:
             raise GattWriteRejected("insufficient authentication")
         try:
