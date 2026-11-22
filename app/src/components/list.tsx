@@ -1,5 +1,5 @@
 import { Children, Fragment, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type AccessibilityProps } from 'react-native';
 
 import { radius, spacing, touch, useTheme } from '@/theme';
 
@@ -51,6 +51,8 @@ export function Row({
   disabled,
   right,
   valueColor,
+  accessibilityRole = 'button',
+  accessibilityState,
 }: {
   label: string;
   detail?: string;
@@ -63,6 +65,8 @@ export function Row({
   disabled?: boolean;
   right?: ReactNode;
   valueColor?: string;
+  accessibilityRole?: AccessibilityProps['accessibilityRole'];
+  accessibilityState?: AccessibilityProps['accessibilityState'];
 }) {
   const { colors } = useTheme();
   const labelColor = destructive ? colors.alert.continuous : colors.text;
@@ -80,7 +84,7 @@ export function Row({
       }}
     >
       {icon ? <Icon name={icon} size={22} color={iconColor ?? (destructive ? colors.alert.continuous : colors.textSecondary)} /> : null}
-      <View style={{ flex: 1, gap: spacing.xxs }}>
+      <View style={{ flex: 1, minWidth: '40%', gap: spacing.xxs }}>
         <Text variant="body" color={labelColor}>
           {label}
         </Text>
@@ -95,13 +99,19 @@ export function Row({
           {value}
         </Text>
       ) : null}
-      {right}
+      {right != null ? <View style={{ flexShrink: 0, maxWidth: '55%' }}>{right}</View> : null}
       {chevron ? <Icon name="chevron" size={20} color={colors.textTertiary} /> : null}
     </View>
   );
   if (!onPress) return body(false);
   return (
-    <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={label}
+      accessibilityState={disabled !== undefined ? { disabled, ...accessibilityState } : accessibilityState}
+    >
       {({ pressed }) => body(pressed)}
     </Pressable>
   );
