@@ -28,6 +28,15 @@ archived in [[Coordination Board 2026-11]].
 > **Not yet verified:** the Pi runtime (`pi/`) on the Pi, Bluetooth between phone and Pi, the Pi
 > hotspot, the crash detector on real motion, and any of it in a moving car.
 
+> [!info] Overnight 22 Nov (01:40–04:30): phone eye calibration
+> - **UI sweep and declutter** of every screen (PR #45, implemented by agy, reviewed and gated by MAIN).
+> - **Camera server as a service** on the Pi (PR #46): `systemctl --user` unit, restarts on crash; boot start waits for `sudo loginctl enable-linger khalifa`.
+> - **Contract v1.1** (PR #47): `phone_calibration` payload; the Pi uses only `closed_ratio` because phone EAR does not transfer across cameras. Detail: [[Eye Calibration]].
+> - **Android controls fix** (PR #48): dropdowns squeezed labels into one letter per line on the realme; now a value + choice sheet.
+> - **Pi side** (PR #49, docs #50): applied and verified on the running Pi with the fixture (200 + `calibrated (phone)`, poor → 400), test profile removed afterwards, no rollback needed.
+> - **App side** (PR #52, docs #51): native `SahiFaceView` (CameraX + MediaPipe face landmarker, same EAR as the Pi), calibration math port, sync to the unit, guided 5-step flow in onboarding and Settings. Gates 520 tests; EAS dev build `00006dd7` compiled. **Not run on the phone yet.**
+> - How: Sonnet orchestrators delegating to Codex (quota ran out mid-night), then agy and Claude subagents with cross-review; MAIN re-ran gates before every merge. One jest run showed a single flaky failure that did not reproduce in three reruns.
+
 ## Decisions
 
 | # | Date | Decision | Why | Detail |
