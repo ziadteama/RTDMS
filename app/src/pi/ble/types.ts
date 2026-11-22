@@ -24,6 +24,8 @@ export interface BleLink {
   /** Why the last attempt failed: 'auth' (the unit wants a pairing code) or 'connection'; null when fine. */
   readonly lastError: string | null;
   readonly state: BleState;
+  /** True while the phone's Bluetooth is switched off; the UI shows "Bluetooth is off". */
+  readonly btOff: boolean;
   /** Wall-clock ms of the last notify received, or null. */
   readonly lastNotifyAt: number | null;
   /** Peripheral id of the current/last connection (persist it as the remembered id), or null. */

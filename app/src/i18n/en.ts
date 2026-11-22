@@ -45,6 +45,8 @@ export const en = {
 
   // Banners
   'banner.offline': 'Unit not connected. Check it is powered on.',
+  'banner.btOff': 'Bluetooth is off',
+  'banner.btOffHint': 'Turn on Bluetooth so your phone can reach your Sahi unit.',
   'banner.offlineHint': 'Check that your Sahi unit is turned on and within range.',
   'banner.demo': 'Demo mode: replayed drive',
   'banner.paused': 'Monitoring is paused',

@@ -6,6 +6,7 @@
  */
 import { getBleLink } from '@/pi/ble';
 import { requestBlePermissions } from '@/pi/ble/permissions';
+import { setLive } from '@/state/live';
 import { useSecure } from '@/state/secure';
 import { useSettings } from '@/state/settings';
 
@@ -28,6 +29,7 @@ export function startBleLink(): () => void {
     wanted = key;
     if (!p) {
       link.stop();
+      setLive({ btOff: false });
       return;
     }
     void begin(key);
@@ -43,6 +45,7 @@ export function startBleLink(): () => void {
   };
 
   const offState = link.onState((state) => {
+    setLive({ btOff: link.btOff });
     const id = link.deviceId;
     if (state === 'online' && id && id !== useSettings.getState().bleDeviceId) useSettings.getState().set({ bleDeviceId: id });
   });
@@ -56,5 +59,6 @@ export function startBleLink(): () => void {
     offSettings();
     offSecure();
     link.stop();
+    setLive({ btOff: false });
   };
 }

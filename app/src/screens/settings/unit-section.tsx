@@ -13,6 +13,7 @@ export function UnitSection() {
   const { colors } = useTheme();
   const online = useLive((s) => s.connection === 'online');
   const link = useLive((s) => s.link);
+  const btOff = useLive((s) => s.btOff);
   const eyeCal = useSettings((s) => s.eyeCalibration);
 
   const forget = () => {
@@ -33,7 +34,7 @@ export function UnitSection() {
     <Section title={t('settings.unit')}>
       <Row
         label={t('settings.status')}
-        value={online ? t(link === 'ble' ? 'settings.viaBluetooth' : link === 'http' ? 'settings.viaWifi' : 'settings.connected') : t('settings.notConnected')}
+        value={online ? t(link === 'ble' ? 'settings.viaBluetooth' : link === 'http' ? 'settings.viaWifi' : 'settings.connected') : btOff ? t('banner.btOff') : t('settings.notConnected')}
         valueColor={online ? colors.alert.none : undefined}
       />
       <Row

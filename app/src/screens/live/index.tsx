@@ -34,6 +34,7 @@ function Banners() {
   const t = useT();
   const { demo, paused } = useSettings(useShallow((s) => ({ demo: s.demo, paused: s.paused })));
   const offline = useLive((s) => s.connection === 'offline');
+  const btOff = useLive((s) => s.btOff);
   const noAlertApi = useLive((s) => s.connection === 'online' && s.alertSupported === false);
   const noGps = useLive((s) => s.connection === 'online' && gpsLost(s.gpsAt, Date.now()));
   const crashOn = useSettings((s) => s.crashDetection);
@@ -42,7 +43,8 @@ function Banners() {
     <>
       {paused ? <Banner icon="pause" title={t('banner.paused')} /> : null}
       {demo ? <Banner icon="play" title={t('banner.demo')} /> : null}
-      {offline && !paused ? <Banner icon="wifiOff" tone="danger" title={t('banner.offline')} detail={t('banner.offlineHint')} /> : null}
+      {btOff && offline && !paused && !demo ? <Banner icon="bluetooth" tone="danger" title={t('banner.btOff')} detail={t('banner.btOffHint')} /> : null}
+      {offline && !btOff && !paused ? <Banner icon="wifiOff" tone="danger" title={t('banner.offline')} detail={t('banner.offlineHint')} /> : null}
       {noAlertApi ? <Banner icon="info" tone="warning" title={t('banner.noAlertApi')} /> : null}
       {noGps && crashOn ? <Banner icon="gps" tone="warning" title={t('banner.gpsLost')} /> : null}
     </>

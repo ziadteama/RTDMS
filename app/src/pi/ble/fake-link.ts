@@ -37,6 +37,7 @@ export class FakeBleLink implements BleLink {
     this.target = null;
     this.setState('idle');
   }
+  btOff = false;
   onState(cb: (s: BleState) => void) {
     this.stateCbs.add(cb);
     return () => void this.stateCbs.delete(cb);
