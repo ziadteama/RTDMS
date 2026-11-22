@@ -21,6 +21,7 @@ Project 2 (the build phase this repo is for).
 ## Implementation (Project 2)
 
 - [[Open Items and Next Steps]] — **what is not done yet** (hardware, app, SOS, product questions)
+- [[MVP Readiness]] — is what we have enough for an MVP? (22 Nov: phone-side yes, full chain no; the gaps and the order to close them)
 - [[Project Log 2026-11]] — decisions, evidence and lessons of 21–22 Nov 2026
 - [[Orchestration Playbook]] · [[Dev Environment and Test Devices]] · [[Coordination Board 2026-11]] — how the agents work, how to run and test everything, the raw trail
 - [[Agent Guide]] — **start here if you're an agent about to dev, explore, or delegate work**
