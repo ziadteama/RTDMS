@@ -31,6 +31,8 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
   val onFace by EventDispatcher<Map<String, Any?>>()
 
   private val previewView = PreviewView(context).apply {
+    // TextureView: the default SurfaceView renders black inside RN's clipped, rounded containers.
+    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
     scaleType = PreviewView.ScaleType.FILL_CENTER
     layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
   }
@@ -163,6 +165,7 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
             return@execute
           }
           faceLandmarker = created
+          Log.i(TAG, "FaceLandmarker ready")
         } catch (e: Exception) {
           Log.e(TAG, "Failed to initialize FaceLandmarker", e)
         }
@@ -227,6 +230,7 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
 
         provider.unbindAll()
         provider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, analysis)
+        Log.i(TAG, "camera bound")
       } catch (e: Exception) {
         Log.e(TAG, "Failed to bind CameraX", e)
       }
@@ -275,7 +279,10 @@ class SahiFaceView(context: Context, appContext: AppContext) : ExpoView(context,
     }
   }
 
+  private var resultCount = 0
+
   private fun handleResult(result: FaceLandmarkerResult, inputImage: MPImage) {
+    if (resultCount++ % 60 == 0) Log.i(TAG, "result #$resultCount faces=${result.faceLandmarks().size} luma=$latestLuma")
     val landmarksList = result.faceLandmarks()
     if (landmarksList.isEmpty()) {
       emitSample(
