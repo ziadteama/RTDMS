@@ -11,8 +11,8 @@ any change. This is separate from the ESP32 PPG packet in `protocol.py`.
 | Roles | Watch = BLE central (GATT client). Pi = BLE peripheral (GATT server, advertising). |
 | Service UUID | 16-bit `0xFFF0` (`0000fff0-0000-1000-8000-00805f9b34fb`), advertised with Flags `0x06` (LE only, General Discoverable). Garmin watches only report scan results for devices that advertise a 16-bit service UUID in General Discoverable mode; a device advertising only a 128-bit service UUID is never seen. `0xFFF0` is a common vendor-test value, so the characteristic below keeps a unique 128-bit UUID and the watch accepts a device only if that characteristic is there. |
 | Characteristic UUID | `1375193a-7edb-4a34-b3f2-18130239c8a8`, properties: write, write-without-response |
-| Direction | Watch writes one packet per write. The Pi never sends anything back. |
-| Rate | One packet per sensor-listener batch, about 1 per second. |
+| Direction | Watch writes one RR packet per write. Pi → watch alerts use notifications on `1375193a-7edb-4a34-b3f2-18130239000b` in the same service; the watch enables its CCCD with `01 00`. |
+| Rate | One packet per sensor-listener batch, about 1 per second, plus immediate v2 packets for changed alerts and wearer ACKs. |
 | Size limit | ≤ 20 bytes per write (Connect IQ `Characteristic.requestWrite` rejects longer values). |
 
 ## Version 1
@@ -49,7 +49,7 @@ Total = 10 + 2 × `rr_count` bytes, so 10 to 20 bytes. A packet whose length doe
 
 ## Version 2
 
-Opt in with `RrPacket(..., version=2)`. `encode` defaults to v1 through the packet default;
+The watch app sends v2. Python callers opt in with `RrPacket(..., version=2)`. `encode` defaults to v1 through the packet default;
 v1 decoding remains supported. All multibyte values are little-endian.
 
 | Offset | Size | Field | Meaning |
@@ -65,11 +65,38 @@ v1 decoding remains supported. All multibyte values are little-endian.
 | 12 | 2 × n | `rr_ms[n]` | uint16 RR intervals, oldest first |
 
 Length must equal `12 + 2 * rr_count` (12–20 bytes). Invalid lengths/counts raise
-`RrCodecError`. ACK acknowledges the wearer response; CONTACT means worn. SPLIT means the
+`RrCodecError`. ACK acknowledges the wearer response; CONTACT approximates worn status. SPLIT means the
 batch continues. v1 yields `contact=None`, `motion=None`, `ack=False`, `echo_seq=None`.
 For encoding, HR/contact/ACK/echo value fields determine their flags; SPLIT comes from flags.
 Absent v2 motion encodes as zero; absent contact encodes as false. Set both explicitly when
 simulating a worn watch. Unknown reserved flag bits are ignored on decode.
+
+### Watch motion, contact, and alert response
+
+The watch requests 25 Hz acceleration alongside each ~1 s RR batch. Acceleration axes are
+milli-g. Motion is `floor(mean(abs(sqrt(x² + y² + z²) - 1000)) / 4)`, clamped to 0–255:
+**1 unit = 4 mg**. Missing/empty acceleration yields 0; if registration with acceleration is
+unsupported, the watch retries RR-only registration. No acceleration history is retained.
+CONTACT is set exactly when `Sensor.Info.heartRate != null`. Connect IQ exposes no direct
+skin-contact flag; this is an approximation, independent of the HR_VALID range check.
+
+`watch_alert` notifications contain exactly `[pattern, seq]` (two uint8 bytes). Patterns are
+0 none, 1 short_beep (one 200 ms vibration), 2 repeated (three 300 ms pulses separated by
+200 ms silence), 3 continuous (1 s pulse every 2 s), and 4 max (strong 1 s pulses every 1 s).
+The existing 1 s app timer schedules repeats; timing is subject to callback scheduling.
+A pattern change starts/replaces vibration and sends an immediate zero-RR packet with current
+HR and ECHO_VALID/echo_seq. Every valid notification records its seq for the next packet;
+same-pattern keep-alives do not restart vibration or generate extra immediate packets.
+
+**Hold UP/MENU (middle-left button) on FR265/265S to send “I'm OK”**, via
+`BehaviorDelegate.onMenu`. BACK (lower-right) still leaves the app; START toggles streaming.
+The ACK button sends an immediate zero-RR packet with ACK and stops local vibration.
+Motion ≥200 for two consecutive batches while an unacknowledged alert is active also ACKs.
+An acknowledged pattern stays silent until the Pi changes the pattern. Pattern 0, stopping
+streaming, and app exit cancel local vibration. Immediate responses discard queued backlog
+(counted as dropped) but preserve any in-flight write, keeping packet sequence order and
+avoiding backlog delay in the echo latency measurement. Button mapping and vibration
+replacement/cancellation must be verified on both target devices with the real SDK.
 
 ## Clocks: which time to trust
 

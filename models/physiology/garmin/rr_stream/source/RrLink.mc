@@ -1,25 +1,10 @@
-// The Bluetooth side of RR Stream: find the RTDMS Pi, connect, and write packets to it.
-//
-// States:  idle -> scanning -> connecting -> finding service -> connected
-//                      ^                                          |
-//                      +-------------- reconnecting <-------------+  (link lost)
-//
-// - Scanning looks for the 16-bit RR service UUID 0xFFF0 in advertisements. Garmin watches only
-//   report devices that advertise a 16-bit service UUID in General Discoverable mode, so the
-//   service is 16-bit (docs/packet_format.md). 0xFFF0 is a common vendor-test value, so a device
-//   is only kept if its FFF0 service has our unique 128-bit RR characteristic.
-// - After pairing, Garmin's Bluetooth system reconnects to the same Pi by itself when the link
-//   drops; if that has not happened within RECONNECT_MS, we unpair and scan again.
-// - Packets wait in a small queue and are written one at a time (write with response, so we
-//   know each one arrived before sending the next). When the queue is full the oldest packet is
-//   dropped; the Pi sees the missing sequence numbers and counts them as lost.
-
 import Toybox.Lang;
 import Toybox.System;
 using Toybox.BluetoothLowEnergy as Ble;
 
 const RR_SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb";
 const RR_CHARACTERISTIC_UUID = "1375193a-7edb-4a34-b3f2-18130239c8a8";
+const WATCH_ALERT_UUID = "1375193a-7edb-4a34-b3f2-18130239000b";
 const RECONNECT_MS = 10000;      // give the system this long to reconnect by itself
 const CONNECT_MS = 15000;        // give a fresh connection attempt this long
 const SERVICE_LOOKUP_MS = 8000;  // after connecting, keep looking for the RR characteristic
@@ -38,6 +23,11 @@ class RrLink extends Ble.BleDelegate {
     var noService as Number = 0;     // links dropped because the RR characteristic was missing
     var serviceFound as Boolean = false;  // last lookup: FFF0 service present
 
+    private var _app as RrStreamApp;
+    private var _alertUuid as Ble.Uuid;
+    private var _alert as Ble.Characteristic? = null;
+    private var _subscribing as Boolean = false;
+    var subscribed as Boolean = false;
     private var _service as Ble.Uuid;
     private var _char as Ble.Uuid;
     private var _wanted as Boolean = false;          // the user pressed START
@@ -47,18 +37,20 @@ class RrLink extends Ble.BleDelegate {
     private var _busy as Boolean = false;            // a write is in flight
     private var _since as Number = 0;                // System.getTimer() when the state began
 
-    function initialize() {
+    function initialize(app as RrStreamApp) {
         BleDelegate.initialize();
+        _app = app;
+        _alertUuid = Ble.stringToUuid(WATCH_ALERT_UUID);
         _service = Ble.stringToUuid(RR_SERVICE_UUID);
         _char = Ble.stringToUuid(RR_CHARACTERISTIC_UUID);
     }
 
     // Tell the BLE system which service / characteristic we will use (once, at app start).
-    // Same form as Garmin's NordicThingy52CoinCollector sample for a write-only characteristic.
     function registerProfile() as Void {
         Ble.registerProfile({
             :uuid => _service,
-            :characteristics => [{ :uuid => _char }]
+            :characteristics => [{ :uuid => _char },
+                { :uuid => _alertUuid, :descriptors => [Ble.cccdUuid()] }]
         });
     }
 
@@ -88,6 +80,10 @@ class RrLink extends Ble.BleDelegate {
         if (!_wanted) {
             return;
         }
+        if (state.equals("connected")) {
+            subscribe();
+            pump();
+        }
         var age = System.getTimer() - _since;
         if (state.equals("finding service")) {
             if (!findCharacteristic() && age > SERVICE_LOOKUP_MS) {
@@ -107,9 +103,14 @@ class RrLink extends Ble.BleDelegate {
     }
 
     // New packet from the sensor callback.
-    function enqueue(packet as ByteArray) as Void {
+    function enqueue(packet as ByteArray, urgent as Boolean) as Void {
         if (!_wanted) {
             return;
+        }
+        // Control responses must not wait behind an outage backlog. Keep only the in-flight write.
+        if (urgent) {
+            dropped += _queue.size();
+            _queue = [] as Array<ByteArray>;
         }
         if (_queue.size() >= QUEUE_MAX) {
             _queue = _queue.slice(1, null);
@@ -147,7 +148,11 @@ class RrLink extends Ble.BleDelegate {
     }
 
     function onConnectedStateChanged(device as Ble.Device, connState as Ble.ConnectionState) as Void {
+        if (!_wanted) { return; }
         _busy = false;
+        _alert = null;
+        _subscribing = false;
+        subscribed = false;
         if (connState == Ble.CONNECTION_STATE_CONNECTED) {
             _device = device;
             connects += 1;
@@ -162,10 +167,8 @@ class RrLink extends Ble.BleDelegate {
     }
 
     function onCharacteristicWrite(characteristic as Ble.Characteristic, status as Ble.Status) as Void {
+        if (!_wanted || !_busy) { return; }
         _busy = false;
-        if (_queue.size() > 0) {
-            _queue = _queue.slice(1, null);  // done with it: delivered, or failed and skipped
-        }
         if (status == Ble.STATUS_SUCCESS) {
             sent += 1;
         } else {
@@ -178,17 +181,18 @@ class RrLink extends Ble.BleDelegate {
 
     // Write the oldest queued packet, if the link is up and nothing is in flight.
     private function pump() as Void {
-        if (_busy || _characteristic == null || _queue.size() == 0) {
+        if (_busy || _subscribing || _characteristic == null || _queue.size() == 0) {
             return;
         }
+        var packet = _queue[0];
+        _queue = _queue.slice(1, null);
         _busy = true;
         try {
-            (_characteristic as Ble.Characteristic).requestWrite(_queue[0],
+            (_characteristic as Ble.Characteristic).requestWrite(packet,
                 {:writeType => Ble.WRITE_TYPE_WITH_RESPONSE});
         } catch (e) {
             _busy = false;
             writeErrors += 1;
-            _queue = _queue.slice(1, null);
         }
     }
 
@@ -199,13 +203,45 @@ class RrLink extends Ble.BleDelegate {
         }
         var service = (_device as Ble.Device).getService(_service);
         serviceFound = (service != null);
-        _characteristic = (service != null) ? service.getCharacteristic(_char) : null;
+        if (service == null) { return false; }
+        _characteristic = service.getCharacteristic(_char);
         if (_characteristic == null) {
             return false;
         }
+        _alert = service.getCharacteristic(_alertUuid);
         setState("connected");
+        subscribe();
         pump();
         return true;
+    }
+
+    // CCCD writes share the ATT request channel with RR writes; retry on the next tick.
+    private function subscribe() as Void {
+        if (_busy || _subscribing || subscribed || _alert == null) { return; }
+        var descriptor = (_alert as Ble.Characteristic).getDescriptor(Ble.cccdUuid());
+        if (descriptor == null) { return; }
+        _subscribing = true;
+        try {
+            descriptor.requestWrite([0x01, 0x00]b);
+        } catch (e) {
+            _subscribing = false;
+            writeErrors += 1;
+        }
+    }
+
+    function onDescriptorWrite(descriptor as Ble.Descriptor, status as Ble.Status) as Void {
+        if (!_wanted || !_subscribing) { return; }
+        _subscribing = false;
+        subscribed = status == Ble.STATUS_SUCCESS;
+        if (!subscribed) { writeErrors += 1; }
+        pump();
+    }
+
+    function onCharacteristicChanged(characteristic as Ble.Characteristic,
+                                      value as ByteArray) as Void {
+        if (!_wanted || _alert == null || !characteristic.getUuid().equals(_alertUuid)) { return; }
+        if (value.size() != 2 || value[0] > 4) { return; }
+        _app.onAlert(value[0], value[1]);
     }
 
     private function scan() as Void {
@@ -215,6 +251,9 @@ class RrLink extends Ble.BleDelegate {
 
     private function forgetDevice() as Void {
         _characteristic = null;
+        _alert = null;
+        _subscribing = false;
+        subscribed = false;
         _busy = false;
         if (_device != null) {
             Ble.unpairDevice(_device as Ble.Device);
