@@ -31,3 +31,15 @@ test('does not start another unresponsive SOS while one is pending', () => {
   expect(triggerSos).not.toHaveBeenCalled();
   stop();
 });
+
+test('does not start an unresponsive SOS while a crash or manual SOS is counting down', () => {
+  for (const kind of ['crash', 'manual'] as const) {
+    jest.clearAllMocks();
+    jest.mocked(db.incidents).mockReturnValueOnce([{ kind, outcome: 'pending' }] as ReturnType<typeof db.incidents>);
+    useLive.setState(INITIAL_LIVE);
+    setLive({ connection: 'online', alert: alert('unresponsive') });
+    const stop = startUnresponsiveMonitor();
+    expect(triggerSos).not.toHaveBeenCalled();
+    stop();
+  }
+});

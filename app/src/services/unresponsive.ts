@@ -12,7 +12,8 @@ export function startUnresponsiveMonitor(): () => void {
     if (!alert.emergency) { episode = false; return; }
     if (episode) return;
     episode = true;
-    const running = db.incidents().some((i) => i.kind === 'unresponsive' && i.outcome === 'pending');
+    // Any SOS already counting down (crash, manual or unresponsive) covers this one.
+    const running = db.incidents().some((i) => i.outcome === 'pending');
     if (!running) triggerSos('unresponsive');
   };
   const unsubscribe = useLive.subscribe(check);
