@@ -4,7 +4,7 @@ tags:
   - backlog
   - status
 status: current
-updated: 2026-11-22
+updated: 2026-11-23
 ---
 
 # Open Items and Next Steps
@@ -21,7 +21,7 @@ The single list of what is **not** done. Update it when something moves.
 | Run the Pi runtime (`pi/`) on the real Pi | **BLE part running** (22 Nov) | `rtdms-pi-user` (BLE only, `--no-camera`, port 8090, dev open mode) runs on the Pi and advertises `RTDMS-Pi`. 207 Docker tests pass. Camera, buzzer and incident parts are not run on the Pi |
 | **Bench spike**: one GATT service with the Garmin characteristic + ten phone ones, phone and watch together; Wi-Fi hotspot on `wlan0` alongside | not run | Go criteria in [[Phone-Pi Link]]. The Pi hardware agent was stopped before it started |
 | Pi hotspot (`wlan0`, 5 GHz) and the in-app Wi-Fi join | not tested | Only the Tailscale route has been used so far |
-| Garmin watch on the Pi alongside the phone service | not tested | Watch availability unknown |
+| Garmin watch on the Pi alongside the phone service | not tested | Watch is available (23 Nov, on the dev machine USB in Garmin mode) |
 | Crash detector on real motion (bumps, drops, braking) | replay tests only | Stillness thresholds untested |
 | ColorOS background kill and the "monitoring paused" status | not tested | |
 | Concurrent CPU / fps / temperature budget with all models, Bluetooth and hotspot | not measured | `.cursor/rules/pi-performance-pipeline.mdc` |
@@ -29,6 +29,17 @@ The single list of what is **not** done. Update it when something moves.
 | Camera server autostart | **done (linger on, 22 Nov)**; camera ribbon detached on purpose for now | `rtdms-camera` systemd user service (PR #46) runs `~/rtdms/start_stream.sh`, restarts on crash, starts at boot. Stopped while the camera is detached. Known issue: `stream.py` exits 0 when the camera is missing, so systemd restarts it every 3 s instead of failing |
 | Phone eye calibration on the real phone | **flow verified on the phone (22 Nov); sync to the Pi not yet** (needs the Pi camera server, or the BLE `calibrate` command, which the app prefers when the link is Bluetooth) | Dev build `ba793815` (PR #55): camera preview, face found at about 10 Hz, user finished the calibration. Still to check: Save → Pi `/status` shows `calibrated (phone)` (the Pi camera server is stopped while the ribbon is detached), voice/haptics, onboarding order |
 | Settings dropdown fix (PR #48) on the real phone | **needs the phone** | Squeezed vertical labels came from the Compose Picker; replaced with value + sheet. Only checked by tests |
+
+## Heart rate (Garmin) — plan in [[Physiology New Approach]]
+
+| Item | State |
+|---|---|
+| P0: fusion ignores physiology for live alerts; no default heart-data log | **done on branches, not merged** (`fusion/physio-guard`, `physio/no-default-log`) |
+| Contract v1.3 CR (one `t`, physio v2 fields, 60 s clock, packet v2) | not posted |
+| P1: watch capability check (accelerometer, contact, vibration, notify subscribe, battery) | needs the user: watch USB mode → MTP, or the Windows build machine |
+| P2–P5: HR pipeline, sync, phone HR UI, shadow score | not started |
+| P6–P7: wrist vibration + "I'm OK", unresponsive-driver SOS | later |
+| Remove the WESAD artifact and "Heart rate shows fatigue" string from the live path | in P2 / P4 |
 
 ## App
 

@@ -9,13 +9,17 @@ tags:
 aliases:
   - Physio fusion approach
   - Garmin fatigue approach
-status: agreed-approach
+status: superseded
 code_path: models/physiology
 ---
 
 # Physiology × Fusion Approach (Garmin confirm path)
 
 ↑ [[Home]] | [[Physiology Subsystem]] | [[Models Index]] | code: `models/physiology/` · fusion stub: `fusion/`
+
+> [!warning] Superseded 2026-11-23 by [[Physiology New Approach]]
+> The "physiology confirms → MAX" role below was dropped: on MPD-DF heart rate added nothing
+> beyond drive time ([[Physiology Decision Log]]). Kept for history.
 
 How physiology should serve RTDMS **decision fusion**, given the live sensor is the **Garmin FR265
 RR stream** (not MAX30102-first for this path). Agreed 2026-11-13.

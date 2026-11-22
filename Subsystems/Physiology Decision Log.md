@@ -8,7 +8,7 @@ tags:
 aliases:
   - physio decision log
   - HRV model investigation
-status: open-decision
+status: decided
 code_path: models/physiology
 ---
 
@@ -17,7 +17,11 @@ code_path: models/physiology
 ↑ [[Home]] | [[Physiology Subsystem]] | [[Models Index]] · numbers: `models/physiology/docs/MPDDF.md`
 · reviews: [[Codex Review 1 - Personalisation]] · [[Codex Review 2 - Whole Case]]
 
-Investigation run 2026-11-20 on branch `physio/mpddf-pilot`. **Start here when you come back.**
+> [!success] Decided 2026-11-23
+> Heart rate is no longer a fatigue detector. See [[Physiology New Approach]] for the
+> new roles (vital signs, quality gate, shadow score, wrist alerts) and the watch–Pi–phone sync plan.
+
+Investigation run 2026-11-20 on branch `physio/mpddf-pilot`.
 Section 8 is the "where we left off" list.
 
 ## 1. The problem we started with
