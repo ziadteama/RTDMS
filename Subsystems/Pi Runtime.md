@@ -9,8 +9,8 @@ tags:
 aliases:
   - Pi Runtime
   - rtdms-pi
-status: implemented-unverified-on-hardware
-updated: 2026-11-21
+status: ble-running-on-pi-camera-and-gpio-unverified
+updated: 2026-11-22
 ---
 
 # Pi Runtime — the `rtdms-pi` process
@@ -55,13 +55,23 @@ Invariants kept: models report and `fusion/` decides (the runtime only gates inp
 
 ## BLE service
 
-Exactly as the contract: one service `0xFFF0` holding the Garmin write characteristic plus the ten phone characteristics (`alert`, `status`, `physio`, `settings`, `command`, `result`, `incident`, `clock`, `auth`, `health`). Notify rates: alert on change + 5 Hz keep-alive, status 2 Hz, physio 1 Hz. Garmin writes are handled first and synchronously. If the Garmin loss fraction over the last 60 packets exceeds 5 %, status and physio notifies drop to half rate (recovers under 2 %).
+Exactly as the contract: one service `0xFFF0` holding the Garmin write characteristic plus the ten phone characteristics (`alert`, `status`, `physio`, `settings`, `command`, `result`, `incident`, `clock`, `auth`, `health`). Garmin writes are handled first and synchronously.
 
-Known limits (all unverified on hardware):
+**Notify schedule (contract v1.2, send on change).** The notifier sleeps on an `asyncio` event: a decision change (from a model thread, through `call_soon_threadsafe`) wakes it and the alert goes out at once. One coalesced 1 s tick covers the rest: alert keep-alive 1 Hz, status and physio only when their quantised payload changed plus a 5 s keep-alive each (the keep-alive gives a late subscriber a state). Outgoing notifies are built from the typed payload builders, encoded compactly and compared with the last sent bytes; they are not schema-validated unless `--debug-validate` (or `RTDMS_DEBUG_VALIDATE=1`). Command results and everything the phone writes stay validated. If the Garmin loss fraction over the last 60 packets exceeds 5 %, status and physio checks drop to half rate (recovers under 2 %).
 
-- `bless` 0.2.6 has no disconnect callback, so auth state cannot be reset on disconnect. The service uses a **TTL** (the phone re-writes `auth` on every connect anyway). Needs a measurement on the Pi.
-- Rejected writes raise `GattWriteRejected`; how `bless` turns that into an ATT "insufficient authentication" error is not confirmed.
-- No true loopback test is possible on the dev machine (one Bluetooth adapter cannot connect to itself), so tests use `FakeGatt`; `pi/tools/phone_sim_client.py` is the bleak stand-in phone for the Pi bench.
+**Auth and disconnects.** bless 0.2.6 has no disconnect callback, so `bless_gatt.py` watches BlueZ on D-Bus (`PropertiesChanged` of `org.bluez.Device1`, `Connected` false) and resets auth; the 300 s TTL stays as a fallback. The Device1 path is not passed by bless, so any peer disconnect (a Garmin watch too) resets auth. A write before auth raises `org.bluez.Error.NotAuthorized`.
+
+Hardware facts and numbers: [[Phone-Pi Link]] and `pi/tools/link_spike/results/README.md`. Still unverified: one service with the watch and the phone connected, GPIO, the camera hook.
+
+## User-service deployment (2026-11-22)
+
+The runtime runs on the Pi as the systemd **user** service `rtdms-pi-user` (`pi/deploy/systemd/rtdms-pi-user.service`, installer `install-user-service.sh`, linger already on): `rtdms-pi --no-camera --ble --buzzer none --port 8090` (8080 belongs to `stream.py`), state in `~/.local/state/rtdms`, `Restart=on-failure`, `Nice=10`, `CPUWeight=20`, `IOSchedulingClass=idle` so it yields to the models. The system unit `rtdms-pi.service` carries the same priorities.
+
+- Code and venv: `~/rtdms-pi/` (`pi/`, `fusion/`, `models/physiology/`, `contracts/`; venv with `--system-site-packages`, `pip install -e './pi[ble]'`: use the path, `pi` alone resolves to an unrelated PyPI package). Update with a tar-over-ssh of `pi/src`, then `systemctl --user restart rtdms-pi-user`.
+- Pairing token: stays in `~/.local/state/rtdms/token` on the Pi (mode 0600); `rtdms-pair --force` prints the QR string (it contains the token and the Wi-Fi PSK: never commit it).
+- `rtdms-camera` stays stopped while the camera is detached. The camera is not part of this unit; `--camera` comes with the camera bring-up.
+- Wireplumber BLE-MIDI is disabled for the desktop image (see [[Phone-Pi Link]]).
+- Uninstall: `install-user-service.sh --uninstall`.
 
 ## Incidents
 
@@ -81,7 +91,7 @@ pi/tools/verify_on_pi.sh                                            # on the Pi 
 
 Last run 2026-11-21: py3.11 and py3.13 both green (see the PR bodies for the counts).
 
-## Hardware queue (nothing here is done)
+## Hardware queue
 
 | # | Check | Why |
 |---|---|---|
@@ -89,12 +99,12 @@ Last run 2026-11-21: py3.11 and py3.13 both green (see the PR bodies for the cou
 | H2 | `pi/tools/verify_on_pi.sh` on Python 3.13 | Docker is not the target |
 | H3 | GPIO buzzer pin 18 and vibration pin | `gpiozero` path never ran |
 | H4 | `StreamPipelineSource` with the IR camera, per-frame hook cost | Hook is untested against the real pipeline |
-| H5 | One bless service with watch + phone connected, 11 characteristics | Contract open question 1 |
+| H5 | One bless service with watch + phone connected, 11 characteristics | Contract open question 1 (laptop-only run done 2026-11-22; watch and phone not yet) |
 | H6 | Hotspot on 5 GHz channel 36, country EG, phone joins, Garmin loss unchanged | Contract open question 3 |
-| H7 | systemd unit at boot and after a crash | Unit never installed |
+| H7 | systemd unit at boot and after a crash | User unit installed and running 2026-11-22; boot and crash restart not yet exercised |
 | H8 | ffmpeg `libx264` clip time at `nice 19` under full load | Budget |
 | H9 | Full concurrent budget (fps, CPU, temperature, `get_throttled`) before and after, per `.cursor/rules/pi-performance-pipeline.mdc` | P6 budget, M4 soak |
 
 ## Results
 
-*None yet.* Hardware numbers go here with their `get_throttled` value.
+2026-11-22, `throttled=0x0`, 49 C: BLE service CPU 0.15-0.17% of one core under a 4-process synthetic load, about +14 MB RSS, 1.1 wake-ups/s idle, alert change p95 113 ms, command round trip p95 96 to 135 ms (connection-interval bound, phone re-test needed). Full tables in [[Phone-Pi Link]]. Camera, GPIO and fps are not measured.
