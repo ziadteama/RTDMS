@@ -11,9 +11,16 @@ def test_face_distracted_beep():
     assert d.pattern is AlertPattern.SHORT_BEEP
 
 
-def test_drowsy_plus_physio_max():
+def test_physio_does_not_escalate_drowsy():
     d = decide(face={"state": "drowsy"}, physiology={"fatigue_probability": 0.8})
-    assert d.pattern is AlertPattern.MAX
+    assert d.pattern is AlertPattern.REPEATED
+    assert d.reasons == ["face drowsy"]
+
+
+def test_physio_alone_never_alerts():
+    d = decide(physiology={"fatigue_probability": 0.99, "quality": "good"})
+    assert d.pattern is AlertPattern.NONE
+    assert d.reasons == []
 
 
 def test_phone_call_flag_alerts_without_score():
@@ -33,6 +40,6 @@ def test_phone_flags_false_do_nothing():
     assert d.pattern is AlertPattern.NONE
 
 
-def test_phone_flag_plus_physio_max():
+def test_phone_flag_plus_physio_stays_continuous():
     d = decide(phone={"texting": True}, physiology={"fatigue_probability": 0.8})
-    assert d.pattern is AlertPattern.MAX
+    assert d.pattern is AlertPattern.CONTINUOUS

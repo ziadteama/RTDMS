@@ -52,15 +52,11 @@ def decide(
             pattern = AlertPattern.SHORT_BEEP
             reasons.append("face distracted")
 
-    if physiology:
-        fatigue = physiology.get("fatigue_probability")
-        if isinstance(fatigue, (int, float)) and fatigue >= 0.7:
-            if pattern in (AlertPattern.REPEATED, AlertPattern.CONTINUOUS):
-                pattern = AlertPattern.MAX
-                reasons.append("physio confirms")
-            elif pattern is AlertPattern.NONE:
-                pattern = AlertPattern.SHORT_BEEP
-                reasons.append("physio elevated")
+    # `physiology` is accepted but does not change alerts. Heart-rate fatigue scores were no
+    # better than elapsed drive time on MPD-DF (Subsystems/Physiology Decision Log.md), so a
+    # physiology-only beep or a "physio confirms" escalation would be a guess. Heart rate returns
+    # only as a shadow-mode score and an emergency vital-sign check (physiology pivot plan).
+    del physiology
 
     return FusionDecision(pattern=pattern, reasons=reasons)
 

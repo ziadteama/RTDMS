@@ -64,7 +64,7 @@ def test_physio_none_passed_exactly(clock: Clock) -> None:
     runtime.stop()
 
 
-def test_physio_confirms_and_expires(clock: Clock) -> None:
+def test_physio_never_escalates_and_expires(clock: Clock) -> None:
     report = PhysioReport({"watch_connected": True, "fatigue_probability": 0.7, "t": 42}, clock())
 
     class Physio:
@@ -82,7 +82,7 @@ def test_physio_confirms_and_expires(clock: Clock) -> None:
     runtime.on_frame(
         FrameResult(FaceReport(state="drowsy", face=True), None, 10, None, True, clock())
     )
-    assert state.snapshot().decision.pattern == AlertPattern.MAX
+    assert state.snapshot().decision.pattern == AlertPattern.REPEATED
     clock.advance(11)
     with patch("rtdms_pi.runtime.decide", wraps=decide) as mocked:
         runtime.tick()
