@@ -77,7 +77,8 @@ archived in [[Coordination Board 2026-11]].
 | SMS permission blocked for a sideloaded APK | Android 13+ "restricted settings" dialog | Manual step (Settings → Apps → Sahi → Allow restricted settings). A Play install does not hit it. Onboarding must explain it |
 | SOS result said "delivered" for WhatsApp but nothing arrived | The app was in **demo mode**, which used a fake relay answering "delivered" | Fixed in the app (demo sends nothing and says so); Demo switch moved to Diagnostics |
 | `npm start` crashed in real mode | Node strip-only mode rejects a TypeScript constructor shorthand; the dry-run smoke test never loaded that file | Start flag changed to `--experimental-transform-types` (package.json and Dockerfile) |
-| Red box "ExpoKeepAwake.deactivate rejected" | Returning to the app after switching away | Reported to the app agent; keep-awake needs guarding |
+| Red box "ExpoKeepAwake.deactivate rejected" | Returning to the app after switching away | Fixed in PR #55: `useKeepAwake(undefined, { suppressDeactivateWarnings: true })` |
+| Eye calibration camera preview black, all three checks failing | First run of dev build `00006dd7` on the realme (22 Nov); camera indicator on, CameraX logged `Failed to get Surfaces` | React Native never measures native children, so the preview stayed 0×0 and CameraX had no Surface: no preview, no frames for the face model. `SahiFaceView` now measures and lays out the preview itself (PR #55). Verified on the phone with build `ba793815`: face found at about 10 Hz, calibration finished |
 | Contract fixtures said 2024 but the incident id said 2026 | Pi orchestrator's CR-1 | Fixtures corrected; two Pi tests updated |
 | Result screen said "Calling 123…" before any call | SOS screen | Fixed to show the real call state |
 | First WhatsApp test "failed" | Number was mistyped in the first run | Retest to the right number delivered |
