@@ -91,5 +91,5 @@ Intro (about 20 s, park first), framing (oval + three ticks: face in oval, good 
 
 - **Tested**: Jest (maths, sync, settings, `FakeFaceSource`, face metrics); sync against the mock Pi only.
 - **Not verified on the device**: camera and face view on the real phone, voice and haptic cues, real sync to the Pi.
-- **Build**: all of the above is in the PR app/phone-calibration (guided screens, entry points, native view, maths, sync); dev build ad8ae940-f710-4786-ab2b-ec1ea1467eb7 on EAS.
+- **Build**: all of the above is in the PR app/phone-calibration (guided screens, entry points, native view, maths, sync); dev build 00006dd7-29c3-48d8-8110-ea1f2838c5bf on EAS.
 - Pi-side limits (cross-camera assumption unvalidated, BLE untested) are listed under [[#Limitations and unvalidated assumptions]].
