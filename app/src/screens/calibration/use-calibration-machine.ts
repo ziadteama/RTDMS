@@ -113,7 +113,7 @@ export function useCalibrationMachine({
 
   // Subscribe to face samples
   useEffect(() => {
-    if (override && override !== 'framing') return;
+    if (override) return;
 
     return subscribe((sample: FaceSample) => {
       const currentTime = now();

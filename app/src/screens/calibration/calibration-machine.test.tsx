@@ -288,6 +288,75 @@ describe('useCalibrationMachine', () => {
     jest.useRealTimers();
   });
 
+  it('keeps parked framing step on framing after 5 s of fake timers, while un-parked flow advances after ~1 s stable', async () => {
+    jest.useFakeTimers();
+    let fakeTime = 1000;
+
+    // 1. Parked framing flow: override is set
+    const parkedSource = createFakeFaceSource({
+      script: 'openThenClosed',
+      now: () => fakeTime,
+    });
+    const parkedHarness = await setupHarness({
+      subscribe: parkedSource.subscribe,
+      calOverride: 'framing',
+      now: () => fakeTime,
+    });
+
+    expect(parkedHarness.machine.step).toBe('framing');
+    expect(parkedHarness.machine.framing).toEqual({
+      faceInOval: true,
+      lightOk: true,
+      headStraight: true,
+    });
+    expect(parkedHarness.machine.isStable).toBe(true);
+
+    // Advance 5 s with fake timers
+    for (let t = 0; t < 5000; t += 250) {
+      fakeTime += 250;
+      await act(async () => {
+        jest.advanceTimersByTime(250);
+      });
+    }
+
+    // Must remain parked on framing step with ticks green
+    expect(parkedHarness.machine.step).toBe('framing');
+    expect(parkedHarness.machine.framing).toEqual({
+      faceInOval: true,
+      lightOk: true,
+      headStraight: true,
+    });
+    expect(parkedHarness.machine.isStable).toBe(true);
+
+    // 2. Un-parked flow: no override, starts at intro and advances after ~1 s stable
+    fakeTime = 1000;
+    const unparkedSource = createFakeFaceSource({
+      script: 'openThenClosed',
+      now: () => fakeTime,
+    });
+    const unparkedHarness = await setupHarness({
+      subscribe: unparkedSource.subscribe,
+      now: () => fakeTime,
+    });
+
+    await act(async () => {
+      unparkedHarness.machine.start();
+    });
+    expect(unparkedHarness.machine.step).toBe('framing');
+
+    // Deliver samples for ~1.2 s (over 1 s stable threshold)
+    for (let t = 0; t < 1200; t += 66) {
+      fakeTime += 66;
+      await act(async () => {
+        jest.advanceTimersByTime(66);
+      });
+    }
+
+    expect(unparkedHarness.machine.step).toBe('open');
+
+    jest.useRealTimers();
+  });
+
   it('handles failure scripts correctly and retry resets state', async () => {
     jest.useFakeTimers();
     let fakeTime = 20000;
@@ -364,6 +433,19 @@ describe('useCalibrationMachine', () => {
   });
 
   it('respects calOverride query params for screenshots', async () => {
+    const framingHarness = await setupHarness({
+      subscribe: () => () => {},
+      calOverride: 'framing',
+    });
+    expect(framingHarness.machine.step).toBe('framing');
+    expect(framingHarness.machine.secondsRemaining).toBe(10);
+    expect(framingHarness.machine.isStable).toBe(true);
+    expect(framingHarness.machine.framing).toEqual({
+      faceInOval: true,
+      lightOk: true,
+      headStraight: true,
+    });
+
     const openHarness = await setupHarness({
       subscribe: () => () => {},
       calOverride: 'open',
