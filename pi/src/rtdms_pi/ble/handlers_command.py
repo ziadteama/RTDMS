@@ -7,7 +7,6 @@ from typing import Any
 from dms_fusion import AlertPattern
 
 from ..buzzer import PatternPlayer
-from ..state import RuntimeState
 
 
 def log_command(command: str, payload: dict[str, Any]) -> None:
@@ -16,9 +15,10 @@ def log_command(command: str, payload: dict[str, Any]) -> None:
 
 def handle_command(
     payload: dict[str, Any],
-    state: RuntimeState,
     player: PatternPlayer,
     on_command: Callable[[str, dict[str, Any]], None],
+    start_calibration: Callable[[], None] | None,
+    apply_phone_calibration: Callable[[dict[str, Any]], None] | None,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {"ok": True}
     if "id" in payload:
@@ -28,7 +28,18 @@ def handle_command(
         if cmd == "test_alert":
             player.test_pattern(AlertPattern(payload.get("pattern", "max")))
         elif cmd == "calibrate":
-            state.request_calibration()
+            profile = payload.get("profile")
+            if profile is None:
+                if start_calibration is None:
+                    raise RuntimeError("calibration unavailable")
+                start_calibration()
+            else:
+                if apply_phone_calibration is None:
+                    raise RuntimeError("calibration unavailable")
+                try:
+                    apply_phone_calibration(profile)
+                except ValueError as exc:
+                    result.update(ok=False, error=str(exc)[:64] or "invalid profile")
         elif cmd in ("restart", "shutdown"):
             on_command(cmd, payload)
         else:

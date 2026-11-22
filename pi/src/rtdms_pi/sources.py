@@ -28,6 +28,8 @@ class FrameResult:
 class FrameSource(Protocol):
     def start(self, on_frame: Callable[[FrameResult], None]) -> None: ...
     def stop(self) -> None: ...
+    def start_calibration(self) -> None: ...
+    def apply_phone_calibration(self, profile: dict[str, Any]) -> None: ...
 
 
 class PhysioSource(Protocol):
@@ -37,6 +39,8 @@ class PhysioSource(Protocol):
 class ScriptedFrameSource:
     def __init__(self, frames: list[FrameResult]) -> None:
         self.frames = tuple(frames)
+        self.calibration_calls = 0
+        self.phone_profiles: list[dict[str, Any]] = []
         self._stop = threading.Event()
 
     def start(self, on_frame: Callable[[FrameResult], None]) -> None:
@@ -45,6 +49,12 @@ class ScriptedFrameSource:
             if self._stop.is_set():
                 break
             on_frame(frame)
+
+    def start_calibration(self) -> None:
+        self.calibration_calls += 1
+
+    def apply_phone_calibration(self, profile: dict[str, Any]) -> None:
+        self.phone_profiles.append(dict(profile))
 
     def stop(self) -> None:
         self._stop.set()
@@ -71,7 +81,8 @@ def map_status(status: dict[str, Any], t: float) -> FrameResult:
         calibrated = d.get("calibrated") if isinstance(d.get("calibrated"), bool) else None
         msg = d.get("message")
         is_failed = isinstance(msg, str) and msg.startswith("calibration failed")
-        calibration = "ok" if calibrated is True else ("failed" if is_failed else None)
+        is_calibrated = calibrated is True or msg == "calibrated (phone)"
+        calibration = "ok" if is_calibrated else ("failed" if is_failed else None)
         face = FaceReport(
             state=str(d.get("state", "unavailable")) if visible else "unavailable",
             reasons=tuple(r for r in reasons if isinstance(r, str))
@@ -173,6 +184,16 @@ class StreamPipelineSource:
 
         self._thread = threading.Thread(target=run, daemon=True, name="vision")
         self._thread.start()
+
+    def start_calibration(self) -> None:
+        if self.shared is None:
+            raise RuntimeError("source not started")
+        self.shared.calibrate = True
+
+    def apply_phone_calibration(self, profile: dict[str, Any]) -> None:
+        if self.shared is None:
+            raise RuntimeError("source not started")
+        self.shared.submit_phone_calibration(profile)
 
     def stop(self) -> None:
         if self.shared is not None:

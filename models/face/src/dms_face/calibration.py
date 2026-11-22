@@ -11,10 +11,11 @@ a 0..1 opening scale and you cannot construct that scale from one endpoint.
 """
 
 import json
+import math
 import os
 import statistics
 import time
-from dataclasses import dataclass, asdict, field
+from dataclasses import asdict, dataclass, field, fields, replace
 
 from .filters import TimeWindow
 
@@ -37,6 +38,7 @@ class DriverProfile:
     quality: str = "unknown"
     created: float = field(default_factory=time.time)
     notes: str = ""
+    closed_ratio: float | None = None
 
     @property
     def is_default(self):
@@ -55,7 +57,9 @@ class DriverProfile:
         if not os.path.isfile(path):
             return None
         with open(path, encoding="utf8") as f:
-            return cls(**json.load(f))
+            data = json.load(f)
+            known = {item.name for item in fields(cls)}
+            return cls(**{k: v for k, v in data.items() if k in known})
 
     @classmethod
     def load_or_default(cls, name, directory="profiles"):
@@ -96,6 +100,49 @@ class DriverProfile:
                 "  eye-state classifier rather than EAR geometry - see README limitations."
             )
         return None
+
+
+def profile_from_phone(payload: dict, current: DriverProfile) -> DriverProfile:
+    """Validate phone measurements and transfer only the camera-independent ratio."""
+    if not isinstance(payload, dict):
+        raise ValueError("payload must be an object")
+    if payload.get("source") != "phone":
+        raise ValueError("source must be phone")
+
+    def number(key):
+        value = payload.get(key)
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or not -math.inf < value < math.inf):
+            raise ValueError(f"{key} must be a finite number")
+        return value
+
+    ratio = number("closed_ratio")
+    if not 0.1 <= ratio <= 0.8:
+        raise ValueError("closed_ratio outside 0.1..0.8")
+    quality = payload.get("quality")
+    if quality == "poor":
+        raise ValueError("poor eye signal")
+    if quality not in ("good", "fair"):
+        raise ValueError("quality must be good or fair")
+    ear_open, ear_closed = number("ear_open"), number("ear_closed")
+    if not 0 < ear_open <= 1 or not 0 <= ear_closed <= 1:
+        raise ValueError("EAR values outside range")
+    if ear_open - ear_closed < 0.04:
+        raise ValueError("eye endpoints too close")
+    if number("snr") < 0:
+        raise ValueError("snr must be nonnegative")
+    for key in ("samples_open", "samples_closed", "created"):
+        value = number(key)
+        if value != int(value):
+            raise ValueError(f"{key} must be an integer")
+        if key != "created" and value < 1:
+            raise ValueError(f"{key} must be positive")
+    allowed = {"source", "closed_ratio", "ear_open", "ear_closed", "snr", "quality",
+               "samples_open", "samples_closed", "created"}
+    if payload.keys() - allowed:
+        raise ValueError("unknown calibration field")
+    return replace(current, ear_closed=ratio * current.ear_open, closed_ratio=ratio,
+                   notes="phone", created=time.time())
 
 
 class CalibrationCollector:
@@ -308,4 +355,6 @@ class BaselineAdapter:
         # margin -- a hard clamp against runaway drift.
         floor = self.profile.ear_closed + 0.05
         self.adapted_ear_open = max(floor, 0.9 * self.adapted_ear_open + 0.1 * candidate)
+        if self.profile.closed_ratio is not None:
+            self.profile.ear_closed = self.profile.closed_ratio * self.adapted_ear_open
         return self.adapted_ear_open

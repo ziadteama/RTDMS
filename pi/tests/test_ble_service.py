@@ -16,6 +16,7 @@ from rtdms_pi.ble.phone_service import PhoneService
 from rtdms_pi.ble.uuids import GARMIN_CHAR_UUID, Char
 from rtdms_pi.incidents_api import MemoryIncidentSink
 from rtdms_pi.payloads import to_json_bytes
+from rtdms_pi.sources import ScriptedFrameSource
 
 CONTRACT = Path(__file__).resolve().parents[2] / "contracts/pi-link"
 
@@ -123,8 +124,10 @@ def test_command_and_failures(service: PhoneService) -> None:
     assert json.loads(service.port.notifications[-1][1]) == fixture("command_result")
     service.player.step()
     assert ("play", 1200, 0.15) in service.player.backend.events
+    source = ScriptedFrameSource([])
+    service.start_calibration = source.start_calibration
     write(service, Char.COMMAND, {"cmd": "calibrate"})
-    assert service.state.snapshot().calibrate_requested
+    assert source.calibration_calls == 1
     calls = []
     service.on_command = lambda cmd, body: calls.append(cmd)
     write(service, Char.COMMAND, {"cmd": "restart"})
@@ -264,3 +267,98 @@ async def test_run_ble_injected_incident_sink(tmp_path: Path) -> None:
     stop = asyncio.Event()
     stop.set()
     await run_ble(config, runtime, stop, fake=True, incidents=custom_sink)
+
+
+@pytest.mark.parametrize("body", [{"cmd": "calibrate"}, {"cmd": "calibrate", "profile": None}])
+def test_camera_calibration(service: PhoneService, body: dict) -> None:
+    source = ScriptedFrameSource([])
+    service.start_calibration = source.start_calibration
+    service.apply_phone_calibration = source.apply_phone_calibration
+    unlock(service)
+    write(service, Char.COMMAND, {**body, "id": "camera"})
+    assert source.calibration_calls == 1
+    assert source.phone_profiles == []
+    assert json.loads(service.port.notifications[-1][1]) == {"ok": True, "id": "camera"}
+
+
+def test_phone_calibration_fixture(service: PhoneService) -> None:
+    source = ScriptedFrameSource([])
+    service.apply_phone_calibration = source.apply_phone_calibration
+    unlock(service)
+    profile = fixture("phone_calibration")
+    write(service, Char.COMMAND, {"cmd": "calibrate", "profile": profile, "id": "phone"})
+    assert source.phone_profiles == [profile]
+    assert source.calibration_calls == 0
+    assert json.loads(service.port.notifications[-1][1]) == {"ok": True, "id": "phone"}
+
+
+@pytest.mark.parametrize(
+    ("error", "reason"),
+    [
+        (ValueError("quality poor"), "quality poor"),
+        (ValueError("x" * 100), "x" * 64),
+        (ValueError(""), "invalid profile"),
+        (RuntimeError("private details"), "command failed"),
+    ],
+)
+def test_phone_calibration_failure(service: PhoneService, error: Exception, reason: str) -> None:
+    from rtdms_pi.config import RuntimeConfig
+    from rtdms_pi.sources import StreamPipelineSource
+
+    class Shared:
+        def submit_phone_calibration(self, profile: dict) -> None:
+            raise error
+
+    source = StreamPipelineSource(RuntimeConfig())
+    source.shared = Shared()
+    service.apply_phone_calibration = source.apply_phone_calibration
+    unlock(service)
+    profile = {**fixture("phone_calibration"), "quality": "poor"}
+    write(service, Char.COMMAND, {"cmd": "calibrate", "profile": profile, "id": "bad"})
+    assert json.loads(service.port.notifications[-1][1]) == {
+        "ok": False, "id": "bad", "error": reason,
+    }
+    assert service.stats.bad_writes == 0
+
+
+@pytest.mark.asyncio
+async def test_run_ble_calibration_wiring(tmp_path: Path) -> None:
+    import asyncio
+
+    from rtdms_pi.ble.fake_gatt import FakeGatt
+    from rtdms_pi.ble.server import run_ble
+    from rtdms_pi.buzzer import PatternPlayer, SilentBuzzer
+    from rtdms_pi.config import RuntimeConfig
+    from rtdms_pi.pairing import load_or_create_token
+    from rtdms_pi.runtime import Runtime
+    from rtdms_pi.sources import NullPhysioSource
+    from rtdms_pi.state import RuntimeState
+
+    token = load_or_create_token(tmp_path / "token")
+    profile = fixture("phone_calibration")
+
+    class Central(FakeGatt):
+        async def start(self, name: str) -> None:
+            await super().start(name)
+            self.write(Char.AUTH.uuid, to_json_bytes({"token": token}))
+            self.write(Char.COMMAND.uuid, to_json_bytes({"cmd": "calibrate"}))
+            self.write(
+                Char.COMMAND.uuid, to_json_bytes({"cmd": "calibrate", "profile": profile})
+            )
+
+    source = ScriptedFrameSource([])
+    player = PatternPlayer(SilentBuzzer(), autostart=False)
+    runtime = Runtime(source, NullPhysioSource(), player, RuntimeState())
+    stop = asyncio.Event()
+    stop.set()
+    port = Central()
+    try:
+        await run_ble(RuntimeConfig(state_dir=tmp_path), runtime, stop, port=port)
+        assert source.calibration_calls == 1
+        assert source.phone_profiles == [profile]
+        results = [
+            json.loads(raw) for uuid, raw in port.notifications if uuid == Char.RESULT.uuid
+        ]
+        assert results == [{"ok": True}, {"ok": True}]
+    finally:
+        player.close()

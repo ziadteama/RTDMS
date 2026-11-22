@@ -10,8 +10,10 @@ calibration (10 s eyes open, 3 s closed) runs per frame, as in models/face/strea
 
 from __future__ import annotations
 
+import json
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +22,18 @@ import numpy as np
 _FACE_SRC = Path(__file__).resolve().parents[2] / "face" / "src"
 if _FACE_SRC.is_dir() and str(_FACE_SRC) not in sys.path:
     sys.path.insert(0, str(_FACE_SRC))
+
+
+def parse_phone_calibration(body: bytes) -> dict:
+    """Validate a request before it reaches the pipeline thread."""
+    from dms_face.calibration import DriverProfile, profile_from_phone
+
+    try:
+        payload = json.loads(body)
+    except (ValueError, UnicodeError, RecursionError) as e:
+        raise ValueError("invalid JSON") from e
+    profile_from_phone(payload, DriverProfile())
+    return payload
 
 
 class Calibration:
@@ -119,6 +133,31 @@ class Drowsiness:
     def start_calibration(self) -> None:
         self.calib = Calibration(self.cfg, self.profile_name)
         self.message = "calibrating"
+
+    def apply_phone_calibration(self, payload: dict) -> None:
+        """Apply on the pipeline thread, using its current adapted baseline."""
+        from dms_face.calibration import profile_from_phone
+
+        try:
+            current = replace(self.profile, ear_open=self.pipe.adapter.adapted_ear_open)
+            profile = profile_from_phone(payload, current)
+        except ValueError as e:
+            self.message = f"calibration failed: {e}"
+            return
+        try:
+            profile.save(self.profile_dir)
+        except Exception:
+            self.message = "calibration failed: could not save profile"
+            return
+        self.profile = profile
+        try:
+            self.pipe.close()
+            self.pipe = self._new_pipeline()
+        except Exception as e:
+            self.message = f"calibration failed: {str(e) or type(e).__name__}"
+            return
+        self.calib, self.banner = None, []
+        self.calibrated, self.message = True, "calibrated (phone)"
 
     def feed(self, t: float, landmarks) -> dict:
         """landmarks: (478, 2) driver-view pixels from the distraction pipeline, or None."""

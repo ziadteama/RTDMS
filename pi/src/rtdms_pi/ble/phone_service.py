@@ -42,10 +42,14 @@ class PhoneService:
         health_fn: Callable[[], dict[str, Any]],
         on_command: Callable[[str, dict[str, Any]], None] = log_command,
         garmin: GarminPhysioSource | None = None,
+        start_calibration: Callable[[], None] | None = None,
+        apply_phone_calibration: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self.port, self.state, self.player = port, runtime_state, player
         self.settings, self.incidents, self.clock = settings, incidents, clock
         self.auth, self.health_fn, self.on_command = auth, health_fn, on_command
+        self.start_calibration = start_calibration
+        self.apply_phone_calibration = apply_phone_calibration
         self.stats = ServiceStats()
         self.notifier = Notifier(runtime_state, clock, self._emit, settings.read)
         self.loss = GarminLossMonitor(self.set_throttle)
@@ -118,6 +122,14 @@ class PhoneService:
             if char == Char.AUTH:
                 raise GattWriteRejected("insufficient authentication") from None
             return
+        # Null has the same meaning as an omitted profile for calibration.
+        if (
+            char == Char.COMMAND
+            and isinstance(obj, dict)
+            and obj.get("cmd") == "calibrate"
+            and obj.get("profile") is None
+        ):
+            obj.pop("profile", None)
         schema = "incident_request" if char == Char.INCIDENT else char.name.lower()
         if char == Char.SETTINGS:
             with self.settings.lock:
@@ -153,7 +165,13 @@ class PhoneService:
             self._emit(
                 Char.RESULT,
                 "command_result",
-                handle_command(payload, self.state, self.player, self.on_command),
+                handle_command(
+                    payload,
+                    self.player,
+                    self.on_command,
+                    self.start_calibration,
+                    self.apply_phone_calibration,
+                ),
             )
         elif char == Char.INCIDENT:
             self._emit(

@@ -64,6 +64,8 @@ async def run_ble(
         AuthGate(load_or_create_token(config.state_dir / "token")),
         health_reader(runtime, config, settings_store),
         garmin=garmin if isinstance(garmin, GarminPhysioSource) else None,
+        start_calibration=runtime.frame_source.start_calibration,
+        apply_phone_calibration=runtime.frame_source.apply_phone_calibration,
     )
     try:
         await port.start(config.ble_name)

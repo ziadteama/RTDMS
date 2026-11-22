@@ -321,3 +321,29 @@ def test_runtime_start_lifecycle(clock: Clock) -> None:
     runtime.stop()
     with pytest.raises(RuntimeError, match="runtime is closed"):
         runtime.start()
+
+
+@pytest.mark.parametrize("calibrated", [True, False, None])
+def test_phone_calibration_status(calibrated: bool | None) -> None:
+    frame = map_status(
+        {"drowsiness": {"calibrated": calibrated, "message": "calibrated (phone)"}}, 1.0
+    )
+    assert frame.face is not None
+    assert frame.face.calibration == "ok"
+    assert frame.face.calibrated is calibrated
+
+
+def test_stream_calibration_effects() -> None:
+    from types import SimpleNamespace
+
+    from rtdms_pi.config import RuntimeConfig
+    from rtdms_pi.sources import StreamPipelineSource
+
+    profiles = []
+    source = StreamPipelineSource(RuntimeConfig())
+    source.shared = SimpleNamespace(calibrate=False, submit_phone_calibration=profiles.append)
+    source.start_calibration()
+    assert source.shared.calibrate is True
+    profile = {"source": "phone", "closed_ratio": 0.38}
+    source.apply_phone_calibration(profile)
+    assert profiles == [profile]
