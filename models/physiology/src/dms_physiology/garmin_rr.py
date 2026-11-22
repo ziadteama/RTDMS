@@ -5,7 +5,7 @@ intervals. This module only turns bytes into checked values and decides, per pac
 is new, a duplicate, late, or the start of a new session. It does no signal processing.
 
 Timestamps: the Pi stamps every packet on arrival (`rx_monotonic`, `rx_wall`). The watch's own
-`watch_ms` and `seq` are used only for ordering, loss counting and gap detection.
+`watch_ms` also lets WatchClock place buffered packets on the Pi monotonic clock.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ MAX_RR_PER_PACKET = 5  # 10-byte header + 5 x 2 bytes = the 20-byte Connect IQ w
 MAX_PACKET_BYTES = 20
 
 _HEADER = struct.Struct("<BBHIBB")  # version, flags, seq, watch_ms, hr, rr_count
+_HEADER_V2 = struct.Struct("<BBHIBBBB")
 _SEQ_MODULUS = 1 << 16
 _WATCH_MS_MODULUS = 1 << 32
 RESTART_BACKWARDS_MS = 5_000  # watch_ms going back more than this = watch rebooted
@@ -35,11 +36,14 @@ GAP_MS = 3_000  # watch_ms jumping more than this between packets = a gap in the
 class RrFlags(IntFlag):
     NONE = 0
     HR_VALID = 1  # `hr` is a real reading
-    SPLIT = 2  # the batch had more than 5 RR intervals and continues in the next packet
+    SPLIT = 2  # this batch continues in the next packet
+    ACK = 4
+    ECHO_VALID = 8
+    CONTACT = 16
 
 
 class RrCodecError(ValueError):
-    """The bytes are not a valid version-1 RR packet."""
+    """The bytes are not a valid RR packet."""
 
 
 @dataclass(frozen=True)
@@ -52,45 +56,73 @@ class RrPacket:
     rr_ms: tuple[int, ...]
     flags: RrFlags = RrFlags.NONE
     version: int = PACKET_VERSION
+    contact: bool | None = None
+    motion: int | None = None
+    ack: bool = False
+    echo_seq: int | None = None
 
 
 def encode(packet: RrPacket) -> bytes:
     """Packet -> bytes (used by the simulator / fake watch and the tests)."""
 
-    if len(packet.rr_ms) > MAX_RR_PER_PACKET:
-        raise RrCodecError(f"at most {MAX_RR_PER_PACKET} RR intervals per packet")
+    if packet.version not in (1, 2):
+        raise RrCodecError(f"unsupported version {packet.version}")
+    limit = MAX_RR_PER_PACKET if packet.version == 1 else 4
+    if len(packet.rr_ms) > limit:
+        raise RrCodecError(f"at most {limit} RR intervals per packet")
     if not 0 <= packet.seq < _SEQ_MODULUS or not 0 <= packet.watch_ms < _WATCH_MS_MODULUS:
         raise RrCodecError("seq or watch_ms out of range")
     if any(not 0 <= rr < 1 << 16 for rr in packet.rr_ms):
         raise RrCodecError("RR interval out of uint16 range")
-    flags = packet.flags | (RrFlags.HR_VALID if packet.hr_bpm is not None else RrFlags.NONE)
+    # Value fields are authoritative; stale validity bits must not create readings.
+    flags = packet.flags & RrFlags.SPLIT
+    if packet.hr_bpm is not None:
+        flags |= RrFlags.HR_VALID
     hr = packet.hr_bpm if packet.hr_bpm is not None else 0
     if not 0 <= hr <= 255:
         raise RrCodecError("heart rate out of uint8 range")
-    head = _HEADER.pack(packet.version, int(flags), packet.seq, packet.watch_ms, hr,
-                        len(packet.rr_ms))
+    if packet.version == 1:
+        head = _HEADER.pack(1, int(flags), packet.seq, packet.watch_ms, hr, len(packet.rr_ms))
+    else:
+        motion = packet.motion if packet.motion is not None else 0
+        echo = packet.echo_seq if packet.echo_seq is not None else 0
+        if not 0 <= motion <= 255 or not 0 <= echo <= 255:
+            raise RrCodecError("motion or echo_seq out of uint8 range")
+        if packet.contact:
+            flags |= RrFlags.CONTACT
+        if packet.ack:
+            flags |= RrFlags.ACK
+        if packet.echo_seq is not None:
+            flags |= RrFlags.ECHO_VALID
+        head = _HEADER_V2.pack(2, int(flags), packet.seq, packet.watch_ms, hr,
+                               motion, echo, len(packet.rr_ms))
     return head + struct.pack(f"<{len(packet.rr_ms)}H", *packet.rr_ms)
 
 
 def decode(payload: bytes) -> RrPacket:
     """Bytes -> packet. Raises RrCodecError on anything that breaks the contract."""
-
-    if len(payload) < _HEADER.size:
-        raise RrCodecError(f"{len(payload)} bytes is shorter than the 10-byte header")
-    if len(payload) > MAX_PACKET_BYTES:
-        raise RrCodecError(f"{len(payload)} bytes is longer than {MAX_PACKET_BYTES}")
-    version, flag_bits, seq, watch_ms, hr, count = _HEADER.unpack_from(payload)
-    if version != PACKET_VERSION:
-        raise RrCodecError(f"unsupported version {version}")
-    if count > MAX_RR_PER_PACKET:
-        raise RrCodecError(f"rr_count {count} > {MAX_RR_PER_PACKET}")
-    if len(payload) != _HEADER.size + 2 * count:
+    if not payload or payload[0] not in (1, 2):
+        raise RrCodecError("missing or unsupported version")
+    version = payload[0]
+    header = _HEADER if version == 1 else _HEADER_V2
+    limit = MAX_RR_PER_PACKET if version == 1 else 4
+    if not header.size <= len(payload) <= MAX_PACKET_BYTES:
+        raise RrCodecError("packet length outside header/write limits")
+    fields = header.unpack_from(payload)
+    _, flag_bits, seq, watch_ms, hr = fields[:5]
+    count = fields[-1]
+    if count > limit or len(payload) != header.size + 2 * count:
         raise RrCodecError(f"length {len(payload)} does not match rr_count {count}")
-    flags = RrFlags(flag_bits & (RrFlags.HR_VALID | RrFlags.SPLIT))
-    rr = struct.unpack_from(f"<{count}H", payload, _HEADER.size)
-    return RrPacket(seq=seq, watch_ms=watch_ms,
-                    hr_bpm=hr if flags & RrFlags.HR_VALID else None,
-                    rr_ms=tuple(rr), flags=flags, version=version)
+    flags = RrFlags(flag_bits & (3 if version == 1 else 31))
+    rr = struct.unpack_from(f"<{count}H", payload, header.size)
+    return RrPacket(
+        seq=seq, watch_ms=watch_ms, hr_bpm=hr if flags & RrFlags.HR_VALID else None,
+        rr_ms=tuple(rr), flags=flags, version=version,
+        contact=bool(flags & RrFlags.CONTACT) if version == 2 else None,
+        motion=fields[5] if version == 2 else None,
+        ack=bool(flags & RrFlags.ACK),
+        echo_seq=fields[6] if flags & RrFlags.ECHO_VALID else None,
+    )
 
 
 class Arrival(StrEnum):
@@ -107,7 +139,7 @@ class RrFrame:
     """A packet plus the Pi-side facts about its arrival. This is what the HRV stage gets."""
 
     packet: RrPacket
-    rx_monotonic: float  # time.monotonic() on the Pi at arrival: THE timestamp for alignment
+    rx_monotonic: float  # Pi arrival time; replace with WatchClock time for downstream alignment
     rx_wall: float  # time.time() at arrival, for logs only
     arrival: Arrival
     lost_before: int  # packets missing between the previous one and this one

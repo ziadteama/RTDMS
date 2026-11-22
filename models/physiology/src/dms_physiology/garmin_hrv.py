@@ -12,8 +12,8 @@ Pipeline (numpy only, a few hundred beats at most, so it costs microseconds per 
 Rules that keep the numbers honest:
 - Successive differences (RMSSD, pNN50) are only taken between beats that really followed each
   other: never across a rejected beat, a lost packet, a Bluetooth gap or a new session.
-- Beat times come from the Pi clock (the packet's receive time, minus the later beats of the
-  same packet), so features line up with camera frames. The watch clock is never used for time.
+- Beat times use frame.rx_monotonic minus later beats in the batch. Callers can supply
+  WatchClock time with dataclasses.replace(frame, rx_monotonic=t) for buffered packets.
 - Bad input gives no HRV numbers (features = None), never a guess. Fusion decides what to do.
 """
 
