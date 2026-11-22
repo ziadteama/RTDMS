@@ -116,6 +116,13 @@ archived in [[Coordination Board 2026-11]].
 - **Don't screenshot the user's phone to debug.** Read the app's own text (`uiautomator dump` when the app is in the foreground) or ask for a screenshot.
 - **Secrets stay outside git.** The Pi sudo password lives in `~/RTDMS-coord/secrets/pi.env` (mode 0600); the pairing QR with the token is only in that folder.
 
+### Evening of 22 Nov: phone side closed
+
+- User tried the Bluetooth link on the realme: no-code connect, reconnect, and Bluetooth off/on all work. Finding: with Bluetooth off the app showed the raw "device powered off" error. Fix #72: the link exposes `btOff`; the Drive banner and the Settings status say "Bluetooth is off".
+- Cleanup: 12 agent worktrees and about 60 merged branches removed; only `main` remains. Root-owned Docker files in worktrees are removed through an alpine container.
+- New note [[MVP Readiness]]: phone side is enough for a demo; the full chain still needs camera + Bluetooth + buzzer on the Pi, a real alert session, the real test SOS, pairing mode and a car test.
+- Decision D23: the phone work is parked; next focus is heart rate / HRV (`models/physiology/`).
+
 ## Open product and technical questions
 
 See [[Open Items and Next Steps]].
