@@ -15,7 +15,7 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(async () => {}),
 }));
 
-const STATUS = { fps: 14, face: true, baseline: 1, levels: {}, ms: {} };
+const STATUS = { fps: 14, face: true, state: 'alert', baseline: 1, levels: {}, ms: {} };
 const ALERT = { pattern: 'none', reasons: [], t: 1 };
 const PHYSIO = { watch_connected: true, hr_bpm: 70, rr_ms: [], fatigue_probability: 0.1, hrv: null, t: 1 };
 const BODIES: Record<string, unknown> = { '/status': STATUS, '/alert': ALERT, '/physio': PHYSIO };
@@ -80,6 +80,25 @@ describe('poller over Bluetooth', () => {
     link.emit('alert', ALERT);
     link.emit('alert', ALERT);
     expect(seen).toHaveBeenCalledTimes(3);
+    off();
+    stop();
+  });
+
+  it('ignores alert timestamp heartbeats but keeps the link fresh', async () => {
+    link.setState('online');
+    const stop = startPoller();
+    link.emit('alert', ALERT);
+    const seen = jest.fn();
+    const off = useLive.subscribe(seen);
+    for (let t = 2; t <= 8; t++) {
+      await tick(1000);
+      link.emit('alert', { ...ALERT, t });
+    }
+    expect(seen).not.toHaveBeenCalled();
+    expect(useLive.getState().connection).toBe('online');
+    expect(link.lastNotifyAt).toBe(Date.now());
+    link.emit('alert', { ...ALERT, reasons: ['changed'], t: 9 });
+    expect(seen).toHaveBeenCalledTimes(1);
     off();
     stop();
   });

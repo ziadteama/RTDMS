@@ -1,11 +1,12 @@
 /**
  * Hybrid transport: handles control, sensor notifies, calibration, alert tests,
  * and incidents over BLE (BleLink), delegating large media (streams, clips, frames)
- * and Wi-Fi system requests to HttpTransport.
+ * to HttpTransport.
  */
 
 import { type ClipSource, PiHttpError, type PiTransport } from '../transport';
 import type { IncidentFrame } from '../types';
+import { adaptNotify } from './adapt';
 import type { BleLink, BleNotifyKind } from './types';
 
 export class BleTransport implements PiTransport {
@@ -36,7 +37,7 @@ export class BleTransport implements PiTransport {
         if (val === undefined) {
           throw new Error(`BLE transport: no cached ${kind} notify received yet`);
         }
-        return val;
+        return adaptNotify(kind, val);
       }
       case '/health':
         return this.link.read('health');
@@ -54,6 +55,12 @@ export class BleTransport implements PiTransport {
     }
 
     if (method === 'POST') {
+      if (path === '/system/restart' || path === '/system/shutdown') {
+        const res = await this.link.command({ cmd: path.slice('/system/'.length) }, timeoutMs);
+        if (res && typeof res === 'object' && 'ok' in res && res.ok === false) throw new PiHttpError(400, path);
+        return res;
+      }
+
       if (path === '/test_alert') {
         const b = (body ?? {}) as Record<string, unknown>;
         const cmd = { cmd: 'test_alert', ...b };

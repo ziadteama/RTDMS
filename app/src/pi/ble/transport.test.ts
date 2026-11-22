@@ -1,4 +1,5 @@
 import { PiHttpError, type PiTransport } from '../transport';
+import { adaptNotify } from './adapt';
 import { FakeBleLink } from './fake-link';
 import { BleTransport } from './transport';
 
@@ -63,9 +64,9 @@ describe('BleTransport', () => {
       fakeLink.emit('alert', alertObj);
       fakeLink.emit('physio', physioObj);
 
-      await expect(transport.get('/status')).resolves.toEqual(statusObj);
+      await expect(transport.get('/status')).resolves.toEqual(adaptNotify('status', statusObj));
       await expect(transport.get('/alert')).resolves.toEqual(alertObj);
-      await expect(transport.get('/physio')).resolves.toEqual(physioObj);
+      await expect(transport.get('/physio')).resolves.toEqual(adaptNotify('physio', physioObj));
     });
   });
 
@@ -91,6 +92,15 @@ describe('BleTransport', () => {
   });
 
   describe('commands & incidents', () => {
+    it.each(['restart', 'shutdown'])('sends system %s over BLE', async (cmd) => {
+      const command = jest.spyOn(fakeLink, 'command').mockResolvedValue({ ok: true });
+      await expect(transport.send('POST', `/system/${cmd}`)).resolves.toEqual({ ok: true });
+      expect(command).toHaveBeenCalledWith({ cmd }, undefined);
+      expect(mockHttp.sendCalls).toEqual([]);
+      command.mockResolvedValue({ ok: false });
+      await expect(transport.send('POST', `/system/${cmd}`)).rejects.toBeInstanceOf(PiHttpError);
+    });
+
     it('sends test_alert via command', async () => {
       fakeLink.handlers.command = (b) => {
         expect(b).toEqual({ cmd: 'test_alert', pattern: 'max' });

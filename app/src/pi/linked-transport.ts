@@ -3,6 +3,8 @@
  * While the link is online, get/send go over BLE (BleTransport); otherwise over HTTP. Video and
  * incident files are always HTTP (they need Wi-Fi anyway).
  */
+import { useSecure } from '@/state/secure';
+
 import { BleTransport } from './ble/transport';
 import type { BleLink } from './ble/types';
 import { type ClipSource, HttpTransport, PiHttpError, type PiTransport } from './transport';
@@ -16,7 +18,7 @@ export class LinkedTransport implements PiTransport {
     baseUrl: string,
     private readonly link: BleLink,
   ) {
-    this.http = new HttpTransport(baseUrl);
+    this.http = new HttpTransport(baseUrl, () => useSecure.getState().piToken);
     this.ble = new BleTransport(link, this.http);
   }
 
@@ -25,11 +27,14 @@ export class LinkedTransport implements PiTransport {
   }
 
   get(path: string, timeoutMs?: number): Promise<unknown> {
-    return this.route((t) => t.get(path, timeoutMs));
+    return this.route((t) => t.get(path, timeoutMs), true);
   }
 
   send(method: 'POST' | 'PUT', path: string, body?: unknown, timeoutMs?: number): Promise<unknown> {
-    return this.route((t) => t.send(method, path, body, timeoutMs));
+    const retry = (method === 'PUT' && path === '/settings') ||
+      (method === 'POST' && path === '/incident' && typeof body === 'object' && body !== null &&
+        'client_id' in body && typeof body.client_id === 'string' && body.client_id.length > 0);
+    return this.route((t) => t.send(method, path, body, timeoutMs), retry);
   }
 
   streamUrl() {
@@ -51,14 +56,14 @@ export class LinkedTransport implements PiTransport {
 
   /**
    * Online: BLE. A rejection that is not an HTTP status (link lost mid-call, notify missing) is
-   * retried ONCE over HTTP; a PiHttpError is a real answer from the Pi and is passed on.
+   * retried ONCE over HTTP only when safe; a PiHttpError is a real answer from the Pi and is passed on.
    */
-  private async route(call: (t: PiTransport) => Promise<unknown>): Promise<unknown> {
+  private async route(call: (t: PiTransport) => Promise<unknown>, retry: boolean): Promise<unknown> {
     if (this.link.state !== 'online') return call(this.http);
     try {
       return await call(this.ble);
     } catch (e) {
-      if (e instanceof PiHttpError) throw e;
+      if (!retry || e instanceof PiHttpError) throw e;
       return call(this.http);
     }
   }

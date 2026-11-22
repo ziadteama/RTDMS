@@ -67,3 +67,36 @@ describe('LinkedTransport', () => {
     expect(mockBle.dispose).toHaveBeenCalled();
   });
 });
+
+it.each(['/calibrate', '/test_alert', '/system/restart', '/system/shutdown', '/incident', '/other'])(
+  'does not replay POST %s after an ambiguous BLE failure', async (path) => {
+    const { t } = make('online');
+    mockBle.send.mockRejectedValue(new Error('lost result'));
+    await expect(t.send('POST', path, {})).rejects.toThrow('lost result');
+    expect(fetchMock).not.toHaveBeenCalled();
+  },
+);
+
+it('retries an incident only when it has a nonempty client_id', async () => {
+  const { t } = make('online');
+  mockBle.send.mockRejectedValue(new Error('lost result'));
+  for (const client_id of [undefined, null, '', 1]) {
+    await expect(t.send('POST', '/incident', { client_id })).rejects.toThrow('lost result');
+  }
+  expect(fetchMock).not.toHaveBeenCalled();
+  const body = { client_id: 'dedup-id', t_crash: 123 };
+  await expect(t.send('POST', '/incident', body)).resolves.toEqual({ from: 'http' });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/incident'), expect.objectContaining({ body: JSON.stringify(body) }));
+});
+
+it('retries reads once, but does not retry arbitrary PUTs', async () => {
+  const { t } = make('online');
+  mockBle.get.mockRejectedValue(new Error('lost link'));
+  await expect(t.get('/status')).resolves.toEqual({ from: 'http' });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  fetchMock.mockClear();
+  mockBle.send.mockRejectedValue(new Error('lost link'));
+  await expect(t.send('PUT', '/other')).rejects.toThrow('lost link');
+  expect(fetchMock).not.toHaveBeenCalled();
+});

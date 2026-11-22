@@ -77,7 +77,7 @@ describe('link-util', () => {
     it('rejects concurrent command calls with busy', async () => {
       const router = new ResultRouter();
       const p1 = router.registerCommand(4000);
-      await expect(router.registerCommand(4000)).rejects.toThrow('busy');
+      expect(() => router.registerCommand(4000)).toThrow('busy');
 
       router.routeResult({ ok: true });
       await expect(p1).resolves.toEqual({ ok: true });
@@ -86,7 +86,7 @@ describe('link-util', () => {
     it('rejects concurrent incident calls with busy', async () => {
       const router = new ResultRouter();
       const p1 = router.registerIncident(6000);
-      await expect(router.registerIncident(6000)).rejects.toThrow('busy');
+      expect(() => router.registerIncident(6000)).toThrow('busy');
 
       router.routeResult({ ok: true });
       await expect(p1).resolves.toEqual({ ok: true });
@@ -102,15 +102,14 @@ describe('link-util', () => {
       expect(router.hasPending()).toBe(false);
     });
 
-    it('rejectAll rejects pending command and incident on link loss', async () => {
+    it.each(['command', 'incident'])('rejectAll rejects pending %s on link loss', async (kind) => {
       const router = new ResultRouter();
-      const pCmd = router.registerCommand(4000);
-      const pInc = router.registerIncident(6000);
+      const pending = kind === 'command' ? router.registerCommand(4000) : router.registerIncident(6000);
 
       router.rejectAll(new Error('BLE link lost'));
 
-      await expect(pCmd).rejects.toThrow('BLE link lost');
-      await expect(pInc).rejects.toThrow('BLE link lost');
+      await expect(pending).rejects.toThrow('BLE link lost');
+      expect(jest.getTimerCount()).toBe(0);
       expect(router.hasPending()).toBe(false);
     });
   });

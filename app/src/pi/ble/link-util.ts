@@ -41,92 +41,89 @@ export function matchesTarget(
   return device.name === target.name || device.localName === target.name;
 }
 
+/** Pi AuthGate rejects writes with ATT insufficient authentication. */
+export function isAuthError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { errorCode?: unknown; attErrorCode?: unknown };
+  // ATT codes are distinct from ble-plx's generic CharacteristicWriteFailed (401).
+  return [5, 8, 14].includes(Number(e.attErrorCode ?? e.errorCode));
+}
+
 type Pending = {
   resolve: (val: unknown) => void;
-  reject: (err: Error) => void;
+  reject: (err: unknown) => void;
   timer: ReturnType<typeof setTimeout>;
+  hold: boolean;
 };
 
-/**
- * Routes characteristic 06 notifications to pending command / incident promises.
- * Only single request in flight per type; rejects concurrent calls with 'busy'.
- */
+/** Characteristic 06 has no reliable discriminator: all requests share one slot. */
 export class ResultRouter {
-  private pendingCommand: Pending | null = null;
-  private pendingIncident: Pending | null = null;
+  private pending: Pending | null = null;
+
+  private register(kind: string, timeoutMs: number, hold = false): Promise<unknown> {
+    if (this.pending) throw new Error('busy');
+    const promise = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const p = this.pending;
+        if (!hold) this.pending = null;
+        p?.reject(new Error(`BLE ${kind} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      this.pending = { resolve, reject, timer, hold };
+    });
+    // A result can reject while the native write is still unresolved.
+    void promise.catch(() => {});
+    return promise;
+  }
 
   registerCommand(timeoutMs: number): Promise<unknown> {
-    if (this.pendingCommand) {
-      return Promise.reject(new Error('busy'));
-    }
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pendingCommand = null;
-        reject(new Error(`BLE command timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-      this.pendingCommand = { resolve, reject, timer };
-    });
+    return this.register('command', timeoutMs);
   }
 
   registerIncident(timeoutMs: number): Promise<unknown> {
-    if (this.pendingIncident) {
-      return Promise.reject(new Error('busy'));
+    return this.register('incident', timeoutMs);
+  }
+
+  async request(kind: string, timeoutMs: number, write: () => Promise<unknown>): Promise<unknown> {
+    const result = this.register(kind, timeoutMs, true);
+    const registration = this.pending;
+    let writeSettled = false;
+    let finished = false;
+    const release = () => {
+      if (finished && writeSettled && this.pending === registration) this.pending = null;
+    };
+    try {
+      let nativeWrite: Promise<unknown>;
+      try { nativeWrite = write(); } catch (error) { writeSettled = true; throw error; }
+      const writing = nativeWrite.finally(() => { writeSettled = true; release(); });
+      const [, value] = await Promise.all([writing, result]);
+      return value;
+    } catch (error) {
+      registration?.reject(error);
+      throw error;
+    } finally {
+      finished = true;
+      if (registration) clearTimeout(registration.timer);
+      release();
     }
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pendingIncident = null;
-        reject(new Error(`BLE incident timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-      this.pendingIncident = { resolve, reject, timer };
-    });
   }
 
   routeResult(value: unknown): boolean {
-    if (this.pendingCommand && !this.pendingIncident) {
-      const p = this.pendingCommand;
-      this.pendingCommand = null;
-      clearTimeout(p.timer);
-      p.resolve(value);
-      return true;
-    }
-
-    if (this.pendingIncident && !this.pendingCommand) {
-      const p = this.pendingIncident;
-      this.pendingIncident = null;
-      clearTimeout(p.timer);
-      p.resolve(value);
-      return true;
-    }
-
-    if (this.pendingCommand && this.pendingIncident) {
-      const isCmd = Boolean(value && typeof value === 'object' && ('error' in value || !('id' in value)));
-      const p = isCmd ? this.pendingCommand : this.pendingIncident;
-      if (isCmd) this.pendingCommand = null;
-      else this.pendingIncident = null;
-      clearTimeout(p.timer);
-      p.resolve(value);
-      return true;
-    }
-
-    return false;
+    const p = this.pending;
+    if (!p) return false;
+    if (!p.hold) this.pending = null;
+    clearTimeout(p.timer);
+    p.resolve(value);
+    return true;
   }
 
   rejectAll(error: Error): void {
-    if (this.pendingCommand) {
-      const p = this.pendingCommand;
-      this.pendingCommand = null;
-      clearTimeout(p.timer);
-      p.reject(error);
-    }
-    if (this.pendingIncident) {
-      const p = this.pendingIncident;
-      this.pendingIncident = null;
+    const p = this.pending;
+    this.pending = null;
+    if (p) {
       clearTimeout(p.timer);
       p.reject(error);
     }
   }
 
-  hasPending(): boolean {
-    return Boolean(this.pendingCommand || this.pendingIncident);
-  }
+  hasPending(): boolean { return this.pending !== null; }
 }

@@ -9,6 +9,7 @@
  * re-arms for the remaining time. `lastOkAt` is written on transitions only; the age of the last
  * notify is `link.lastNotifyAt` (read it where needed instead of subscribing to a store).
  */
+import { adaptNotify } from '@/pi/ble/adapt';
 import type { BleLink, BleNotify } from '@/pi/ble/types';
 import { parseAlert, parsePhysio, parseStatus } from '@/pi/parse';
 import { type LiveState, setLive, useLive } from '@/state/live';
@@ -34,19 +35,21 @@ export function startBlePush(link: BleLink): () => void {
   }
 
   const off = link.onNotify(({ kind, value }) => {
-    const raw = JSON.stringify(value);
+    const adapted = adaptNotify(kind, value);
+    if (!adapted) return;
+    const raw = JSON.stringify(kind === 'alert' ? { pattern: adapted.pattern, reasons: adapted.reasons } : adapted);
     const live = useLive.getState();
     const patch: Partial<LiveState> = {};
     if (raw !== lastRaw[kind]) {
       lastRaw[kind] = raw;
       if (kind === 'status') {
-        const status = parseStatus(value);
+        const status = parseStatus(adapted);
         if (status) patch.status = status;
       } else if (kind === 'alert') {
-        patch.alert = parseAlert(value);
+        patch.alert = parseAlert(adapted);
         if (live.alertSupported !== true) patch.alertSupported = true;
       } else {
-        patch.physio = parsePhysio(value);
+        patch.physio = parsePhysio(adapted);
         if (live.physioSupported !== true) patch.physioSupported = true;
       }
     }
