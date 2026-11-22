@@ -151,7 +151,7 @@ payloads as their BLE counterparts, but the app uses BLE for them once the BLE t
 | 1 | 2026-11-21 | First version |
 | 1.1 | 2026-11-22 | Additive: `phone_calibration` payload (POST /calibrate body, `command.profile`) |
 | 1.2 | 2026-11-22 | Pi efficiency (CR-BLE-RATES): slower notify cadence, send on change. No layout or schema change. The phone treats more than 3 s without any notify as stale (was 1 s) and, while BLE is online, sends no HTTP polls (HTTP fallback poll is 1 Hz) |
-| 1.3 | 2026-11-23 | CR-CLOCK-PHYSIO: one time model (§Time; `t_src`; `clock` every 60 s); `physio` drops `fatigue_probability`, adds `worn`, `hr_baseline_bpm`, `hr_delta_bpm`, `hr_trend_bpm_per_10min` (`quality` = heart-rate stream quality); `alert.emergency` (`"unresponsive"`); `health.physio_diag`; characteristic 0b `watch_alert` for the Garmin watch |
+| 1.3 | 2026-11-23 | CR-CLOCK-PHYSIO: one time model (§Time; `t_src`; `clock` every 60 s); `physio` drops `fatigue_probability`, adds `worn`, `hr_baseline_bpm`, `hr_delta_bpm`, `hr_trend_bpm_per_10min` (`quality` = heart-rate stream quality); `alert.emergency` (`"unresponsive"`); `health.physio_diag` (incl. watch alert round-trip p50/p95); characteristic 0b `watch_alert` for the Garmin watch |
 
 ## Open questions for the spike (P1) and first integration
 

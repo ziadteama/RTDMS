@@ -104,6 +104,18 @@
             "number",
             "null"
           ]
+        },
+        "watch_alert_rtt_p50_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "watch_alert_rtt_p95_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
         }
       }
     }
