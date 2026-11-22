@@ -37,6 +37,16 @@ realme phone (Tailscale) ──► Pi 100.113.107.122:8080          (camera serv
 All Tailscale links are relayed (not direct), so the round trip is slow and uneven (18–366 ms
 measured once). Use them for functional tests, **never for latency numbers**.
 
+### Dev machine habits learnt on 22 Nov
+
+- **Metro for the dev build:** `cd app && CI=1 npx expo start --dev-client --port 8081 --host lan --clear`. After pulling or merging, restart it with `--clear`, force-stop the app (`adb shell am force-stop edu.aast.rtdms.sahi`) and reopen with `adb shell am start -a android.intent.action.VIEW -d "exp+sahi://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081" edu.aast.rtdms.sahi` after `adb reverse tcp:8081 tcp:8081`.
+- **Run `npm install` in `app/` of the main checkout** after merging a PR that adds a dependency, or the phone shows "failed to load".
+- **Open a screen from adb:** `adb shell am start -a android.intent.action.VIEW -d "sahi://pair" edu.aast.rtdms.sahi` (also `sahi://diagnostics`). Read the screen without a picture: `adb shell uiautomator dump`, only while Sahi is in the foreground.
+- **Phone log:** the logcat buffer rotates within about a minute, so stream with a tag filter (`adb logcat -v time SahiFaceView:V CXCP:I ReactNativeJS:V '*:S'`).
+- **`/tmp` is a 3.9 GB tmpfs.** Do not keep APKs or worktrees there; use `/home`.
+- **Pi gates:** `docker compose -f pi/compose.yaml run --build --rm verify`.
+- **WhatsApp relay** runs as the user service `rtdms-relay` (see [[WhatsApp SOS Relay]]).
+
 ### Pi on a direct cable (when it has no Wi-Fi)
 
 Set up on 22 Nov when the Pi was cabled straight into the dev machine's `eno1`:
