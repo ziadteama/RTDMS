@@ -10,8 +10,11 @@ Reconnection needs nothing from this side: the Pi keeps advertising, and when th
 back it connects again; a restarted app shows up as a NEW_SESSION. Liveness is judged from data,
 not from connection events: `seconds_since_last_packet()` grows when the watch is gone.
 
-    python -m dms_physiology.garmin_receiver                  # log to logs/garmin_rr_<time>.csv
-    python -m dms_physiology.garmin_receiver --csv rr.csv --name RTDMS
+    python -m dms_physiology.garmin_receiver                  # live only, nothing saved
+    python -m dms_physiology.garmin_receiver --csv rr.csv --name RTDMS   # consented research log
+
+Heart data is never written to disk unless --csv is given (report §4.3: no persistent biometric
+storage); use --csv only for a consented research session.
 
 Linux / BlueZ (Raspberry Pi OS Bookworm) with the optional dependency: pip install ".[garmin]".
 """
@@ -239,13 +242,13 @@ class GarminRrReceiver:
 
 
 async def _main(args: argparse.Namespace) -> None:
-    path = Path(args.csv or f"logs/garmin_rr_{time.strftime('%Y%m%d_%H%M%S')}.csv")
-    log = RrCsvLog(path)
+    log = None if args.csv is None else RrCsvLog(Path(args.csv))
     rx = GarminRrReceiver(log)
     hrv = RrHrv()
     model = None if args.model is None else LogisticModel.from_json_file(Path(args.model))
     live = LiveState(rx.tracker)
-    print(f"[garmin] logging to {path}", flush=True)
+    print(f"[garmin] research log {args.csv}" if log else "[garmin] live only, nothing saved",
+          flush=True)
     if model is not None:
         print(f"[garmin] fatigue model {model.version}", flush=True)
     if args.http:
@@ -300,7 +303,8 @@ async def _main(args: argparse.Namespace) -> None:
             t.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await t
-        log.close()
+        if log:
+            log.close()
         t_ = rx.tracker
         print(f"[garmin] received {t_.received}, lost {t_.lost}, duplicates {t_.duplicates}, "
               f"late {t_.late}, decode errors {rx.decode_errors}", flush=True)
@@ -308,7 +312,7 @@ async def _main(args: argparse.Namespace) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    p.add_argument("--csv", help="raw log file (default logs/garmin_rr_<time>.csv)")
+    p.add_argument("--csv", help="consented research log file (default: off, nothing saved)")
     p.add_argument("--name", default="RTDMS", help="advertised Bluetooth name")
     p.add_argument("--stale-s", type=float, default=5.0, help="warn after this long without data")
     p.add_argument("--http", type=int, default=8081,
