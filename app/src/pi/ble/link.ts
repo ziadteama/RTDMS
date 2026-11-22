@@ -11,6 +11,8 @@ export class PlxBleLink implements BleLink {
   lastNotifyAt: number | null = null;
   deviceId: string | null = null;
   lastError: string | null = null;
+  /** True while the phone's Bluetooth radio is off or unusable (the link waits for it to come back). */
+  btOff = false;
   private session = 0;
   private target: BleTarget | null = null;
   private manager: BleManager | null = null;
@@ -47,6 +49,7 @@ export class PlxBleLink implements BleLink {
     this.cleanupConnection();
     this.target = null;
     this.lastError = null;
+    this.btOff = false;
     this.reconnectAttempt = 0;
     if (this.manager) {
       void this.manager.destroy().catch(() => {});
@@ -79,6 +82,7 @@ export class PlxBleLink implements BleLink {
     try {
       const btState = await manager.state();
       if (!this.current(session)) return;
+      this.btOff = btState !== 'PoweredOn';
       if (btState !== 'PoweredOn') {
         this.setState('offline');
         this.btStateSub?.remove();
@@ -86,6 +90,7 @@ export class PlxBleLink implements BleLink {
           if (this.current(session) && s === 'PoweredOn') {
             this.btStateSub?.remove();
             this.btStateSub = null;
+            this.btOff = false;
             void this.connectOrScan(session);
           }
         }, false);

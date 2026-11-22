@@ -13,6 +13,8 @@ export type LiveState = {
   connection: Connection;
   /** Which link feeds the data right now: Bluetooth or the HTTP fallback; null until known. */
   link: 'ble' | 'http' | null;
+  /** The phone's Bluetooth is switched off, so the unit cannot be reached over Bluetooth. */
+  btOff: boolean;
   lastOkAt: number | null;
   status: PiStatus | null;
   alert: PiAlert | null;
@@ -32,6 +34,7 @@ export type LiveState = {
 export const INITIAL_LIVE: LiveState = {
   connection: 'connecting',
   link: null,
+  btOff: false,
   lastOkAt: null,
   status: null,
   alert: null,

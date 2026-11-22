@@ -187,6 +187,7 @@ describe('PlxBleLink', () => {
     await flushAsync(2);
 
     expect(link.state).toBe('offline');
+    expect(link.btOff).toBe(true);
     expect(mockManager.stateListener).not.toBeNull();
 
     // Turn Bluetooth on
@@ -195,5 +196,6 @@ describe('PlxBleLink', () => {
 
     await flushAsync();
     expect(link.state).toBe('online');
+    expect(link.btOff).toBe(false);
   });
 });
