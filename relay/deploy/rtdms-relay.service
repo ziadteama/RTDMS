@@ -1,0 +1,20 @@
+[Unit]
+Description=RTDMS WhatsApp SOS relay (Baileys), http://<dev machine>:8088
+# The relay reconnects to WhatsApp by itself; no network-online ordering is needed in a user unit.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=%h/RTDMS/relay
+# Secrets stay out of git: RELAY_API_KEY, RELAY_AUTH_DIR (WhatsApp session), RELAY_DB_PATH, ...
+EnvironmentFile=%h/RTDMS-coord/relay-data/relay.env
+ExecStart=/usr/bin/node --experimental-transform-types src/main.ts
+Restart=always
+RestartSec=5
+# Keep Node warnings out of the way, give the process a clean shutdown window.
+TimeoutStopSec=15
+# Low priority: this machine also builds and tests.
+Nice=5
+
+[Install]
+WantedBy=default.target
