@@ -164,6 +164,18 @@ class SahiNativeModule : Module() {
       wifiCallback = null
     }
 
+    View(SahiFaceView::class) {
+      Events("onFace")
+
+      Prop("active") { view: SahiFaceView, active: Boolean ->
+        view.setActive(active)
+      }
+
+      OnViewDestroys { view: SahiFaceView ->
+        view.onDestroy()
+      }
+    }
+
     OnDestroy {
       stopMotion()
       smsReceiver?.let { runCatching { context.unregisterReceiver(it) } }
