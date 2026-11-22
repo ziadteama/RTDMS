@@ -16,6 +16,7 @@ updated: 2026-11-21
 # Pi Runtime — the `rtdms-pi` process
 
 ↑ [[Home]] | Link design: [[Phone-Pi Link]] | Contract: `contracts/pi-link/CONTRACT.md` | Device: [[Raspberry Pi 5 Target]] | Setup: [[Pi Setup Plan]] | Models: [[Face Subsystem]], [[Distraction Subsystem]], [[Physiology Subsystem]]
+Related: [[Eye Calibration]]
 
 One Python process (package `pi/`, entry point `rtdms-pi`) that joins the model outputs, runs `dms_fusion.decide()` on every frame, drives the buzzer, serves the phone over BLE, records incidents and answers health. **Status: code complete and Docker-verified on x86 (Python 3.11 and 3.13). Nothing here has run on the Pi yet.** Every claim about hardware is "not verified on hardware" until the Hardware queue (below) is cleared.
 
