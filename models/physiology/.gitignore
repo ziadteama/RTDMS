@@ -15,6 +15,7 @@ recordings/
 models/*.json
 !models/.gitkeep
 !models/fatigue_wesad_v1.json
+!models/hr_shadow_mpddf_v1.json
 
 # mock_wearable latency sidecar output
 *.csv

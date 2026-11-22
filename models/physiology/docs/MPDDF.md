@@ -180,3 +180,59 @@ python3 -m venv ~/.venvs/mpddf && ~/.venvs/mpddf/bin/pip install numpy scipy sci
 # data: figshare 28455737, *_PSG.edf + *_Annotation.txt into data/mpddf/
 ~/.venvs/mpddf/bin/python tools/mpddf_pilot.py --data data/mpddf --subjects 1-50 --evaluate
 ```
+
+## §9 Shadow score (hr_shadow_mpddf_v1)
+
+This score is logged only next to alert decisions with weight 0, never acted on, and its
+weight is raised only if a paired camera + watch test shows value.
+
+`tools/mpddf_score.py` exports `models/hr_shadow_mpddf_v1.json` in the existing logistic
+format, with exactly `hr_delta_bpm` and `hr_trend_bpm_per_10min`. Delta subtracts the median
+HR of **all** subject windows ending at or before first `t_s` + 300 s. Trend is least-squares
+HR slope over (t_s − 600, t_s], multiplied by 600, requiring at least 24 windows. Both are
+computed before label/purity filtering. Windows through the baseline endpoint are excluded
+from fitting and evaluation; retained labels are 0 versus 2/3/4, purity ≥ 0.8, with finite
+features. No additional quality filter is applied. These ECG-derived 60 s averages approximate
+the live watch features; they do not reproduce its one-second sampling or quality gates.
+
+The input has 66,454 windows from **49** subject IDs (42 is absent), despite §7's description
+of 50 participants. Subjects 26 and 38 have no eligible windows after exclusions, leaving
+47 subjects for LOSO and the final fit; 34 have both classes for within-subject AUROC.
+Both models use identical windows and fold-local StandardScaler + balanced LogisticRegression
+(default C=1, lbfgs, max_iter=1000, random_state=0). The final HR model fits all eligible
+subjects. The JSON records full-precision metrics, per-subject AUROCs, input SHA-256 and
+numpy/pandas/scikit-learn versions; extra metadata is accepted by the unchanged loader.
+
+Reproduce from `models/physiology/` (reads the external CSV; does not copy it):
+
+```bash
+PYTHONPATH=src /home/teamacs/.venvs/mpddf/bin/python tools/mpddf_score.py
+```
+
+Printed summary (rates are fractions; false-alarm rate = FP / (FP + TN), per window):
+
+```text
+hr_shadow_mpddf_v1: LOSO, baseline windows excluded
+Eligible: 47504 windows; 3154 positive; 47 subjects
+Paired subject bootstrap: seed 42; 5000 resamples; percentile 95% CI
+HR shadow: AUROC mean 0.761022, median 0.840791, 95% CI [0.678355, 0.838278]; subjects > 0.5: 28/34
+  Pooled at p >= 0.7: precision 0.171032, recall 0.175967, false-alarm rate 0.060654
+  TN=41660, FP=2690, FN=2599, TP=555
+Time only (hours): AUROC mean 0.824221, median 0.947321, 95% CI [0.743675, 0.897373]; subjects > 0.5: 31/34
+  Pooled at p >= 0.7: precision 0.247312, recall 0.313570, false-alarm rate 0.067869
+  TN=41340, FP=3010, FN=2165, TP=989
+HR minus time: mean AUROC difference -0.063200, paired 95% CI [-0.145684, 0.015692]
+Export: hr_shadow_mpddf_v1; loader/sklearn probability parity passed
+Use: logged only; weight 0; never acted on
+```
+
+The percentile bootstrap resamples the same 34 subject IDs for both models (5,000 draws,
+seed 42), preserving pairing for the difference. It estimates uncertainty across held-out
+subjects conditional on fitted LOSO predictions, without refitting bootstrap folds; it does
+not establish watch-domain performance or probability calibration. Overlapping windows are
+not independent trials, and false-alarm rate is not alarms per hour.
+
+On clean ECG the AUROC ≥ 0.65 and ≥ 70% above-chance numerical criteria hold (28/34), but
+beating time-only by ≥ 0.05 fails. The paired difference CI includes zero. §6's actual
+Garmin-degraded validation and operating-precision gates remain unmet; this shadow export
+does not authorize deployment as an alert input or change runtime wiring.
