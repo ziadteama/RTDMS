@@ -37,7 +37,7 @@ const SHOTS = [
   ['02-permissions', '/permissions', { onboarded: false }],
   ['03-pair', '/connect', { onboarded: false }],
   ['03b-onboarding-eye-calibration', '/eye-calibration', { onboarded: false }],
-  ['03c-pair-ble-manual', '/connect', { onboarded: false }, async (p) => { await p.getByRole('button', { name: 'Pair with a code instead' }).click(); await p.waitForTimeout(500); }],
+  ['03c-pair-ble-manual', '/connect', { onboarded: false }, async (p) => { await p.getByText('Pair with a code instead').first().click(); await p.waitForTimeout(500); }],
   ['04-emergency-contacts', '/emergency-contacts', { onboarded: false }],
   ['05-drive', '/live', {}],
   ['06-drive-driving-lock', '/live', { demo: true }, async (p) => p.waitForTimeout(23_000)], // demo speed > 10 km/h after 20 s
@@ -54,7 +54,7 @@ const SHOTS = [
   ['10h-eye-cal-failure', '/eye-calibration?cal=failure', {}],
   ['11-contacts', '/contacts', {}],
   ['12-privacy', '/privacy', {}],
-  ['14-diagnostics-link', '/diagnostics', { bleName: 'RTDMS-Pi' }, async (p) => { await p.getByText('Signal').first().scrollIntoViewIfNeeded(); await p.waitForTimeout(2500); }],
+  ['14-diagnostics-link', '/diagnostics', { bleName: 'RTDMS-Pi' }, async (p) => { await p.getByText('Link', { exact: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(2500); }],
   ['13-sos', '/sos?incident=1', { demo: true }, async (p) => p.waitForTimeout(3000)],
 ];
 
