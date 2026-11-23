@@ -129,10 +129,11 @@ def map_status(status: dict[str, Any], t: float) -> FrameResult:
 
 
 # The production camera configuration (models/distraction start_stream.sh on the Pi): face mesh
-# drowsiness + v2 hybrid phone alerts, no box detector, texting alerts off. `--profile pi` picks
-# the LiteRT face mesh (MediaPipe is not installed on the Pi); `--mesh` draws it on the stream.
-CAMERA_ARGS = ("--profile", "pi", "--no-rectify", "--roi", "full", "--drowsiness", "--no-texting",
-               "--hybrid", "--no-detect", "--mesh")
+# drowsiness + v2 hybrid phone alerts, no box detector, texting alerts off; `--mesh` draws the face
+# mesh on the stream. No `--profile pi`: the Pi bundle's own configs/pipeline.yaml already selects
+# the LiteRT face mesh and the Pi has no configs/profiles/ (deploy.sh never sends configs/).
+CAMERA_ARGS = ("--no-rectify", "--roi", "full", "--drowsiness", "--no-texting", "--hybrid",
+               "--no-detect", "--mesh")
 
 
 class StreamPipelineSource:
