@@ -109,6 +109,8 @@ if [ "$SYSTEM" = 1 ]; then
     as_root mkdir -p /var/log/journal
     as_root systemctl restart systemd-journald
   fi
+  # the volatile journal moves to /var/log/journal only after a flush (done by itself at boot)
+  if [ -z "$(ls -A /var/log/journal 2>/dev/null)" ]; then as_root journalctl --flush; fi
   if ! loginctl show-user "$USER" -p Linger 2>/dev/null | grep -q 'Linger=yes'; then
     say "enable linger (user services start at boot without a login)"
     as_root loginctl enable-linger "$USER"
