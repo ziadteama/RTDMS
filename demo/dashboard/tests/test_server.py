@@ -114,25 +114,24 @@ def test_camera_lost_in_health_hides_camera(pi):
     assert d.state()["eyes"] is None
 
 
-def test_drinking_debounce():
+def test_drinking_debounce_averages_the_score():
     db = server.DrinkDebounce()
-    assert not db.update(0.0, "drinking", 0.9)  # too few samples
-    assert not db.update(0.25, "drinking", 0.9)
-    assert db.update(0.5, "drinking", 0.9)
-    assert db.update(0.75, "normal", 0.9)  # 3 of 4 = 75 % still holds
-    assert not db.update(1.0, "normal", 0.9)  # 3 of 5 = 60 %
+    # mid-sip flicker: drinking narrowly loses every other frame, its score stays ~0.45-0.7
+    flicker = [("drinking", 0.7, 0.7), ("other", 0.55, 0.45), ("drinking", 0.6, 0.6),
+               ("other", 0.5, 0.5), ("drinking", 0.65, 0.65)]
+    got = [db.update(i * 0.25, a, p, pd) for i, (a, p, pd) in enumerate(flicker)]
+    assert got == [False, False, True, True, True]  # 3 samples needed, then steady
     db.reset()
-    for i in range(3):  # 50 % confidence is enough
-        db.update(i * 0.25, "drinking", 0.5)
-    assert db.update(0.75, "drinking", 0.5)
-    db.reset()
-    for i in range(6):  # below 50 % never counts
-        assert not db.update(i * 0.25, "drinking", 0.45)
+    for i in range(8):  # an ordinary scene: low drinking score never shows
+        assert not db.update(i * 0.25, "other", 0.8, 0.15)
     db.reset()
     for i in range(6):
-        db.update(i * 0.25, "drinking", 0.9)
-    assert not db.update(5.0, "normal", 0.9)  # old samples expire
+        db.update(i * 0.25, "drinking", 0.9, 0.9)
+    assert not db.update(5.0, "other", 0.9, 0.1)  # old samples expire
     assert len(db.samples) == 1
+    db.reset()  # older camera script without p_drinking: top-class probability, else 0
+    assert [db.update(i * 0.25, "drinking", 0.9) for i in range(3)] == [False, False, True]
+    assert db.mean == 0.9
 
 
 def test_watch_disconnected_link():

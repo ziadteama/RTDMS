@@ -216,7 +216,7 @@ function render(s){
   if(!d){card('c-drink','off');$('d-big').textContent='Offline';$('d-sub').textContent=''}
   else if(d.face===false){card('c-drink','off');$('d-big').textContent='No face';$('d-sub').textContent='needs the driver in view'}
   else{card('c-drink',d.detected?'warn':'ok');$('d-big').textContent=d.detected?'DRINKING':'Not drinking';
-    $('d-sub').textContent=d.p!=null?`Classifier confidence ${pct(d.p)}`:'No cup at the mouth'}
+    $('d-sub').textContent=d.p!=null?`Drinking score ${pct(d.p)} (1.5 s average)`:'No cup at the mouth'}
 
   // heart
   const h=s.heart;const icon=$('h-icon');

@@ -34,13 +34,12 @@ HEALTH_S = 5.0  # /health runs vcgencmd on the Pi: keep it slow
 TIMEOUT_S = 0.5
 STALE_S = {"camera": 1.5, "alert": 2.0, "physio": 2.0, "health": 15.0}
 
-# Drinking is only exposed as the classifier's top class per frame; debounce it with the window
-# and fraction of models/distraction/scripts/hybrid_alerts.py (WIN["drinking"], FRAC). The
-# confidence floor is 0.5 here (hybrid_alerts uses 0.7), lowered for the demo camera at the
-# user's request. Display only: fusion ignores drinking on purpose (decision D28), no alert.
+# Drinking: the classifier judges each frame alone and, mid-sip from a frontal camera, scores
+# drinking and "other" about equally, so the top label flickers. The camera now reports the
+# drinking score every frame (hybrid p_drinking); its mean over 1.5 s (hybrid_alerts.py's
+# drinking window) >= 0.4 shows drinking. Display only: fusion ignores drinking (decision D28).
 DRINK_WIN_S = 1.5
-DRINK_MIN_P = 0.5
-DRINK_FRAC = 0.7
+DRINK_MEAN_P = 0.4
 DRINK_MIN_SAMPLES = 3
 
 Json = dict[str, Any]
@@ -80,19 +79,27 @@ class Source:
 
 
 class DrinkDebounce:
+    """Mean drinking score over the last DRINK_WIN_S; drinking when it is >= DRINK_MEAN_P."""
+
     def __init__(self) -> None:
-        self.samples: deque[tuple[float, bool]] = deque()
+        self.samples: deque[tuple[float, float]] = deque()
+        self.mean: float | None = None
 
     def reset(self) -> None:
         self.samples.clear()
+        self.mean = None
 
-    def update(self, t: float, action: Any, p: Any) -> bool:
-        hit = action == "drinking" and isinstance(p, (int, float)) and p >= DRINK_MIN_P
-        self.samples.append((t, hit))
+    def update(self, t: float, action: Any, p: Any, p_drinking: Any = None) -> bool:
+        if num(p_drinking) is not None:  # the score itself, even when another class wins
+            score = float(p_drinking)
+        else:  # older camera script: only the top class and its probability
+            score = float(p) if action == "drinking" and num(p) is not None else 0.0
+        self.samples.append((t, score))
         while self.samples and t - self.samples[0][0] > DRINK_WIN_S:
             self.samples.popleft()
         n = len(self.samples)
-        return n >= DRINK_MIN_SAMPLES and sum(h for _, h in self.samples) / n >= DRINK_FRAC
+        self.mean = sum(s for _, s in self.samples) / n
+        return n >= DRINK_MIN_SAMPLES and self.mean >= DRINK_MEAN_P
 
 
 def num(v: Any) -> float | None:
@@ -100,7 +107,7 @@ def num(v: Any) -> float | None:
 
 
 def merge(cam: Json | None, alert: Json | None, physio: Json | None, health: Json | None,
-          drinking: bool) -> Json:
+          drinking: bool, drink_score: float | None = None) -> Json:
     """One view for the page. A part is None when its source is offline or stale."""
     out: Json = {"eyes": None, "phone": None, "drinking": None, "heart": None, "alert": None}
     perf: Json = {}
@@ -121,7 +128,7 @@ def merge(cam: Json | None, alert: Json | None, physio: Json | None, health: Jso
         }
         out["phone"] = {k: h.get(k) for k in ("face", "call", "action", "p", "ear")}
         out["drinking"] = {"face": h.get("face"), "detected": drinking,
-                           "p": h.get("p") if h.get("action") == "drinking" else None}
+                           "p": None if drink_score is None else round(drink_score, 2)}
         ms = {k: v for k, v in (cam.get("ms") or {}).items() if num(v) is not None}
         perf.update(fps=num(cam.get("fps")), stages_ms=ms,
                     processing_ms=round(sum(ms.values()), 1) if ms else None,
@@ -194,7 +201,8 @@ class Dashboard:
                 self.drinking = False
             else:
                 h = cam.get("hybrid") or {}
-                self.drinking = self.drink.update(now, h.get("action"), h.get("p"))
+                self.drinking = self.drink.update(now, h.get("action"), h.get("p"),
+                                                  h.get("p_drinking"))
 
     def state(self) -> Json:
         now = self.clock()
@@ -204,7 +212,7 @@ class Dashboard:
             if health is not None and health.get("camera") == "lost":
                 fresh["camera"] = None
             out = merge(fresh["camera"], fresh["alert"], fresh["physio"], health,
-                        self.drinking)
+                        self.drinking, self.drink.mean)
             out["links"] = {n: {"ok": fresh[n] is not None, "age_s": s.age(now)}
                             for n, s in self.sources.items()}
         heart = out["heart"]
@@ -268,6 +276,7 @@ def mock_sources(t: float) -> dict[str, Json]:
                        "blink_rate": 14, "closure_ms": closure, "calibrated": True,
                        "calibration_step": step, "calibration_left_s": left},
         "hybrid": {"face": True, "call": call, "action": action, "p": p,
+                   "p_drinking": 0.88 if drinking else 0.05,
                    "ear": 0.81 if phase == "phone" else 0.03},
     }
     if drinking:

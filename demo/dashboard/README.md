@@ -52,6 +52,6 @@ scp -r demo/dashboard <user>@<pi>:~/rtdms-demo/
 
 - **Processing / frame** is the sum of the model stage times the camera reports (`/status` `ms`). No end-to-end measurement from capture to alert exists yet, so the page does not claim one.
 - **Pi → watch alert** is the Bluetooth round trip from an alert change to the watch's echo, median and p95 (`/health` `physio_diag`). It appears once the watch has received alerts.
-- **Drinking** is debounced here with the classifier's own numbers (1.5 s window and 70 % of samples as in `hybrid_alerts.py`; confidence p ≥ 0.5, lowered from its 0.7 for the demo camera). It is shown as a detection only: fusion does not alert on drinking (decision D28).
+- **Drinking** is the classifier's drinking score averaged over the last 1.5 s (`p_drinking`, reported every frame even when another class narrowly wins); 40 % or more shows drinking. The top label alone flickers mid-sip. It is shown as a detection only: fusion does not alert on drinking (decision D28).
 
 Tests: `pytest demo/dashboard/tests`.
