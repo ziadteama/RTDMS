@@ -34,7 +34,7 @@ aliases:
 | Local worktrees (dev machine) | `C:\Users\youss\projects\RTDMS-dashboard`, `-occlusion`, `-pi-flags`, `-docs`, `-pre`. The main checkout `RTDMS` is on the user's own branch `phone/eating-mnv3` (19 commits, **never pushed**: the user said "not now"); do not touch it |
 | Someone else's work | `C:\Users\youss\projects\RTDMS-reset`, branch `pi/perclos-reset-after-calibration`, **uncommitted**, from the "Remote control" session: a camera `/reset` command, its own post-calibration grace, app BLE/i18n changes. It overlaps `drowsiness.py` / `stream.py` / `app/src/i18n/en.ts`. Do not edit it; reconcile with its owner before merging |
 
-Nothing is on `main`.
+**On `main` since 23 Nov evening:** PR #94 (mesh), #95 (camera pipeline), #96 (dashboard + tools), plus this docs PR.
 
 ## The Pi right now
 
