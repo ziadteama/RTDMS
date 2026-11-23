@@ -9,10 +9,12 @@ import { Row, Section } from '@/components/list';
 import { ProgressBar } from '@/components/progress-bar';
 import { Text } from '@/components/text';
 import { useT, type StringKey } from '@/i18n';
-import { announceCountdown, cancelSos, runEmergency, type CallProgressState } from '@/services/emergency';
+import { announceCountdown, cancelSos, runEmergency } from '@/services/emergency';
 import type { ChannelStatus } from '@/services/relay/types';
 import type { ContactChannelState } from '@/services/sos-channels';
+import { isWatchAckFresh } from '@/services/watch-ack-cancel';
 import { db } from '@/state/db';
+import { useLive } from '@/state/live';
 import { useSecure } from '@/state/secure';
 import { useSettings } from '@/state/settings';
 import { spacing, useTheme } from '@/theme';
@@ -44,8 +46,6 @@ export default function Sos() {
   const total = kind === 'manual' ? 10 : countdown;
   const [left, setLeft] = useState<number>(total);
   const [phase, setPhase] = useState<Phase>({ kind: 'countdown' });
-  const [callState, setCallState] = useState<CallProgressState>('none');
-  const [callNumber, setCallNumber] = useState('');
   const [smsSent, setSmsSent] = useState<number>(0);
   const [channels, setChannels] = useState<ContactChannelState[]>([]);
   const [demoRun, setDemoRun] = useState(false);
@@ -69,8 +69,6 @@ export default function Sos() {
       if (info.demo) setDemoRun(true);
       if (info.contacts) setChannels(info.contacts);
       if (info.sent !== undefined) setSmsSent(info.sent);
-      if (info.number) setCallNumber(info.number);
-      if (info.callState) setCallState(info.callState);
     });
   };
 
@@ -96,6 +94,18 @@ export default function Sos() {
     setPhase({ kind: 'cancelled' });
     router.back();
   };
+
+  const onWatchAck = useEffectEvent(() => {
+    if (phase.kind === 'countdown') ok();
+  });
+
+  useEffect(() => {
+    const unsub = useLive.subscribe((s) => {
+      if (isWatchAckFresh(s.physio?.ack_age_s)) onWatchAck();
+    });
+    if (isWatchAckFresh(useLive.getState().physio?.ack_age_s)) onWatchAck();
+    return unsub;
+  }, []);
 
   const bg = phase.kind === 'countdown' ? colors.alert.max : colors.background;
   const fg = phase.kind === 'countdown' ? colors.onAlert.max : colors.text;
@@ -136,7 +146,7 @@ export default function Sos() {
         <ScrollView contentContainerStyle={{ gap: spacing.xl, paddingBottom: spacing.lg }} showsVerticalScrollIndicator={false}>
           <Text variant="headline">{demoRun ? t('sos.demoDone') : t('sos.done')}</Text>
           {demoRun ? <Text tone="secondary">{t('sos.demoNote')}</Text> : null}
-          {demoRun ? null : <View style={{ gap: spacing.xs }}>
+          {demoRun ? null : (
             <Text tone="secondary">
               {!hasContacts
                 ? t('sos.noContacts')
@@ -144,28 +154,7 @@ export default function Sos() {
                 ? t('sos.smsSentSingle')
                 : t('sos.smsSentPlural', { n: smsSent })}
             </Text>
-            {callState === 'waiting' ? (
-              <View style={{ gap: spacing.md, marginTop: spacing.sm }}>
-                <Text tone="secondary">{t('sos.callDelay', { n: callNumber })}</Text>
-                <Button title={t('sos.cancelCall')} variant="destructive" size="lg" onPress={ok} />
-              </View>
-            ) : null}
-            {callState === 'starting' ? (
-              <Text tone="secondary" accessibilityLiveRegion="assertive">
-                {t('sos.callStarting', { n: callNumber })}
-              </Text>
-            ) : null}
-            {callState === 'calling' ? (
-              <Text tone="secondary" accessibilityLiveRegion="assertive">
-                {t('sos.callDialed', { n: callNumber })}
-              </Text>
-            ) : null}
-            {callState === 'failed' ? (
-              <Text tone="secondary" accessibilityLiveRegion="assertive">
-                {t('sos.callFailed')}
-              </Text>
-            ) : null}
-          </View>}
+          )}
           {channels.length > 0 ? (
             <Section title={t('settings.contacts')}>
               {channels.map((c) => (

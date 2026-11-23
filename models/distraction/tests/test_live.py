@@ -61,7 +61,9 @@ def test_pipeline_accepts_colour_and_gray_frames():
     b = pipe.process(np.zeros((640, 640, 3), np.uint8), 0.1)
     assert a.view.ndim == 2 and b.view.ndim == 3
     img = render(b, 10.0, debug=False, info=["model x"], banner="Phone call at your RIGHT ear")
-    assert img.ndim == 3 and img.shape[0] >= 560
+    assert img.ndim == 3 and img.shape[0] >= 560 and img.shape[1] > 640
+    clean = render(b, 10.0, debug=False, panel=False)
+    assert clean.shape == (640, 640, 3)
 
 
 def test_guided_scorer_hits_false_alarms_and_tta():

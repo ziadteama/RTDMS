@@ -253,7 +253,7 @@ def test_stream_hook_and_shutdown(monkeypatch: pytest.MonkeyPatch, clock: Clock)
         assert isinstance(source.shared, Shared)
         assert seen[0].face.state == "drowsy"
         assert source.camera_ok
-        assert arguments == [*CAMERA_ARGS, "--rotate", "90"]  # production flags, start_stream.sh
+        assert arguments == [*CAMERA_ARGS, "--rotate", "90"]  # production flags (+ --no-panel)
         clock.advance(3)
         assert not source.camera_ok
     finally:

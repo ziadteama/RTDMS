@@ -22,7 +22,7 @@ export function adaptStatus(v: unknown): Obj | null {
 export function adaptPhysio(v: unknown): Obj | null {
   if (!object(v) || typeof v.watch_connected !== 'boolean' || !number(v.t)) return null;
   return pick(v, ['watch_connected', 'hr_bpm', 'rr_ms', 'hrv_state', 'rmssd_ms', 'quality',
-    'worn', 'hr_baseline_bpm', 'hr_delta_bpm', 'hr_trend_bpm_per_10min', 't', 't_src']);
+    'worn', 'hr_baseline_bpm', 'hr_delta_bpm', 'hr_trend_bpm_per_10min', 'ack_age_s', 't', 't_src']);
 }
 
 export function adaptAlert(v: unknown): Obj | null {

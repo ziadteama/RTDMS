@@ -21,6 +21,7 @@ import { useSettings } from '@/state/settings';
 import { triggerSos } from './emergency';
 import { pi } from './pi';
 import { startUnresponsiveMonitor } from './unresponsive';
+import { startWatchAckCancel } from './watch-ack-cancel';
 
 export { gpsLost };
 
@@ -99,6 +100,7 @@ export async function locationPermission(): Promise<boolean> {
 
 export function startMonitor(): () => void {
   const stopUnresponsive = startUnresponsiveMonitor();
+  const stopWatchAck = startWatchAckCancel();
   const demo = useSettings.getState().demo;
   let stopped = false;
   let watch: Location.LocationSubscription | null = null;
@@ -163,6 +165,7 @@ export function startMonitor(): () => void {
   return () => {
     stopped = true;
     stopUnresponsive();
+    stopWatchAck();
     unsub();
     timers.forEach(clearInterval);
     motion?.remove();

@@ -11,6 +11,7 @@ jest.mock('expo-haptics', () => ({ impactAsync: jest.fn(), notificationAsync: je
   ImpactFeedbackStyle: { Heavy: 'heavy' }, NotificationFeedbackType: { Warning: 'warning', Error: 'error' } }));
 jest.mock('expo-speech', () => ({ stop: jest.fn().mockResolvedValue(undefined), speak: jest.fn() }));
 jest.mock('@modules/sahi-native', () => ({ __esModule: true, default: { notify: jest.fn(), cancel: jest.fn() } }));
+// present() cancels before notify so the Android channel re-alerts on the same id.
 jest.mock('@/state/settings', () => ({ useSettings: { getState: () => ({ sound: true, volume: 1, vibration: 'strong' }) } }));
 const send = (pattern: AlertPattern, episode: number | null = 1) =>
   setLive({ connection: 'online', alert: parseAlert({ pattern, episode, reasons: [], t: Date.now() }) });
@@ -38,7 +39,8 @@ test('many notifies and keep-alives present once, escalation and new episodes pr
   send('continuous', 2); await flush();
   expect(Speech.speak).toHaveBeenCalledTimes(3);
   send('none', 2);
-  expect(SahiNative?.cancel).toHaveBeenCalledTimes(1);
+  // present() cancels before each notify; stop() cancels once more on clear.
+  expect(SahiNative?.cancel).toHaveBeenCalledTimes(4);
   expect(Speech.stop).toHaveBeenCalledTimes(4);
   send('short_beep', 3); await flush();
   expect(Speech.speak).toHaveBeenCalledTimes(4);
@@ -76,7 +78,8 @@ test('awaits stop before speaking and discards superseded or ended requests', as
 test('calibration immediately stops output and silences all alert updates and repeats', async () => {
   send('max'); await flush();
   setLive({ calibrating: true });
-  expect(SahiNative?.cancel).toHaveBeenCalledTimes(1);
+  // one cancel from present(max), one from stop() on calibrating
+  expect(SahiNative?.cancel).toHaveBeenCalledTimes(2);
   jest.clearAllMocks();
   send('max', 2); send('continuous', 3);
   jest.advanceTimersByTime(30000); await flush();

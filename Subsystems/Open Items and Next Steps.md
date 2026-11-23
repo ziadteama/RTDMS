@@ -20,7 +20,8 @@ Handoff for the next agent: [[Handoff 2026-11-23 Demo]].
 | Item | State |
 |---|---|
 | "Looking away" while looking ahead (iris gaze 0.183 > 0.16 with the head within limits) | measurement fields deployed; 1-minute test and fix pending |
-| Hand / phone at the cheek read as drinking (66-89 %) | proposal "call wins" pending |
+| Hand / phone at the cheek read as drinking (66-89 %) | **mitigated on `demo/held-drinking`**: mouth `held` path + ear veto + call ear-majority (`SUPER-Papa-Johns`); retest on final mount |
+| Matte **black flask** at lips: hand at mouth yes, object ~0.29 (below p=0.5) → no drinking (plastic bottle OK) | **open — solve later**; `held_food3` IR domain gap, not YOLO. Write-up: `models/distraction/docs/PI_LIVE_DRINKING_PHONE_2026-11-23.md` § Open issue. Need IR flask crops + retrain/fine-tune; do not only lower `p` |
 | Camera placement: side = good drinking/phone, poor eyes; frontal close = good eyes | demo compromise 50-80 cm, 25-30 deg to the side, recalibrate |
 | Pi rebooted by itself 5 times on 23 Nov (2 from moving it) | check the 27 W supply and cable before the demo |
 | Merge PR #94, `distraction/occlusion-gate`, `demo/live-dashboard` (pre-release `demo/pre-2026-11-23`) | not merged |

@@ -5,10 +5,11 @@ Per frame, from the face mesh:
                                                 hand_on_face, normal, other, texting)
   two ear crops (1.2 x face width, 128 px)   -> phone-in-hand classifier (ears)
   (texting and its lap check are removed: head-down is face-model distraction)
-  CALL    = action "call" in >= 70% of the last 2 s AND mean ear phone prob > 0.5
+  CALL    = ear phone > 0.5 on >= 70% of the last 2 s
+            OR (action "call" >= 70% of 2 s AND ear/talk confirm) — see hybrid_alerts.py
 Crops get the same 1st-99th percentile contrast stretch as in training. Models are INT8 NCNN
-exports from D:/rtdms-data/action_v1 (REPORT_v2.md). The ear phone check only runs while the action
-classifier says call, so it costs nothing the rest of the time.
+exports from D:/rtdms-data/action_v1 (REPORT_v2.md). The ear phone check runs while the action says
+call, drinking, or hand_on_face (so a phone mislabelled as drinking can still latch call / veto held).
 """
 
 from __future__ import annotations
@@ -119,8 +120,10 @@ class Hybrid:
         probs = np.array(self.action(up), dtype=np.float64)
         probs[DROPPED] = 0.0  # the next best class is reported instead
         top = CLASSES[int(probs.argmax())]
+        # Ear check also when the action looks like a sip / hand on face: a phone at the ear is
+        # often labelled "drinking", and the held path needs ear>0.5 to veto before call latches.
         ear = None
-        if top == "call":
+        if top in ("call", "drinking", "hand_on_face"):
             ear = float(max(self.ear(er)[0], self.ear(el)[0]))
         state, onsets = self.logic.update(t, probs, ear, lip)
         out = {"face": True, "call": state["call"], "texting": False, "action": top,

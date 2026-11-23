@@ -124,7 +124,13 @@ class SahiNativeModule : Module() {
         context, id, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
       )
       val sos = channel == CHANNEL_SOS
-      val n = NotificationCompat.Builder(context, channel)
+      // Map legacy "alerts" JS id onto alerts_v2 (sound-enabled channel).
+      val channelId = when {
+        sos -> CHANNEL_SOS
+        channel == "alerts" || channel == CHANNEL_ALERTS -> CHANNEL_ALERTS
+        else -> channel
+      }
+      val n = NotificationCompat.Builder(context, channelId)
         .setSmallIcon(android.R.drawable.ic_dialog_alert)
         .setContentTitle(title)
         .setContentText(body)
@@ -228,6 +234,10 @@ class SahiNativeModule : Module() {
         NotificationChannel(CHANNEL_ALERTS, "Driver alerts", NotificationManager.IMPORTANCE_HIGH).apply {
           enableVibration(true)
           vibrationPattern = longArrayOf(0, 250, 120, 250)
+          setSound(
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+            AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build()
+          )
         }
       )
     }
@@ -330,7 +340,8 @@ class SahiNativeModule : Module() {
   }
 
   companion object {
-    const val CHANNEL_ALERTS = "alerts"
+    // v2: notification sound attached (Android never mutates an existing channel id).
+    const val CHANNEL_ALERTS = "alerts_v2"
     const val CHANNEL_SOS = "sos"
     const val ACTION_SMS_SENT = "edu.aast.rtdms.sahi.SMS_SENT"
     const val ACTION_SMS_DELIVERED = "edu.aast.rtdms.sahi.SMS_DELIVERED"

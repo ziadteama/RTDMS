@@ -123,6 +123,7 @@ export function parsePhysio(v: unknown): PiPhysio | null {
     hr_baseline_bpm: num(v.hr_baseline_bpm),
     hr_delta_bpm: num(v.hr_delta_bpm),
     hr_trend_bpm_per_10min: num(v.hr_trend_bpm_per_10min),
+    ack_age_s: num(v.ack_age_s),
     quality: oneOf(v.quality, QUALITIES),
     hrv_state: oneOf(v.hrv_state, HRV_STATES),
     rmssd_ms: num(v.rmssd_ms),

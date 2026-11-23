@@ -134,6 +134,22 @@ def test_drinking_debounce_averages_the_score():
     assert db.mean == 0.9
 
 
+def test_held_result_is_the_drinking_light():
+    clock = Clock()
+    d = server.Dashboard("127.0.0.1", 9, 9, mock=False, clock=clock)
+    d.sources["camera"].url = None  # tick must not overwrite the sample
+    cheek = {"face": True, "hybrid": {"face": True, "action": "drinking", "p": 0.9,
+                                      "p_drinking": 0.89, "ear": 0.8},
+             "held": {"eating_drinking": False, "kind": None, "object": None, "near": False}}
+    d.sources["camera"].set(cheek)
+    d.tick()
+    assert d.state()["drinking"]["detected"] is False
+    d.sources["camera"].set({**cheek, "held": {"eating_drinking": True, "kind": "drinking",
+                                               "object": 0.97, "near": True}})
+    d.tick()
+    assert d.state()["drinking"] == {"face": True, "detected": True, "p": 0.97}
+
+
 def test_watch_disconnected_link():
     s = server.merge(None, None, {"watch_connected": False}, None, False)
     assert s["heart"]["watch_connected"] is False and s["heart"]["hr_bpm"] is None
@@ -255,8 +271,35 @@ def test_http_routes():
     base = f"http://127.0.0.1:{srv.server_address[1]}"
     try:
         with urlopen(base + "/") as r:
-            assert b"RTDMS" in r.read()
+            body = r.read()
+            assert b"RTDMS" in body and b"phone-col" in body and b"footer" not in body
         with urlopen(base + "/state?x=1") as r:
-            assert json.load(r)["mock"] is True
+            s = json.load(r)
+            assert s["mock"] is True
+            assert s["phone_mirror"] == {"enabled": False, "ok": False}
+    finally:
+        srv.shutdown()
+
+
+def test_phone_mirror_serves_png():
+    png = server.PNG_MAGIC + b"fake"
+
+    class FakeMirror(server.PhoneMirror):
+        def __init__(self):
+            super().__init__()
+            self.enabled = True
+            self.ok, self.png = True, png
+
+        def start(self):
+            pass
+
+    d = server.Dashboard("127.0.0.1", 8080, 8090, mock=True, phone_mirror=FakeMirror())
+    assert d.state()["phone_mirror"] == {"enabled": True, "ok": True}
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), server.make_handler(d))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with urlopen(f"http://127.0.0.1:{srv.server_address[1]}/phone.png") as r:
+            assert r.headers["Content-Type"] == "image/png"
+            assert r.read() == png
     finally:
         srv.shutdown()

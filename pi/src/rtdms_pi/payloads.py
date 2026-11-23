@@ -112,12 +112,16 @@ def physio_payload(snapshot: Snapshot, clock: PhoneClock) -> dict[str, object]:
     raw = p.raw
     d["watch_connected"] = raw.get("watch_connected") is True
     # Preserve HR context first; diagnostics and beat arrays yield to the notify budget.
-    numeric = ["hr_bpm", "hr_baseline_bpm", "hr_delta_bpm", "hr_trend_bpm_per_10min"]
-    optional = ["hr_bpm", "quality", "worn", *numeric[1:], "hrv_state", "rmssd_ms", "rr_ms"]
+    # ack_age_s is small and must reach the phone so watch "I'm OK" can cancel SOS.
+    numeric = ["hr_bpm", "hr_baseline_bpm", "hr_delta_bpm", "hr_trend_bpm_per_10min", "ack_age_s"]
+    optional = ["hr_bpm", "ack_age_s", "quality", "worn", *numeric[1:-1], "hrv_state", "rmssd_ms", "rr_ms"]
     for key in [*numeric, "rmssd_ms"]:
         if key in raw:
             value = number(raw[key])
-            d[key] = round(value, 1) if value is not None else None
+            if key == "ack_age_s":
+                d[key] = round(value, 2) if value is not None else None
+            else:
+                d[key] = round(value, 1) if value is not None else None
     if isinstance(raw.get("worn"), bool):
         d["worn"] = raw["worn"]
     rr = raw.get("rr_ms")

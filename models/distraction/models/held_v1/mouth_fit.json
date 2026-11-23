@@ -1,0 +1,65 @@
+{
+  "c": 1.0785096101242293,
+  "g": {
+    "inter_eye": 2.7482603980381572,
+    "eye_ear": 1.8652179132079216
+  },
+  "preferred_height": "inter_eye",
+  "head_confidence": 0.3,
+  "formula": "mouth=nose+c*(nose-eye_mid); height=g*scale; no intercept",
+  "loss": "least squares in mesh-face-height-normalized coordinates",
+  "fit_frames": 89599,
+  "fit_drivers": 49,
+  "internal_holdout_drivers": [
+    "syndd_14786",
+    "syndd_28557",
+    "syndd_38479",
+    "syndd_46141",
+    "syndd_50921",
+    "syndd_61302",
+    "syndd_70176",
+    "syndd_79023",
+    "syndd_87903",
+    "syndd_96371"
+  ],
+  "internal_holdout": {
+    "frames": 20818,
+    "mouth_mean_fh": 0.14661167024780639,
+    "mouth_median_fh": 0.12268541146533261,
+    "mouth_p90_fh": 0.19002731807540954,
+    "height": {
+      "inter_eye": {
+        "frames": 20818,
+        "mean_fh": 0.1305767543512626,
+        "p90_fh": 0.2505198178644206
+      },
+      "eye_ear": {
+        "frames": 20818,
+        "mean_fh": 0.17866934658761735,
+        "p90_fh": 0.3877160081244138
+      }
+    }
+  },
+  "final_train_errors": {
+    "frames": 89599,
+    "mouth_mean_fh": 0.13958627385033792,
+    "mouth_median_fh": 0.12392475158692673,
+    "mouth_p90_fh": 0.18764372367222942,
+    "height": {
+      "inter_eye": {
+        "frames": 89599,
+        "mean_fh": 0.12139872366321454,
+        "p90_fh": 0.24211014276855253
+      },
+      "eye_ear": {
+        "frames": 89598,
+        "mean_fh": 0.1629414260690742,
+        "p90_fh": 0.403890796437141
+      }
+    }
+  },
+  "coverage": {
+    "train_frames": 98223
+  },
+  "inference_calls": 0
+}

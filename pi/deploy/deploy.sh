@@ -61,8 +61,8 @@ tree() {
 }
 tree rtdms-pi . pi/src pi/pyproject.toml pi/deploy fusion/src fusion/pyproject.toml \
   models/physiology/src models/physiology/models models/physiology/pyproject.toml contracts
-tree rtdms/distraction models/distraction src scripts/stream.py scripts/hybrid.py scripts/hybrid_alerts.py scripts/drowsiness.py scripts/run.py pyproject.toml \
-  models/action_v2 models/det_v2d_ir_512_ncnn_model models/det_v2d_ir_512_det_aciq_mixed_ncnn_model \
+tree rtdms/distraction models/distraction src scripts/stream.py scripts/hybrid.py scripts/hybrid_alerts.py scripts/drowsiness.py scripts/run.py scripts/held_live.py pyproject.toml \
+  models/action_v2 models/held_v1 models/det_v2d_ir_512_ncnn_model models/det_v2d_ir_512_det_aciq_mixed_ncnn_model \
   models/yolo26n_pose_320_ncnn_model
 tree rtdms/face models/face src models/face_landmarker.task
 N="$(wc -l <"$CHANGED_LIST")"

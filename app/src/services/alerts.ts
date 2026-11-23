@@ -44,9 +44,20 @@ export function speak(key: StringKey, params?: Record<string, string | number>):
   const { sound, volume } = useSettings.getState();
   if (!sound) return;
   const request = ++speechRequest;
-  void Speech.stop().then(() => {
-    if (request === speechRequest) Speech.speak(t(key, params), { language: 'en-US', volume, rate: 1.0 });
-  }).catch(() => undefined);
+  const line = t(key, params);
+  void (async () => {
+    try {
+      await Speech.stop();
+    } catch {
+      // Android TTS often rejects stop when idle; still speak.
+    }
+    if (request !== speechRequest) return;
+    try {
+      Speech.speak(line, { language: 'en-US', volume: Math.max(0.1, volume), rate: 1.0, pitch: 1.0 });
+    } catch {
+      // TTS missing / muted — notification path in present() still covers audible cues.
+    }
+  })();
 }
 
 function present(pattern: AlertPattern, voice = true, notify = true): void {
@@ -55,9 +66,16 @@ function present(pattern: AlertPattern, voice = true, notify = true): void {
   const live = useLive.getState();
   const key = voiceKey(pattern, driverState(live.status, live.connection === 'online'));
   if (voice && p.voice && key) speak(key as StringKey);
-  if (notify && p.notify && AppState.currentState !== 'active' && SahiNative) {
+  // Foreground demos often have media volume at 0 so TTS is silent; fire the notification
+  // channel sound too (cancel first so Android re-alerts on the same id).
+  const wantSound = useSettings.getState().sound;
+  if (notify && p.notify && SahiNative && (AppState.currentState !== 'active' || wantSound)) {
     const reasons = live.alert?.reasons.join(', ') ?? '';
+    SahiNative.cancel(NOTIFICATION_ID);
     SahiNative.notify(NOTIFICATION_ID, 'alerts', t(`pattern.${pattern}`), reasons || (key ? t(key as StringKey) : ''), null);
+    if (AppState.currentState === 'active') {
+      setTimeout(() => SahiNative?.cancel(NOTIFICATION_ID), 2000);
+    }
   }
 }
 

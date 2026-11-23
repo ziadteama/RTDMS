@@ -8,6 +8,8 @@
     python scripts/stream.py --drowsiness --hybrid --no-detect --mesh
         # v2 phone alerts (action classifier + phone checks, hybrid.py), no box detector,
         # face mesh drawn on the view
+    python scripts/stream.py --drowsiness --hybrid --held --no-detect --mesh
+        # + drinking: hand at the mouth + cup (held_live.py). The phone path is unchanged.
 
 Open http://<pi address>:8080 on any computer on the same network: the camera view with the
 detector's boxes and the alert state, plus /status (JSON: fps, per-stage ms, CPU temperature,
@@ -70,6 +72,9 @@ const y=s.hybrid;if(y){for(const k of ['call','texting'])h+=`<tr><td>${k==='call
 `<td class="${y[k]?'alert':''}">${y[k]?'ALERT':'none'}</td></tr>`;
 h+=`<tr><td>action</td><td>${y.action ?? '-'} ${y.p ?? ''}</td></tr>`+
 `<tr><td>phone at ear / lap</td><td>${y.ear ?? '-'} / ${y.lap ?? '-'}</td></tr>`;}
+const g=s.held;if(g){h+=`<tr><td>DRINKING</td>`+
+`<td class="${g.eating_drinking&&g.kind==='drinking'?'alert':''}">${g.eating_drinking&&g.kind==='drinking'?'ALERT':'none'}</td></tr>`+
+`<tr><td>hand at mouth</td><td>${g.near?'yes':'no'}</td></tr>`;}
 const d=s.drowsiness;if(d){const c=d.state==='drowsy'?'alert':(d.state==='warning'?'warning':'');
 h+=`<tr><td>DROWSINESS</td><td class="${c}">${d.state.toUpperCase()}</td></tr>`+
 `<tr><td>PERCLOS</td><td>${d.perclos==null?'-':Math.round(d.perclos*100)+'%'}`+
@@ -162,10 +167,15 @@ def pipeline_loop(args, shared: Shared) -> None:
         from hybrid import Hybrid
 
         hybrid = Hybrid(resolve_path(args.hybrid_models))
+    held = None
+    if args.held:
+        from held_live import HeldLive
+
+        held = HeldLive(resolve_path(args.held_models), pcfg.pose.weights)
     det_name = "off" if args.no_detect else pcfg.detector.weights
     print(f"[stream] {src.describe()} -> view {pipe.roi.out_w}x{pipe.roi.out_h}; "
           f"detector {det_name}; v2 phone {'on' if hybrid else 'off'}; "
-          f"drowsiness {'on' if drowsy else 'off'}; "
+          f"drowsiness {'on' if drowsy else 'off'}; drinking {'on' if held else 'off'}; "
           f"texting rule {'on' if rcfg.simple.texting else 'off'}; log {log.path}", flush=True)
     n, fps, t0, last_enc = 0, 0.0, time.perf_counter(), 0.0
     try:
@@ -203,6 +213,23 @@ def pipeline_loop(args, shared: Shared) -> None:
                 hy = hybrid.feed(t, v, res.face.landmarks if res.face is not None else None)
                 for a in hy.get("onsets", []):
                     print(f"[event] t={t:.2f} v2 {a} ALERT", flush=True)
+            hl = None
+            if held is not None:
+                v = res.view if res.view.ndim == 2 else cv2.cvtColor(res.view, cv2.COLOR_BGR2GRAY)
+                # Veto drinking if call is latched OR the ear crop already sees a phone (phone at
+                # cheek often tops as "drinking", so waiting for the 2 s call latch is too late).
+                ear = None if hy is None else hy.get("ear")
+                phone_on = bool(
+                    hy is not None and (
+                        hy["call"] or hy["texting"]
+                        or (isinstance(ear, (int, float)) and float(ear) > 0.5)
+                    )
+                )
+                hl = held.feed(t, v, res.face.landmarks if res.face is not None else None,
+                               res.face.pitch_deg if res.face is not None else None,
+                               phone_on)
+                for a in hl["onsets"]:
+                    print(f"[event] t={t:.2f} {a} ALERT", flush=True)
             if n % 15 == 0:
                 now = time.perf_counter()
                 fps, t0 = 15 / (now - t0), now
@@ -220,11 +247,16 @@ def pipeline_loop(args, shared: Shared) -> None:
             if args.no_detect:  # the release box rules have no input: hide them
                 status["levels"] = {}
                 res.behaviours = {}
-                res.level = "alert" if hy is not None and (hy["call"] or hy["texting"]) else "none"
+                phone_alert = hy is not None and (hy["call"] or hy["texting"])
+                held_alert = hl is not None and hl["eating_drinking"]
+                res.level = "alert" if phone_alert or held_alert else "none"
                 status["ms"].pop("detect", None)
             if hy is not None:
                 status["hybrid"] = {k: v for k, v in hy.items() if k not in ("onsets", "ms")}
                 status["ms"]["v2_phone"] = hy["ms"]
+            if hl is not None:
+                status["held"] = {k: v for k, v in hl.items() if k not in ("onsets", "ms")}
+                status["ms"]["held"] = hl["ms"]
             jpeg = None
             now = time.perf_counter()
             if shared.viewers and now - last_enc >= 1.0 / args.stream_fps:
@@ -249,12 +281,22 @@ def pipeline_loop(args, shared: Shared) -> None:
                                 f"lap {hy['lap'] if hy['lap'] is not None else '-'}")
                     if alerts:
                         banner = (banner + "  |  " if banner else "") +                             " + ".join(alerts) + " ALERT"
+                if hl is not None:
+                    obj = "-" if hl["object"] is None else hl["object"]
+                    alert = f"{hl['kind'].upper()} ALERT" if hl["eating_drinking"] else "none"
+                    info.append(f"DRINKING: {alert}  hand at mouth "
+                                f"{'yes' if hl['near'] else 'no'}  object {obj} {hl['seen'] or ''}")
+                    if hl["eating_drinking"]:
+                        banner = (banner + "  |  " if banner else "") + alert
                 frame = render(res, fps, rcfg.phone_in_hand.holder_zones, debug=args.debug,
-                               info=info, banner=banner)
+                               info=None if args.no_panel else info, banner=banner,
+                               panel=not args.no_panel)
                 if args.mesh and res.face is not None:
                     draw_mesh(frame, res.face.landmarks)
                 if hybrid is not None:
                     hybrid.draw(frame)
+                if held is not None:
+                    held.draw(frame)
                 if frame.shape[1] > args.max_width:
                     s = args.max_width / frame.shape[1]
                     frame = cv2.resize(frame, (args.max_width, round(frame.shape[0] * s)),
@@ -376,6 +418,8 @@ def parse_args(argv=None):
     p.add_argument("--weights", help="override detector.weights (e.g. the INT8 model)")
     p.add_argument("--detect-every", type=int, help="run the detector every Nth frame")
     p.add_argument("--debug", action="store_true", help="draw face mesh, zones and timings")
+    p.add_argument("--no-panel", action="store_true",
+                   help="omit the right-hand debug status column (presentation / dashboard)")
     p.add_argument("--stream-fps", type=float, default=10.0, help="max frames sent per second")
     p.add_argument("--max-width", type=int, default=640, help="downscale the stream to this")
     p.add_argument("--jpeg-quality", type=int, default=70)
@@ -391,6 +435,10 @@ def parse_args(argv=None):
                    help="v2 phone alerts: action classifier + ear / lap phone checks (hybrid.py)")
     p.add_argument("--hybrid-models", default="models/action_v2",
                    help="folder with the three INT8 NCNN classifiers for --hybrid")
+    p.add_argument("--held", action="store_true",
+                   help="drinking: hand at the mouth + cup in hand (held_live.py); phone path unchanged")
+    p.add_argument("--held-models", default="models/held_v1",
+                   help="folder with held_food3.onnx, yolo26n_coco_320.onnx, held_params.json, mouth_fit.json")
     p.add_argument("--no-detect", action="store_true",
                    help="do not run the phone / drink / food box detector at all")
     p.add_argument("--mesh", action="store_true", help="draw every face-mesh point on the view")
