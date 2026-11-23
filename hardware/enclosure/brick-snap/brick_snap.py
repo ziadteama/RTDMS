@@ -133,7 +133,7 @@ def clip_slot():
     return front.union(end).union(lip).union(stop)
 
 
-def shell():
+def shell(pi_screws=False):
     outer = (cq.Workplane().box(W, D, H_SHELL, centered=(True, False, False))
              .edges("|Z").fillet(R_V).faces("<Z").edges().fillet(1.5))
     inner = (cq.Workplane().box(INNER_W, D - 2 * WALL, H_SHELL, centered=(True, False, False))
@@ -146,9 +146,10 @@ def shell():
     for h in PI_HOLES:
         x, y = pb(*h)
         s = s.union(cyl(6.0, PCB_Z0 - FLOOR + 0.01, (x, y, FLOOR - 0.01), (0, 0, 1)))
-        pin = (cq.Workplane().circle(PIN_D / 2).extrude(PIN_TOP - PCB_Z0 + 0.01)
-               .faces(">Z").chamfer(0.5).translate((x, y, PCB_Z0 - 0.01)))
-        s = s.union(pin)
+        if not pi_screws:
+            pin = (cq.Workplane().circle(PIN_D / 2).extrude(PIN_TOP - PCB_Z0 + 0.01)
+                   .faces(">Z").chamfer(0.5).translate((x, y, PCB_Z0 - 0.01)))
+            s = s.union(pin)
 
     cuts = [
         stadium_y(0, CAM_ZC, EYE_L, EYE_H, -1, 1 + EYE_DEPTH),
@@ -167,6 +168,8 @@ def shell():
         for hy in HOOK_Y:
             x0, x1 = sorted((sx * (INNER_W / 2 - 2.0), sx * (W / 2 + 1.0)))
             cuts.append(box(x0, x1, hy - WIN_W / 2, hy + WIN_W / 2, WIN_Z0, WIN_Z1))
+    if pi_screws:   # M2.5 self-tapping into the standoffs (5-6 mm screws only), same 2.8 mm hole as ../brick/
+        cuts += [cyl(2.8, 4.5, (*pb(*h), PCB_Z0 + 0.01), (0, 0, -1)) for h in PI_HOLES]
     for c in cuts:
         s = s.cut(c)
     return s
@@ -183,7 +186,7 @@ def arm():
     return a
 
 
-def lid():
+def lid(pi_screws=False):
     plate = (cq.Workplane().box(W, D, LID_T, centered=(True, False, False))
              .edges("|Z").fillet(R_V).faces(">Z").edges().fillet(1.2).translate((0, 0, H_SHELL)))
     lw, ld = INNER_W - 2 * CLR, D - 2 * WALL - 2 * CLR
@@ -203,7 +206,7 @@ def lid():
         y = 23.0 + i * 5.5
         l = l.cut(cq.Workplane().box(72.0, 3.0, LID_T + 4).edges("|Z").fillet(1.45).translate((0, y, H_SHELL)))
     # hold-down posts: a solid patch where a post meets the grille, then the post itself
-    for h in POST_HOLES:
+    for h in ([] if pi_screws else POST_HOLES):   # with screws the Pi is held down by them, no posts
         x, y = pb(*h)
         l = l.union(cyl(POST_D + 4.0, LID_T, (x, y, H_SHELL), (0, 0, 1)))
         l = l.union(cyl(POST_D, H_SHELL + 0.5 - POST_Z0, (x, y, POST_Z0), (0, 0, 1)))
@@ -244,6 +247,12 @@ def main():
         bb = q.val().BoundingBox()
         print(f"{name:12s} print size {bb.xlen:6.1f} x {bb.ylen:6.1f} x {bb.zlen:6.1f} mm  "
               f"solids={len(p.solids().vals())} valid={p.val().isValid()}")
+    # optional: the Pi held by its own 4 screws instead of pins + posts
+    for name, p in {"shell_pi_screws": shell(True), "lid_pi_screws": lid(True)}.items():
+        cq.exporters.export(p, str(OUT / f"{name}.step"))
+        cq.exporters.export(print_orient(name.split("_")[0], p), str(OUT / "print" / f"{name}.stl"),
+                            tolerance=0.03, angularTolerance=0.15)
+        print(f"{name:16s} valid={p.val().isValid()} solids={len(p.solids().vals())}")
     print(f"assembled outer size: {W:.1f} x {D:.1f} x {H_SHELL + LID_T:.1f} mm (W x D x H)")
 
 

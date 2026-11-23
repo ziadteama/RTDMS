@@ -29,6 +29,14 @@ openings, USB-C hole and vents are unchanged. **Only the way parts are held chan
   If the Pi rattles, stick 1 mm foam tape on the post ends.
 - Slide the Pi onto the pins before the lid goes on. The USB-C end faces the back as before.
 
+### Optional: hold the Pi with its own 4 screws
+If you would rather screw the Pi down (the Pi's holes are 58 × 49 mm apart, M2.5), print
+`out/print/shell_pi_screws.stl` and `out/print/lid_pi_screws.stl` **instead of** `shell.stl` and `lid.stl`
+(the clips are the same). The standoffs have Ø2.8 holes, 4.5 mm deep, instead of pins, and the lid has
+no posts (the screw heads would hit them). Use **4 × M2.5 × 5-6 mm** screws; a longer one pokes through the floor.
+The lid still snaps on and the clips still slide in, so only these 4 screws remain. The holes are 2.8 mm
+as in `../brick/`, so the screws only clamp (see the note there).
+
 ### Camera clips
 - The clip is the same leaf spring as before: pad on the IR board, 0.3 mm of preload, but 2.0 mm thick (was 2.5)
   and 10 mm tall (was 12) so it's softer. Its outer end sits in a slot: a front face, a back lip and a bottom stop.
@@ -41,8 +49,8 @@ openings, USB-C hole and vents are unchanged. **Only the way parts are held chan
 
 | Part | File | How many |
 |---|---|---|
-| Shell | `out/print/shell.stl` | 1 (open side up) |
-| Lid | `out/print/lid.stl` | 1 (already flipped: outer face down, arms and posts up) |
+| Shell | `out/print/shell.stl` (or `shell_pi_screws.stl`) | 1 (open side up) |
+| Lid | `out/print/lid.stl` (or `lid_pi_screws.stl`) | 1 (already flipped: outer face down, arms and posts up) |
 | Camera clip | `out/print/camera_clip.stl` | 2 (the file holds one; already flat, pad up) |
 
 `out/*.step` are the same parts in assembled position (edit in Fusion 360 / Onshape). `out/assembled/*.stl` is for `render.scad` only.
