@@ -1,4 +1,4 @@
-# Pi ↔ phone link contract (version 1.4)
+# Pi ↔ phone link contract (version 1.5)
 
 Single source of truth for the Sahi app (`app/`) and the Pi runtime (`pi/`). Design rationale:
 `Subsystems/Phone-Pi Link.md`. **Owner: the coordinator.** Neither side edits this directory
@@ -153,6 +153,7 @@ payloads as their BLE counterparts, but the app uses BLE for them once the BLE t
 | 1.2 | 2026-11-22 | Pi efficiency (CR-BLE-RATES): slower notify cadence, send on change. No layout or schema change. The phone treats more than 3 s without any notify as stale (was 1 s) and, while BLE is online, sends no HTTP polls (HTTP fallback poll is 1 Hz) |
 | 1.3 | 2026-11-23 | CR-CLOCK-PHYSIO: one time model (§Time; `t_src`; `clock` every 60 s); `physio` drops `fatigue_probability`, adds `worn`, `hr_baseline_bpm`, `hr_delta_bpm`, `hr_trend_bpm_per_10min` (`quality` = heart-rate stream quality); `alert.emergency` (`"unresponsive"`); `health.physio_diag` (incl. watch alert round-trip p50/p95); characteristic 0b `watch_alert` for the Garmin watch |
 | 1.4 | 2026-11-23 | Additive (CR-CALIB-STEP): `status.calibration_step` (`waiting_face` / `countdown_open` / `open` / `countdown_closed` / `closed`) and `calibration_left_s` while the unit calibrates, so the phone follows the unit's run instead of its own timers |
+| 1.5 | 2026-11-23 | Additive (CR-ALERT-POLICY): `alert.episode` — the Pi's alert policy turns per-frame decisions into stable episodes (one alert at a time by priority, held 3 s after its cause clears, cooldown before the same alert restarts, silent while calibrating). Phone and watch start sound / voice / vibration once per episode or escalation, never per notify |
 
 ## Open questions for the spike (P1) and first integration
 

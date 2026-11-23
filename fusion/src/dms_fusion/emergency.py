@@ -69,6 +69,10 @@ class EmergencyMonitor:
         self._since = 0.0  # time the current stage began
         self._responded_at: float | None = None  # last "I'm OK" / wrist movement while waiting
 
+    def reset(self) -> None:
+        """Forget any closure in progress (e.g. while the driver calibrates with eyes shut)."""
+        self._stage, self._since, self._responded_at = EmergencyStage.NORMAL, 0.0, None
+
     @property
     def stage(self) -> EmergencyStage:
         return self._stage

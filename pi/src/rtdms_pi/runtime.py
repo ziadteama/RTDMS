@@ -70,12 +70,14 @@ class Runtime:
         from .detector_gate import apply_settings
 
         face, phone, physio = apply_settings(settings, face, phone, physio)
+        episode = 0
         if self.safety is None:
             decision = decide(face=face, phone=phone, physiology=physio)
         else:
-            decision = decide(face=face, phone=phone, physiology=physio, **self.safety.inputs(s))
-            self.safety.observe(decision, s)
-        self.state.set_decision(decision)
+            raw = decide(face=face, phone=phone, physiology=physio, **self.safety.inputs(s))
+            out = self.safety.finish(raw, s)
+            decision, episode = out.decision, out.episode
+        self.state.set_decision(decision, episode)
         self.player.set_pattern(decision.pattern)
 
     def diagnostics(self) -> dict[str, object]:

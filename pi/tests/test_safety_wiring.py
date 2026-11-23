@@ -126,3 +126,35 @@ def test_emergency_change_notifies_phone_at_once(service, clock: Clock) -> None:
     service.notifier.step()  # same pattern, same tick: must still go out now
     alerts = [json.loads(d) for u, d in service.port.notifications if u == Char.ALERT.uuid]
     assert alerts[-1]["emergency"] == "unresponsive"
+
+
+def calibrating_face(closure_ms: float) -> FaceReport:
+    return FaceReport(state="drowsy", face=True, closure_ms=closure_ms,
+                      calibration="calibrating", calibration_step="closed")
+
+
+def test_calibration_silences_alerts_and_resets_the_emergency_count(clock: Clock) -> None:
+    rt = make(clock)
+    for _ in range(12):  # 12 s with eyes shut on purpose during calibration
+        rt.on_frame(FrameResult(calibrating_face(9000), None, 15, None, True, clock()))
+        assert rt.state.snapshot().decision.pattern is AlertPattern.NONE
+        clock.advance(1)
+    eyes(rt, clock, 500)  # calibration over: no SOS carried over from the closed-eye phase
+    d = rt.state.snapshot().decision
+    assert d.pattern is AlertPattern.REPEATED and d.emergency is None
+    rt.stop()
+
+
+def test_flickering_face_model_gives_one_held_episode(clock: Clock) -> None:
+    rt = make(clock)
+    seen = []
+    for state in ["drowsy", "alert", "drowsy", "alert", "drowsy", "alert", "alert", "alert",
+                  "alert", "alert"]:
+        eyes(rt, clock, 0, state=state)
+        d = rt.state.snapshot().decision
+        seen.append((d.pattern, d.episode))
+        clock.advance(0.7)
+    assert {e for _, e in seen} == {1}
+    assert seen[0][0] is AlertPattern.REPEATED and seen[-1][0] is AlertPattern.NONE
+    assert all(p is AlertPattern.REPEATED for p, _ in seen[:7])
+    rt.stop()
