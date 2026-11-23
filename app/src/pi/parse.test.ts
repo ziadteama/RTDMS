@@ -38,6 +38,7 @@ const V2 = {
     openness: 0.31,
     face: true,
     calibrated: true,
+    calibration: null,
     message: 'calibrated',
     ms: 6.1,
   },
@@ -219,4 +220,10 @@ describe('pairing', () => {
     expect(normalizeBaseUrl('')).toBeNull();
     expect(normalizeBaseUrl('not a url')).toBeNull();
   });
+});
+
+test.each(['ok', 'calibrating', 'failed', 'lost', 'unknown', null, undefined, 1])('parses calibration %s without guessing', (calibration) => {
+  const parsed = parseStatus({ fps: 1, face: true, drowsiness: { calibration, message: 'calibrated' } });
+  expect(parsed?.drowsiness?.calibration).toBe(['ok', 'calibrating', 'failed', 'lost'].includes(calibration as string) ? calibration : null);
+  expect(parsed?.drowsiness?.message).toBe('calibrated');
 });

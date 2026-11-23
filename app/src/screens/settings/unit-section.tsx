@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
 import { Row, Section } from '@/components/list';
+import { calibrationState } from '@/pi/calibration-state';
 import { useT } from '@/i18n';
 import { useLive } from '@/state/live';
 import { useSecure } from '@/state/secure';
@@ -14,7 +15,7 @@ export function UnitSection() {
   const online = useLive((s) => s.connection === 'online');
   const link = useLive((s) => s.link);
   const btOff = useLive((s) => s.btOff);
-  const eyeCal = useSettings((s) => s.eyeCalibration);
+  const calibration = useLive((s) => calibrationState(s.status?.drowsiness));
 
   const forget = () => {
     Alert.alert(t('settings.forget'), t('settings.forgetConfirm'), [
@@ -38,16 +39,9 @@ export function UnitSection() {
         valueColor={online ? colors.alert.none : undefined}
       />
       <Row
-        label={t('settings.eyeCalibration')}
-        value={eyeCal ? t(`cal.eye.quality.${eyeCal.quality}`) : t('settings.eyeCalNotDone')}
-        valueColor={eyeCal?.quality === 'good' ? colors.alert.none : undefined}
-        icon="eye"
-        chevron
-        onPress={() => router.push('/eye-calibration')}
-      />
-      <Row
-        label={t('settings.drivingPosition')}
-        detail={t('settings.drivingPositionDetail')}
+        label={t('settings.calibrate')}
+        detail={t('settings.calibrateDetail')}
+        value={t(`cal.state.${calibration}`)}
         chevron
         disabled={!online}
         onPress={() => router.push('/calibrate')}

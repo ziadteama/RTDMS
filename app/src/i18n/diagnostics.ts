@@ -1,5 +1,7 @@
 /** Diagnostics strings table (for team and engineers, not end-user drivers). */
 export const diagnostics = {
+  'diag.calibration': 'Calibration',
+  'diag.phoneCalibration': 'Phone-camera eye calibration (legacy)',
   // Title & header
   'diag.title': 'Diagnostics',
   'diag.subtitle': 'For the Sahi team',

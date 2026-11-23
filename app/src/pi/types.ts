@@ -31,6 +31,7 @@ export type PiDrowsiness = {
   openness: number | null;
   face: boolean;
   calibrated: boolean;
+  calibration: 'ok' | 'calibrating' | 'failed' | 'lost' | null;
   message: string;
   ms: number;
 };

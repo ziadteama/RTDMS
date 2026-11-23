@@ -3,8 +3,24 @@ import { setup } from './setup';
 
 export const en = {
   ...setup,
+  'settings.calibrate': 'Calibrate',
+  'settings.calibrateDetail': "Your eyes and head position, measured by your Sahi unit's camera",
+  'cal.title': 'Calibrate',
+  'cal.intro': "Park, sit in your usual driving position and put the phone down. Look ahead where you would watch the road and follow the voice: eyes open for about 15 seconds, then closed for about 10 seconds until you are told to open them.",
+  'cal.step1': 'Look ahead with your eyes open',
+  'cal.step2': 'Close your eyes',
+  'cal.waiting': 'Open your eyes. Waiting for your Sahi unit…',
+  'cal.done': 'Calibration complete. You can open your eyes.',
+  'cal.failed': 'Calibration could not finish. Check that your Sahi unit can see your face, then try again.',
+  'cal.offline': 'Unit not connected. Check it is powered on.',
+  'cal.start': 'Start',
+  'cal.again': 'Try again',
+  'cal.close': 'Done',
+  'cal.skip': 'Skip for now',
+  'cal.state.done': 'Done',
+  'cal.state.notDone': 'Not done',
+  'cal.state.inProgress': 'In progress',
   'app.name': 'Sahi',
-
   // Driver state indicator
   'state.offline': 'Unit not connected. Check it is powered on.',
   'state.starting': 'Starting',
@@ -15,7 +31,6 @@ export const en = {
   'state.drowsy': 'Drowsy',
   'state.phone': 'Phone use',
   'state.paused': 'Sahi stopped monitoring. Tap to fix.',
-
   // Alert pattern names
   'pattern.none': 'No alert',
   'pattern.short_beep': 'Short beep',
@@ -23,13 +38,11 @@ export const en = {
   'pattern.continuous': 'Continuous alarm',
   'pattern.max': 'Maximum alarm',
   'pattern.unknown': 'Alert level unknown',
-
   // Alert reasons; unknown reasons are shown as sent
   'reason.face drowsy': 'Drowsy face',
   'reason.face distracted': 'Looking away',
   'reason.phone sustained': 'Phone in use',
   'reason.test alert': 'Test alert',
-
   // Voice lines
   'voice.generic': 'Attention, please.',
   'voice.distracted': 'Eyes on the road.',
@@ -38,12 +51,10 @@ export const en = {
   'voice.max': 'Danger. Pull over and rest now.',
   'voice.test': 'This is a test alert.',
   'voice.sos': 'Crash detected. Sending help in {s} seconds. Tap I am OK to cancel.',
-
   // Tabs
   'tab.live': 'Drive',
   'tab.trips': 'Trips',
   'tab.settings': 'Settings',
-
   // Banners
   'banner.offline': 'Unit not connected. Check it is powered on.',
   'banner.btOff': 'Bluetooth is off',
@@ -53,7 +64,6 @@ export const en = {
   'banner.paused': 'Monitoring is paused',
   'banner.gpsLost': 'No GPS: crash detection is off',
   'banner.noAlertApi': 'Alerts sound from your Sahi unit only.',
-
   // Drive tab
   'live.camera': 'Camera',
   'live.eyes': 'Eyes',
@@ -91,7 +101,6 @@ export const en = {
   'quality.bad': 'Bad',
   'quality.warmup': 'Warming up',
   'quality.stale': 'No data',
-
   // Trips
   'trips.weekly': 'Safety score by week',
   'trips.empty': 'No trips yet. A trip starts when your phone connects to your Sahi unit.',
@@ -117,18 +126,12 @@ export const en = {
   'event.sos': 'Manual SOS',
   'event.connected': 'Unit connected',
   'event.disconnected': 'Unit disconnected',
-
   // Settings
   'settings.title': 'Settings',
   'settings.unit': 'Your Sahi unit',
   'settings.status': 'Status',
   'settings.connected': 'Connected',
   'settings.notConnected': 'Not connected. Check that it is powered on.',
-  'settings.eyeCalibration': 'Eye calibration',
-  'settings.eyeCalNotDone': 'Not done',
-  'settings.drivingPosition': 'Driving position',
-  'settings.drivingPositionDetail': 'Where you sit, for gaze and head angle',
-  'settings.calibrate': 'Set up driving position',
   'settings.connectOther': 'Connect a different unit',
   'settings.viaBluetooth': 'Connected via Bluetooth',
   'settings.viaWifi': 'Connected via Wi-Fi',
@@ -181,7 +184,6 @@ export const en = {
   'settings.save': 'Save',
   'settings.saved': 'Saved',
   'settings.address': 'Unit address',
-
   // SOS
   'sos.callDelay': 'Calling {n} in 15s unless cancelled.',
   'sos.cancelCall': 'Cancel call',
@@ -221,7 +223,6 @@ export const en = {
   'sos.notifTitle': 'Crash detected',
   'sos.notifBody': 'Open to cancel the emergency countdown.',
   'sos.manualIOS': 'This phone cannot send SMS automatically. Opening Messages.',
-
   // Contacts
   'contacts.title': 'Emergency contacts',
   'contacts.name': 'Name',
@@ -237,7 +238,6 @@ export const en = {
   'contacts.status.opted_out': 'Opted out',
   'contacts.status.invalid': 'SMS only',
   'contacts.status.failed': 'SMS only',
-
   // Incident
   'incident.title': 'Incident',
   'incident.time': 'Time',
@@ -268,11 +268,9 @@ export const en = {
   'incident.na': 'Not available',
   'incident.piList': 'Saved video clips',
   'incident.noneOnPi': 'No saved video clips.',
-
   // Monitoring foreground service
   'service.title': 'Sahi is monitoring this trip',
   'service.body': 'Crash detection and alerts are on.',
-
   // Generic
   'common.cancel': 'Cancel',
   'common.confirm': 'Confirm',
