@@ -74,6 +74,25 @@ The runtime runs on the Pi as the systemd **user** service `rtdms-pi-user` (`pi/
 - Wireplumber BLE-MIDI is disabled for the desktop image (see [[Phone-Pi Link]]).
 - Uninstall: `install-user-service.sh --uninstall`.
 
+## Heart rate, time and safety (contract v1.3, 23 Nov)
+
+Plan and reasons: [[Physiology New Approach]].
+
+- **Time:** `clock.py` `PhoneClock` keeps the smallest offset (`pi_mono_ms − phone_ms`) of the
+  last 10 `clock` writes; every payload `t` is UTC epoch seconds in phone time with `t_src`
+  ("pi" = Pi wall clock before any write). Incidents use the same offset on Pi monotonic time.
+  Optional one-shot system-clock sync: `sync_system_clock` (default off).
+- **Heart rate:** `garmin_source.py` decodes the watch packet (v1/v2) → `SequenceTracker` →
+  `WatchClock` → `HrStream` (+ `RrHrv` for Diagnostics PRV). The heart-rate maths is cached at
+  1 s / 5 s (the runtime asks per camera frame); ACK, echo, motion and ages are always fresh. No
+  WESAD model, no `fatigue_probability`, nothing written to disk.
+- **Safety:** `safety.py` owns the fusion `EmergencyMonitor` (eyes closed ≥ 8 s → MAX "driver not
+  responding"; no response for 10 s with the watch / 20 s without / 5 s if HR is clearly abnormal
+  → `alert.emergency = "unresponsive"`, which starts the phone's SOS countdown), the 2 h
+  `BreakReminder`, and the MPD-DF shadow score (counted in `health.physio_diag`, never acted on).
+- **Watch alert:** characteristic 0b `watch_alert` = 2 raw bytes `[pattern, seq]` on every
+  change + 5 s keep-alive; the watch echoes the seq, giving round-trip p50/p95 in `physio_diag`.
+
 ## Incidents
 
 20 s of status and alert history at 10 fps is held in memory (JPEG frames feed in later from the stream `Shared`; wiring is a TODO). A phone `incident` write is mapped onto the ring with the clock offset from the last `clock` write; the same `client_id` returns the same incident id. The clip is written as `clip.avi` at once and transcoded by a `nice 19` ffmpeg job to `clip.mp4`; `clip_ready` flips when it exists. Retention is 20 incidents and a 500 MB free-disk floor. HTTP (list, files, Range, `POST /incident`, bearer token) currently runs on a temporary port 8081 until merged into the single :8080 server.

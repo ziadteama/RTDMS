@@ -9,7 +9,7 @@ tags:
 aliases:
   - physio pivot
   - HR pipeline plan
-status: in-progress
+status: implemented
 updated: 2026-11-23
 code_path: models/physiology
 ---
@@ -107,16 +107,26 @@ a Garmin with our Connect IQ app open.
 
 ## Phases
 
-| Phase | What | Branches | State |
+| Phase | What | PR | State (23 Nov, morning) |
 |---|---|---|---|
-| P0 | Fusion ignores physiology for live alerts; no default heart-data log | `fusion/physio-guard`, `physio/no-default-log` | **done, not merged** (fusion 8 tests, Pi 207, physiology 132 pass) |
-| P1 | Half-day watch check: accelerometer with HR/RR, contact, vibration, subscribing to a Pi notify, battery over 30 min | `physio/watch-api-check` | needs the user + watch |
-| P2 | Packet v2, `WatchClock`, `HrStream`, slim `GarminPhysioSource` | `physio/hr-pipeline`, `pi/hr-source` | not started |
-| P3 | One `t` (`pi/.../clock.py`), 60 s clock writes, phone uses payload `t`; contract v1.3 CR | `pi/one-clock`, `app/one-clock` | not started |
-| P4 | Phone HR + quality dot, trip-HR switch | `app/hr-v2` | not started |
-| P5 | MPD-DF shadow score + break reminder | `physio/mpddf-score`, `fusion/physio-shadow` | not started |
-| P6 | Watch vibration + ACK; Pi↔watch latency (target < 100 ms) | `physio/watch-alert`, `pi/watch-alert` | later |
-| P7 | Unresponsive-driver SOS (`EmergencyMonitor` in fusion → `alert.emergency` → `triggerSos('unresponsive')`) | `fusion/emergency`, `app/unresponsive-sos` | later |
+| P0 | Fusion ignores physiology for live alerts; no default heart-data log | #74, #75 | **merged** |
+| P1 | Watch capability check (accelerometer + HR/RR, contact, vibration, notify subscribe, battery) | — | **needs the user + watch** |
+| P2 | Packet v2, `WatchClock`, `HrStream` | #77 | **merged** |
+| P3 | Contract v1.3: one `t` in phone time, 60 s clock, physio v2, `watch_alert`; Pi + app | #79, #80, #83 | **merged**, deployed on the Pi |
+| P4 | App: physio v2, trip-HR switch, no fatigue copy | #80 | **merged**; not yet tried on the phone |
+| P5 | MPD-DF shadow score (0.761 vs time 0.824) + break reminder | #81, #78, #83 | **merged**, running on the Pi |
+| P6 | Watch vibration + ACK + round-trip latency: Pi side | #83, #84 | **merged**, deployed |
+| P6 | Watch app (packet v2, vibration, ACK, motion) | #82 (draft) | **written, NOT compiled** — build on Windows first |
+| P7 | Unresponsive-driver SOS: fusion + Pi + app | #78, #83, #80 | **merged**; needs camera + phone for a real run |
+
+## Evidence (23 Nov, Pi 5, camera detached, no phone connected)
+
+| Check | Result |
+|---|---|
+| Gates on `main` | Pi 235 (Docker, ruff, mypy --strict), fusion 24, physiology Docker clean, app tsc/eslint + jest 728, contract 14/14 |
+| Over-the-air: dev machine as a v2 "watch" → deployed Pi runtime, 150 s | physiology `running`, HR + worn + quality `good`, PRV after warm-up, watch-clock offset spread **≈ 50 ms**, `watch_alert` keep-alive every 5 s received |
+| Pi CPU, `rtdms-pi-user` | **0.23 %** of one core idle, **0.35 %** while the watch streams; RSS 120 MB; not throttled |
+| Not measured yet | Round-trip latency (needs an alert change: camera or phone), phone on v1.3, real watch, concurrent cost with the camera models |
 
 ## Pi budget
 
