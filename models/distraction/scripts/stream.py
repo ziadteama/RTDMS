@@ -83,6 +83,23 @@ document.getElementById('t').innerHTML=h}catch(e){}}setInterval(tick,500);tick()
 </body></html>"""
 
 
+# A phone at the ear, a cup or food at the mouth, a hand on the face or the head bowed over a phone
+# hides or squashes the eyes: the eye ratio then reads "closed" and drowsiness fired while the
+# driver was calling or drinking. While the v2 classifier sees one of these (and for a short hold
+# after it, while the hand moves away), drowsiness is not fed the face: eyes unavailable, not
+# closed. The phone / drinking outputs themselves are unchanged.
+OCCLUDING = frozenset({"call", "texting", "drinking", "eating", "hand_on_face"})
+OCCLUDED_P = 0.5
+OCCLUDED_HOLD_S = 1.0
+
+
+def occludes_eyes(hy: dict | None) -> bool:
+    if not hy or hy.get("action") not in OCCLUDING:
+        return False
+    p = hy.get("p")
+    return isinstance(p, (int, float)) and p >= OCCLUDED_P
+
+
 def cpu_temp() -> float | None:
     try:
         return round(int(Path("/sys/class/thermal/thermal_zone0/temp").read_text()) / 1000, 1)
@@ -168,6 +185,7 @@ def pipeline_loop(args, shared: Shared) -> None:
           f"drowsiness {'on' if drowsy else 'off'}; "
           f"texting rule {'on' if rcfg.simple.texting else 'off'}; log {log.path}", flush=True)
     n, fps, t0, last_enc = 0, 0.0, time.perf_counter(), 0.0
+    occluded_until = float("-inf")
     try:
         while shared.running:
             gray, t = src.read()
@@ -182,6 +200,16 @@ def pipeline_loop(args, shared: Shared) -> None:
                 gray = cv2.rotate(gray, ROTATE[args.rotate])
             res = pipe.process(gray, t)
             n += 1
+            lm = res.face.landmarks if res.face is not None else None
+            hy = None
+            if hybrid is not None:
+                v = res.view if res.view.ndim == 2 else cv2.cvtColor(res.view, cv2.COLOR_BGR2GRAY)
+                hy = hybrid.feed(t, v, lm)
+                for a in hy.get("onsets", []):
+                    print(f"[event] t={t:.2f} v2 {a} ALERT", flush=True)
+                if occludes_eyes(hy):
+                    occluded_until = t + OCCLUDED_HOLD_S
+            occluded = t < occluded_until
             dz = None
             if drowsy is not None:
                 if shared.calibrate:
@@ -196,13 +224,9 @@ def pipeline_loop(args, shared: Shared) -> None:
                     drowsy.apply_phone_calibration(payload)
                 elif error is not None:
                     drowsy.message = f"calibration failed: {error}"
-                dz = drowsy.feed(t, res.face.landmarks if res.face is not None else None)
-            hy = None
-            if hybrid is not None:
-                v = res.view if res.view.ndim == 2 else cv2.cvtColor(res.view, cv2.COLOR_BGR2GRAY)
-                hy = hybrid.feed(t, v, res.face.landmarks if res.face is not None else None)
-                for a in hy.get("onsets", []):
-                    print(f"[event] t={t:.2f} v2 {a} ALERT", flush=True)
+                # Eyes hidden or distorted: drowsiness sees no face, so PERCLOS skips the frame.
+                dz = drowsy.feed(t, None if occluded else lm)
+                dz["occluded"] = occluded
             if n % 15 == 0:
                 now = time.perf_counter()
                 fps, t0 = 15 / (now - t0), now
