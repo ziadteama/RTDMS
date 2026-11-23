@@ -7,7 +7,7 @@ from dataclasses import replace
 
 from dms_physiology.garmin_hrv import UPDATE_S, HrvSnapshot, RrHrv
 from dms_physiology.garmin_rr import Arrival, RrCodecError, RrFrame, SequenceTracker, decode
-from dms_physiology.hr_stream import HrStream
+from dms_physiology.hr_stream import HrSnapshot, HrStream
 from dms_physiology.watch_clock import WatchClock
 
 from .state import PhysioReport
@@ -33,7 +33,7 @@ class GarminPhysioSource:
         self._placed = 0.0
         self._motion_t: float | None = None
         self._ack_t: float | None = None
-        self._report: PhysioReport | None = None
+        self._hr_snapshot: HrSnapshot | None = None
         self._hrv_snapshot: HrvSnapshot | None = None
         self._snapshot_at = self._hrv_at = float("-inf")
 
@@ -50,8 +50,9 @@ class GarminPhysioSource:
             t = self.watch_clock.add(frame)
             self._hr.add(frame, t)
             self._hrv.add(replace(frame, rx_monotonic=t))
-            if frame.arrival == Arrival.NEW_SESSION:
+            if frame.arrival == Arrival.NEW_SESSION or self._was_stale(frame.rx_monotonic):
                 self._motion_t = self._ack_t = None
+                self._snapshot_at = self._hrv_at = float("-inf")  # recompute at once
             if packet.motion is None:
                 self._motion_t = None
             elif packet.motion >= MOTION_ACTIVE or self._motion_t is None:
@@ -61,20 +62,25 @@ class GarminPhysioSource:
                 self._ack_t = t
             self._last, self._placed = frame, t
 
+    def _was_stale(self, now: float) -> bool:
+        return self._last is not None and now - self._last.rx_monotonic > self._stale_s
+
     def latest(self) -> PhysioReport | None:
+        """Fresh report on every call; only the HR (1 Hz) and PRV (5 s) maths is cached.
+
+        The runtime calls this per camera frame, so ACK, echo, motion and ages must never be
+        served from a cache, while the stream statistics need not be recomputed 15 times a second.
+        """
         with self._lock:
             now, frame = self._clock(), self._last
             if frame is None or now - frame.rx_monotonic > self._stale_s:
                 return None
-            if now - self._snapshot_at < 1.0:
-                return self._report
-            hr = self._hr.snapshot(now)
-            if now - self._hrv_at >= UPDATE_S:
-                self._hrv_snapshot = self._hrv.compute(now)
-                self._hrv_at = now
-            hrv = self._hrv_snapshot
-            assert hrv is not None
-            self._report = PhysioReport(
+            if self._hr_snapshot is None or now - self._snapshot_at >= 1.0:
+                self._hr_snapshot, self._snapshot_at = self._hr.snapshot(now), now
+            if self._hrv_snapshot is None or now - self._hrv_at >= UPDATE_S:
+                self._hrv_snapshot, self._hrv_at = self._hrv.compute(now), now
+            hr, hrv = self._hr_snapshot, self._hrv_snapshot
+            return PhysioReport(
                 {
                     "watch_connected": True,
                     "worn": hr.worn,
@@ -89,14 +95,12 @@ class GarminPhysioSource:
                     "motion": frame.packet.motion,
                     "wrist_still_s": None
                     if self._motion_t is None
-                    else max(0, now - self._motion_t),
-                    "ack_age_s": None if self._ack_t is None else max(0, now - self._ack_t),
+                    else max(0.0, now - self._motion_t),
+                    "ack_age_s": None if self._ack_t is None else max(0.0, now - self._ack_t),
                     "echo_seq": frame.packet.echo_seq,
                 },
                 self._placed,
             )
-            self._snapshot_at = now
-            return self._report
 
     def diagnostics(self) -> dict[str, object]:
         with self._lock:

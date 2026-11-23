@@ -95,3 +95,26 @@ def test_sink_missing_clock_offset(tmp_path: Path) -> None:
 
     meta = json.loads((tmp_path / inc_id / "meta.json").read_text())
     assert meta["clock_synced"] is False
+
+
+def test_sink_selects_frames_by_monotonic_time(tmp_path: Path) -> None:
+    """Offset is pi_mono_ms - phone_ms, so the window must be found on t_mono, not t_wall."""
+    ring = FrameRing(seconds=30.0, fps=10.0)
+    for i in range(250):
+        t_mono = 80.0 + i * 0.1
+        ring.push(Entry(t_mono=t_mono, t_wall=1.79e9 + t_mono, jpeg=b"\xff\xd8\xff\xd9",
+                        status={}, alert={}))
+    store = IncidentStore(root=tmp_path)
+    scheduler = FakeScheduler()
+    sink = RingIncidentSink(ring=ring, store=store, clock=lambda: 103.0,
+                            wall=lambda: 1.79e9 + 103.0, scheduler=scheduler)
+    phone_crash_ms = 1795189202400
+    offset = 100_000 - phone_crash_ms  # crash happened at Pi monotonic 100 s
+    inc_id = sink.report({"t_crash": phone_crash_ms, "client_id": "c-mono"},
+                         clock_offset_ms=offset)
+    assert scheduler.scheduled[0][0] == 2.0  # waits until 5 s after the crash
+    scheduler.run_all()
+    lines = [ln for ln in (tmp_path / inc_id / "data.jsonl").read_text().splitlines() if ln]
+    assert len(lines) > 200  # 20 s before + 5 s after at 10 fps, minus ring edges
+    meta = json.loads((tmp_path / inc_id / "meta.json").read_text())
+    assert meta["created"] == 1.79e9 + 103.0

@@ -62,7 +62,7 @@ def test_ring_window() -> None:
     for i in range(25):
         ring.push(_make_entry(t_mono=float(i), t_wall=100.0 + i))
 
-    sub = ring.window(105.0, 110.0)
+    sub = ring.window(5.0, 10.0)  # monotonic seconds; wall 105..110
     assert len(sub) == 6
     assert sub[0].t_wall == 105.0
     assert sub[-1].t_wall == 110.0

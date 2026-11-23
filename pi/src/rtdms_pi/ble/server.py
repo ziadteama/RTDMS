@@ -63,7 +63,7 @@ async def run_ble(
         runtime.player,
         settings_store,
         incident_sink,
-        time.time,
+        time.monotonic,
         AuthGate(
             load_or_create_token(config.state_dir / "token"), open_mode=config.ble_open
         ),
