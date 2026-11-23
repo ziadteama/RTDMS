@@ -9,6 +9,7 @@ from typing import Any
 
 from ..payloads import alert_payload, physio_payload, status_payload, to_json_bytes
 from ..state import DecisionSnapshot, RuntimeState
+from ..watch_alert import WatchAlert
 from .uuids import Char
 
 EPS = 1e-9
@@ -45,6 +46,8 @@ def _physio_key(payload: dict[str, object]) -> bytes:
     return _alert_key(payload)
 
 
+WATCH_KEEPALIVE_S = 5.0
+
 class Notifier:
     def __init__(
         self,
@@ -52,8 +55,12 @@ class Notifier:
         clock: Callable[[], float],
         emit: Callable[[Char, str, dict[str, object]], None],
         settings_provider: Callable[[], Mapping[str, object]] | None = None,
+        watch: WatchAlert | None = None,
+        emit_raw: Callable[[Char, bytes], None] | None = None,
     ) -> None:
         self.state, self.clock, self.emit = state, clock, emit
+        self.watch, self.emit_raw = watch, emit_raw
+        self._watch_at = float("-inf")
         self.settings_provider = settings_provider
         self.factor = 1.0
         self.wakeups = 0
@@ -103,6 +110,19 @@ class Notifier:
             emitted |= self._send_alert(
                 alert_payload(decision, now, self.state.phone_clock), now, keepalive=False
             )
+            if self.watch is not None:
+                self._send_watch(self.watch.change(decision.pattern), now)
+
+    def _send_watch(self, value: bytes, now: float) -> None:
+        """Garmin watch alert: 2 raw bytes on every change, then a 5 s keep-alive."""
+        if self.watch is None or self.emit_raw is None:
+            return
+        try:
+            self.emit_raw(Char.WATCH_ALERT, value)
+            self.watch.sent(value, now)
+        except Exception:
+            logging.getLogger(__name__).exception("BLE notify failed: WATCH_ALERT")
+        self._watch_at = now
 
     def set_throttle(self, factor: float) -> None:
         if not math.isfinite(factor) or not 0 < factor <= 1:
@@ -132,6 +152,8 @@ class Notifier:
             self._send_alert(
                 alert_payload(snapshot.decision, now, self.state.phone_clock), now, keepalive=True
             )
+        if self.watch is not None and now - self._watch_at >= WATCH_KEEPALIVE_S - EPS:
+            self._send_watch(self.watch.read(), now)
         if changed or now - self._checked_at >= 1.0 / self.factor - EPS:
             self._checked_at = now
             self._check_status(snapshot, now)
@@ -139,7 +161,8 @@ class Notifier:
 
     def _next_due(self) -> float:
         alert_due = self._sent_at[Char.ALERT] + ALERT_KEEPALIVE_S
-        return min(alert_due, self._checked_at + 1.0 / self.factor)
+        watch_due = self._watch_at + WATCH_KEEPALIVE_S if self.watch is not None else math.inf
+        return min(alert_due, self._checked_at + 1.0 / self.factor, watch_due)
 
     async def run(self, stop: asyncio.Event) -> None:
         self._loop, wake = asyncio.get_running_loop(), asyncio.Event()

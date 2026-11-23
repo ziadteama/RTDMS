@@ -59,6 +59,7 @@ class PhysioReport:
 class DecisionSnapshot:
     pattern: AlertPattern = AlertPattern.NONE
     reasons: tuple[str, ...] = ()
+    emergency: str | None = None
 
 
 @dataclass(frozen=True)
@@ -119,8 +120,12 @@ class RuntimeState:
 
     def set_decision(self, decision: FusionDecision) -> None:
         with self._lock:
-            changed = self._data.decision.pattern != decision.pattern
-            current = DecisionSnapshot(decision.pattern, tuple(decision.reasons))
+            changed = (self._data.decision.pattern, self._data.decision.emergency) != (
+                decision.pattern, decision.emergency
+            )
+            current = DecisionSnapshot(
+                decision.pattern, tuple(decision.reasons), decision.emergency
+            )
             self._data = replace(self._data, decision=current)
             if changed:
                 for callback in self._decision_listeners:

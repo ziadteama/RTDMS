@@ -6,7 +6,14 @@ from collections.abc import Callable
 from dataclasses import replace
 
 from dms_physiology.garmin_hrv import UPDATE_S, HrvSnapshot, RrHrv
-from dms_physiology.garmin_rr import Arrival, RrCodecError, RrFrame, SequenceTracker, decode
+from dms_physiology.garmin_rr import (
+    Arrival,
+    RrCodecError,
+    RrFrame,
+    RrPacket,
+    SequenceTracker,
+    decode,
+)
 from dms_physiology.hr_stream import HrSnapshot, HrStream
 from dms_physiology.watch_clock import WatchClock
 
@@ -37,16 +44,17 @@ class GarminPhysioSource:
         self._hrv_snapshot: HrvSnapshot | None = None
         self._snapshot_at = self._hrv_at = float("-inf")
 
-    def handle_write(self, raw: bytes) -> None:
+    def handle_write(self, raw: bytes) -> RrPacket | None:
+        """Ingest one watch write; returns the accepted packet (None if rejected)."""
         with self._lock:
             try:
                 packet = decode(raw)
             except RrCodecError:
                 self.decode_errors += 1
-                return
+                return None
             frame = self.tracker.accept(packet, self._clock(), self._wall())
             if frame.arrival in (Arrival.DUPLICATE, Arrival.LATE):
-                return
+                return None
             t = self.watch_clock.add(frame)
             self._hr.add(frame, t)
             self._hrv.add(replace(frame, rx_monotonic=t))
@@ -61,6 +69,7 @@ class GarminPhysioSource:
             if packet.ack:
                 self._ack_t = t
             self._last, self._placed = frame, t
+            return packet
 
     def _was_stale(self, now: float) -> bool:
         return self._last is not None and now - self._last.rx_monotonic > self._stale_s

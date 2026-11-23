@@ -215,7 +215,7 @@ async def test_disconnect_and_subscribe(service: PhoneService) -> None:
     port.connect()
     with pytest.raises(GattWriteRejected):
         write(service, Char.CLOCK, fixture("clock"))
-    assert len(port.characteristics) == 11
+    assert len(port.characteristics) == 12
     assert port.characteristics[GARMIN_CHAR_UUID].props == {"write", "write_no_response"}
     await port.stop()
 

@@ -12,8 +12,10 @@ from typing import Any
 from dms_fusion import decide
 
 from .buzzer import PatternPlayer
+from .safety import Safety
 from .sources import FrameResult, FrameSource, PhysioSource
 from .state import RuntimeState
+from .watch_alert import WatchAlert
 
 
 class Runtime:
@@ -26,7 +28,11 @@ class Runtime:
         clock: Callable[[], float] = time.monotonic,
         tick_rate: float = 1.0,
         settings_provider: Callable[[], Mapping[str, Any]] | None = None,
+        safety: Safety | None = None,
+        watch_alert: WatchAlert | None = None,
     ) -> None:
+        # Emergency monitor, break reminder and shadow score; None in unit tests that skip them.
+        self.safety, self.watch_alert = safety, watch_alert
         self.frame_source, self.physio_source = frame_source, physio_source
         self.player, self.state, self.clock = player, state, clock
         self.settings_provider = settings_provider
@@ -64,7 +70,11 @@ class Runtime:
         from .detector_gate import apply_settings
 
         face, phone, physio = apply_settings(settings, face, phone, physio)
-        decision = decide(face=face, phone=phone, physiology=physio)
+        if self.safety is None:
+            decision = decide(face=face, phone=phone, physiology=physio)
+        else:
+            decision = decide(face=face, phone=phone, physiology=physio, **self.safety.inputs(s))
+            self.safety.observe(decision, s)
         self.state.set_decision(decision)
         self.player.set_pattern(decision.pattern)
 

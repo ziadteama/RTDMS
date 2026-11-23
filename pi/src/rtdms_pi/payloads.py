@@ -39,6 +39,8 @@ def alert_payload(
         "t": round(t, 3),
         "t_src": t_src,
     }
+    if decision.emergency == "unresponsive":
+        d["emergency"] = "unresponsive"
     while reasons and len(to_json_bytes(d)) > 240:
         reasons[-1] = reasons[-1][:-1]
         if not reasons[-1]:
@@ -156,9 +158,9 @@ def health_payload(
             d[key] = value
     if physio_diag is not None:
         d["physio_diag"] = {
-            **physio_diag,
             "shadow_agree": None,
             "shadow_disagree": None,
             "shadow_only": None,
+            **physio_diag,
         }
     return d

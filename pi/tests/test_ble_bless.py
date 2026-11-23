@@ -133,7 +133,7 @@ async def test_one_service_and_dispatch(monkeypatch, service, bless, dbus) -> No
     await port.start("test")
     server = port.server
     assert server.services == [SERVICE_UUID]
-    assert len(server.chars) == 11  # ten phone entries plus Garmin: contract authority
+    assert len(server.chars) == 12  # eleven phone entries (incl. watch_alert) plus Garmin
     assert server.chars[GARMIN_CHAR_UUID].props == Props.write | Props.write_without_response
     assert server.chars[Char.SETTINGS.uuid].props == Props.read | Props.write
     assert server.chars[Char.RESULT.uuid].props == Props.notify

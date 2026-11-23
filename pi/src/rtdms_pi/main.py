@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from .config import RuntimeConfig
     from .runtime import Runtime
 
+SHADOW_MODEL = "models/physiology/models/hr_shadow_mpddf_v1.json"
+
 
 def build_runtime(
     config: RuntimeConfig,
@@ -30,6 +32,7 @@ def build_runtime(
     )
     from .clock import PhoneClock
     from .runtime import Runtime
+    from .safety import Safety
     from .sources import (
         FrameSource,
         GarminPhysioSource,
@@ -39,6 +42,7 @@ def build_runtime(
         StreamPipelineSource,
     )
     from .state import RuntimeState
+    from .watch_alert import WatchAlert
 
     backend: BuzzerBackend
     if config.buzzer == "gpio":
@@ -70,6 +74,8 @@ def build_runtime(
         state,
         tick_rate=config.tick_rate,
         settings_provider=settings_provider,
+        safety=Safety(config.repo_root / SHADOW_MODEL),
+        watch_alert=WatchAlert(),
     )
 
 
