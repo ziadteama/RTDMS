@@ -1,0 +1,13 @@
+[Unit]
+Description=RTDMS boot readiness (logs "RTDMS READY" once camera, BLE and HTTP are up)
+After=rtdms-pi-user.service
+Wants=rtdms-pi-user.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=%h/rtdms-pi/pi/deploy/check.sh --wait 240 --boot
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

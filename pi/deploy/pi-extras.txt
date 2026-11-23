@@ -1,0 +1,8 @@
+# Python packages the runtime needs on top of ~/rtdms/.venv (vision stack, offline wheels from
+# ~/rtdms/install.sh). Installed with --no-deps by install.sh when an import is missing.
+bless==0.2.6
+bleak==0.22.3
+dbus-fast==2.46.4
+dbus-next==0.2.3
+scipy==1.18.1
+qrcode==8.2
