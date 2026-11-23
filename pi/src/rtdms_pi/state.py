@@ -32,6 +32,8 @@ class FaceReport:
     face: bool = False
     calibrated: bool | None = None
     calibration: str | None = None
+    calibration_step: str | None = None  # the unit's own calibration step, for the phone to follow
+    calibration_left_s: float | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "reasons", tuple(self.reasons))

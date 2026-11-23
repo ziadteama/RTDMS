@@ -352,3 +352,13 @@ def test_stream_calibration_effects() -> None:
     profile = {"source": "phone", "closed_ratio": 0.38}
     source.apply_phone_calibration(profile)
     assert profiles == [profile]
+
+
+def test_map_status_calibration_step() -> None:
+    d = {"face": True, "calibrated": True, "message": "calibrating",
+         "calibration_step": "countdown_closed", "calibration_left_s": 2.4}
+    f = map_status({"face": True, "drowsiness": d}, 100).face
+    assert f is not None and f.calibration_step == "countdown_closed"
+    assert f.calibration_left_s == 2.4
+    f = map_status({"face": True, "drowsiness": {**d, "calibration_step": "bogus"}}, 100).face
+    assert f is not None and f.calibration_step is None  # unknown steps are dropped, not guessed
