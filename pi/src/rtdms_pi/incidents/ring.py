@@ -71,12 +71,13 @@ class FrameRing:
 
             return True
 
-    def window(self, t_start_wall: float, t_end_wall: float) -> list[Entry]:
+    def window(self, t_start_mono: float, t_end_mono: float) -> list[Entry]:
+        """Entries between two Pi monotonic times (the clock the phone offset maps onto)."""
         with self._lock:
             return [
                 e
                 for e in self._entries
-                if t_start_wall <= e.t_wall <= t_end_wall
+                if t_start_mono <= e.t_mono <= t_end_mono
             ]
 
     def __len__(self) -> int:

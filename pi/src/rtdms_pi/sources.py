@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
 from .config import RuntimeConfig
+from .garmin_source import GarminPhysioSource as GarminPhysioSource
 from .state import FaceReport, PhoneReport, PhysioReport
 
 
@@ -202,68 +203,3 @@ class StreamPipelineSource:
                 self.shared.cond.notify_all()
         if self._thread is not None:
             self._thread.join(timeout=5)
-
-
-class GarminPhysioSource:
-    """In-memory receiver only. P3 routes GATT writes here; no CSV or BLE server.
-
-    The upstream receiver forces an asyncio queue; consume each accepted frame
-    immediately on a private loop, without starting an asynchronous worker.
-    Not verified on hardware.
-    """
-
-    def __init__(
-        self,
-        stale_s: float = 10.0,
-        clock: Callable[[], float] = time.monotonic,
-        wall: Callable[[], float] = time.time,
-    ) -> None:
-        receiver = importlib.import_module("dms_physiology.garmin_receiver")
-        self.receiver = receiver.GarminRrReceiver(log=None, clock=clock, wall=wall)
-        self._hrv = importlib.import_module("dms_physiology.garmin_hrv").RrHrv()
-        self._enrich = importlib.import_module("dms_physiology.wesad_garmin").enrich_hrv_dict
-        self._clock, self._wall, self._stale_s = clock, wall, stale_s
-        self._lock = threading.Lock()
-        self._last: Any = None
-
-    def handle_write(self, raw: bytes) -> None:
-        with self._lock:
-            frame = self.receiver.handle_write(raw)
-            if frame is not None:
-                # The queue is already nonempty. Driving this coroutine directly
-                # also works when P3 calls us inside its running asyncio loop.
-                async def consume() -> None:
-                    frames = self.receiver.frames()
-                    try:
-                        self._hrv.add(await anext(frames))
-                    finally:
-                        await frames.aclose()
-
-                coro = consume()
-                try:
-                    coro.send(None)
-                except StopIteration:
-                    pass
-                finally:
-                    coro.close()
-                self._last = frame
-
-    def latest(self) -> PhysioReport | None:
-        with self._lock:
-            frame = self._last
-            if frame is None or self._clock() - frame.rx_monotonic > self._stale_s:
-                return None
-            d = self._enrich(self._hrv.compute(self._clock(), self._wall()), None)
-            return PhysioReport(
-                {
-                    "watch_connected": True,
-                    "hr_bpm": frame.packet.hr_bpm,
-                    "rr_ms": tuple(frame.packet.rr_ms),
-                    "fatigue_probability": d["fatigue_probability"],
-                    "hrv_state": d["state"],
-                    "rmssd_ms": d["rmssd_ms"],
-                    "quality": d["quality"],
-                    "t": frame.rx_wall,
-                },
-                frame.rx_monotonic,
-            )

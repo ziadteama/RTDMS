@@ -12,6 +12,7 @@ from ..payloads import alert_payload, physio_payload, status_payload, to_json_by
 from ..settings import SettingsStore
 from ..sources import GarminPhysioSource
 from ..state import RuntimeState
+from ..watch_alert import WatchAlert
 from .auth import AuthGate
 from .contract import validate
 from .gatt import GattPort, GattWriteRejected
@@ -45,6 +46,7 @@ class PhoneService:
         start_calibration: Callable[[], None] | None = None,
         apply_phone_calibration: Callable[[dict[str, Any]], None] | None = None,
         validate_outgoing: bool = False,
+        watch_alert: WatchAlert | None = None,
     ) -> None:
         self.validate_outgoing = validate_outgoing
         self.port, self.state, self.player = port, runtime_state, player
@@ -53,7 +55,10 @@ class PhoneService:
         self.start_calibration = start_calibration
         self.apply_phone_calibration = apply_phone_calibration
         self.stats = ServiceStats()
-        self.notifier = Notifier(runtime_state, clock, self._emit, settings.read)
+        self.watch_alert = watch_alert if watch_alert is not None else WatchAlert()
+        self.notifier = Notifier(
+            runtime_state, clock, self._emit, settings.read, self.watch_alert, self._emit_raw
+        )
         self.loss = GarminLossMonitor(self.set_throttle)
         self.garmin = garmin if garmin is not None else GarminPhysioSource()
         port.set_disconnect_handler(self.on_disconnect)
@@ -63,9 +68,11 @@ class PhoneService:
         self._register()
 
     def _register(self) -> None:
-        readable = {Char.ALERT, Char.STATUS, Char.PHYSIO, Char.SETTINGS, Char.HEALTH}
+        readable = {
+            Char.ALERT, Char.STATUS, Char.PHYSIO, Char.SETTINGS, Char.HEALTH, Char.WATCH_ALERT
+        }
         writable = {Char.SETTINGS, Char.COMMAND, Char.INCIDENT, Char.CLOCK, Char.AUTH}
-        notifiable = {Char.ALERT, Char.STATUS, Char.PHYSIO, Char.RESULT}
+        notifiable = {Char.ALERT, Char.STATUS, Char.PHYSIO, Char.RESULT, Char.WATCH_ALERT}
         for char in Char:
             props = frozenset(
                 p
@@ -89,19 +96,25 @@ class PhoneService:
         self.auth.reset()
 
     def _garmin_write(self, raw: bytes) -> None:
-        tracker = self.garmin.receiver.tracker
+        tracker = self.garmin.tracker
         before_lost, before_received = tracker.lost, tracker.received
-        self.garmin.handle_write(raw)  # synchronous, before any phone scheduling
+        packet = self.garmin.handle_write(raw)  # synchronous, before any phone scheduling
+        if packet is not None and packet.echo_seq is not None:
+            self.watch_alert.echo(packet.echo_seq, self.clock())
         for _ in range(min(60, tracker.lost - before_lost)):
             self.loss.record(lost=True)
         self.loss.record(lost=tracker.received == before_received)
 
     def read(self, char: Char) -> bytes:
+        if char == Char.WATCH_ALERT:
+            return self.watch_alert.read()  # raw bytes for the watch, not JSON
         snapshot = self.state.snapshot()
         builders: dict[Char, Callable[[], dict[str, Any]]] = {
-            Char.ALERT: lambda: alert_payload(snapshot.decision, self.clock()),
+            Char.ALERT: lambda: alert_payload(
+                snapshot.decision, snapshot.t, self.state.phone_clock
+            ),
             Char.STATUS: lambda: status_payload(snapshot, self.settings.read()),
-            Char.PHYSIO: lambda: physio_payload(snapshot),
+            Char.PHYSIO: lambda: physio_payload(snapshot, self.state.phone_clock),
             Char.SETTINGS: self.settings.read,
             Char.HEALTH: self.health_fn,
         }
@@ -193,6 +206,9 @@ class PhoneService:
         data = to_json_bytes(payload)
         if char != Char.RESULT and len(data) > 240:
             raise ValueError("notify budget exceeded")
+        self.port.notify(char.uuid, data)
+
+    def _emit_raw(self, char: Char, data: bytes) -> None:
         self.port.notify(char.uuid, data)
 
     def set_throttle(self, factor: float) -> None:

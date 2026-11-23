@@ -7,6 +7,7 @@ import jsonschema
 import pytest
 from dms_fusion import AlertPattern, FusionDecision
 
+from rtdms_pi.clock import PhoneClock
 from rtdms_pi.payloads import (
     alert_payload,
     health_payload,
@@ -15,6 +16,8 @@ from rtdms_pi.payloads import (
     to_json_bytes,
 )
 from rtdms_pi.state import FaceReport, PhoneReport, PhysioReport, Snapshot
+
+CLOCK = PhoneClock(wall=lambda: 100.0)
 
 CONTRACT = Path(__file__).resolve().parents[2] / "contracts/pi-link"
 
@@ -35,7 +38,7 @@ def test_real_fixtures(fixture: Path) -> None:
 
 @pytest.mark.parametrize("pattern", list(AlertPattern))
 def test_alert(pattern: AlertPattern) -> None:
-    d = alert_payload(FusionDecision(pattern, ["眼" * 100] * 10), 1732117202.4)
+    d = alert_payload(FusionDecision(pattern, ["眼" * 100] * 10), 1732117202.4, CLOCK)
     validate("alert", d)
     assert d["pattern"] == pattern.value
     assert " " not in to_json_bytes(d).decode()
@@ -62,8 +65,12 @@ def test_payloads_full_and_empty() -> None:
     )
     for snapshot in (s, Snapshot(t=100)):
         validate("status", status_payload(snapshot))
-        validate("physio", physio_payload(snapshot))
-    assert physio_payload(Snapshot(t=100)) == {"watch_connected": False, "t": 100}
+        validate("physio", physio_payload(snapshot, CLOCK))
+    assert physio_payload(Snapshot(t=100), CLOCK) == {
+        "watch_connected": False,
+        "t": 100,
+        "t_src": "pi",
+    }
     assert "calibration" not in status_payload(Snapshot())
     validate(
         "health",
@@ -112,9 +119,9 @@ def test_worst_case_numeric_payloads() -> None:
         ),
     )
     validate("status", status_payload(s))
-    validate("physio", physio_payload(s))
+    validate("physio", physio_payload(s, CLOCK))
     assert "temp_c" not in status_payload(s)
-    assert "quality" not in physio_payload(s)
+    assert "rr_ms" not in physio_payload(s, CLOCK)
 
 
 def test_invalid_values_omitted() -> None:
@@ -123,7 +130,7 @@ def test_invalid_values_omitted() -> None:
         physio=PhysioReport({"t": 1, "hrv_state": "unknown", "quality": "unknown"}, 1),
     )
     validate("status", status_payload(s))
-    validate("physio", physio_payload(s))
+    validate("physio", physio_payload(s, CLOCK))
 
 
 def test_status_payload_no_face_or_camera_lost() -> None:

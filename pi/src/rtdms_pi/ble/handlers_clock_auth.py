@@ -8,7 +8,7 @@ from .gatt import GattWriteRejected
 
 
 def handle_clock(payload: dict[str, Any], state: RuntimeState, pi_time_ms: int) -> None:
-    state.set_clock_offset(pi_time_ms - payload["phone_ms"])
+    state.phone_clock.on_clock_write(pi_time_ms, payload["phone_ms"])
 
 
 def handle_auth(payload: dict[str, Any], auth: AuthGate) -> None:

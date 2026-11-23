@@ -12,7 +12,7 @@ from typing import Any
 
 from .ble.contract import CONTRACT_VERSION
 from .config import RuntimeConfig
-from .sources import NullPhysioSource, PhysioSource
+from .sources import GarminPhysioSource, NullPhysioSource, PhysioSource
 from .state import RuntimeState, Snapshot
 
 
@@ -100,7 +100,9 @@ class HealthProbe:
         read_text: Callable[[Path | str], str] | None = None,
         clock: Callable[[], float] = time.monotonic,
         disk_usage: Callable[[Path | str], Any] = shutil.disk_usage,
+        extra_diag: Callable[[], Mapping[str, object]] | None = None,
     ) -> None:
+        self.extra_diag = extra_diag
         self.state, self.settings_provider = state, settings_provider
         self.physio_source, self.config = physio_source, config
         self.state_dir = Path(state_dir)
@@ -233,6 +235,14 @@ class HealthProbe:
             d["mem_total_mb"] = mem_total
         if disk_free is not None:
             d["disk_free_mb"] = disk_free
+        if isinstance(self.physio_source, GarminPhysioSource):
+            d["physio_diag"] = {
+                "shadow_agree": None,
+                "shadow_disagree": None,
+                "shadow_only": None,
+                **self.physio_source.diagnostics(),
+                **(self.extra_diag() if self.extra_diag else {}),
+            }
         return d
 
     def __call__(self) -> dict[str, Any]:

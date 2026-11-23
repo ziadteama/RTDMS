@@ -69,7 +69,7 @@ def test_loss_hysteresis() -> None:
 
 def test_garmin_before_pending_notifications(service: PhoneService) -> None:
     events = []
-    receiver = service.garmin.receiver
+    receiver = service.garmin
     service.state.set_decision(FusionDecision(AlertPattern.MAX, []))
     with patch.object(receiver, "handle_write", wraps=receiver.handle_write) as handle:
         service.port.write(GARMIN_CHAR_UUID, encode(RrPacket(1, 1000, 72, (830,))))
@@ -79,7 +79,7 @@ def test_garmin_before_pending_notifications(service: PhoneService) -> None:
         assert not service.port.notifications
         service.notifier.step()
         events.extend("notify" for _ in service.port.notifications)
-    assert events == ["garmin", "notify", "notify", "notify"]
+    assert events == ["garmin", "notify", "notify", "notify", "notify"]  # + watch_alert
     service.port.write(GARMIN_CHAR_UUID, encode(RrPacket(8, 8000, 72, (830,))))
     assert service.notifier.factor == 0.5
     assert not service.auth.authed
@@ -92,7 +92,7 @@ async def test_async_scheduler_stop(service: PhoneService) -> None:
     await asyncio.sleep(0)
     stop.set()
     await asyncio.wait_for(task, 1)
-    assert len(service.port.notifications) == 3
+    assert len(service.port.notifications) == 4  # alert, watch_alert, status, physio
 
 
 def test_change_during_drain_never_replays_old_snapshot(clock: Clock) -> None:
@@ -196,7 +196,7 @@ def test_no_validation_in_hot_path(service: PhoneService) -> None:
     with patch("rtdms_pi.ble.phone_service.validate") as v:
         service.notifier.step()
     v.assert_not_called()
-    assert len(service.port.notifications) == 3
+    assert len(service.port.notifications) == 4  # alert, watch_alert, status, physio
 
 
 def test_validate_outgoing_rejects_invalid(service: PhoneService) -> None:

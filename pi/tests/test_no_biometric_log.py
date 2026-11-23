@@ -6,7 +6,6 @@ from unittest.mock import patch
 
 import pytest
 from conftest import Clock
-from dms_physiology.garmin_receiver import GarminRrReceiver
 from dms_physiology.garmin_rr import RrPacket, encode
 from test_payloads import validate
 
@@ -20,14 +19,9 @@ from rtdms_pi.state import RuntimeState
 def test_receiver_no_log_and_no_writes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, clock: Clock
 ) -> None:
-    # Import dependencies before observing the runtime (no import bytecode counted).
-    import dms_physiology.wesad_garmin  # noqa: F401
-
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("TMPDIR", str(tmp_path))
-    with patch("dms_physiology.garmin_receiver.GarminRrReceiver", wraps=GarminRrReceiver) as ctor:
-        source = GarminPhysioSource(clock=clock, wall=lambda: 1234.0)
-        assert ctor.call_args.kwargs["log"] is None
+    source = GarminPhysioSource(clock=clock, wall=lambda: 1234.0)
     assert source.latest() is None
     packet = encode(RrPacket(1, 1000, 75, (800, 810)))
     # Guard all Python file writes, not just files that survive until shutdown.
@@ -64,18 +58,18 @@ def test_receiver_no_log_and_no_writes(
         asyncio.run(feed())
         report = source.latest()
         assert report is not None and report.raw["hr_bpm"] == 75
-        assert report.raw["fatigue_probability"] is None
+        assert "fatigue_probability" not in report.raw
         for seq in range(2, 300):
             source.handle_write(encode(RrPacket(seq, seq * 1000, 75, (800,))))
-        assert source.receiver.dropped_frames == 0
-        assert source.receiver._queue.empty()
+        assert source.tracker.received == 299
+        assert source.decode_errors == 1
         state = RuntimeState(clock=clock)
         runtime = Runtime(
             ScriptedFrameSource([]), source, PatternPlayer(RecordingBuzzer()), state, clock
         )
         runtime.start()
         runtime.tick()
-        payload = physio_payload(state.snapshot())
+        payload = physio_payload(state.snapshot(), state.phone_clock)
         runtime.stop()
         clock.advance(10.01)
         assert source.latest() is None

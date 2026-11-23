@@ -215,7 +215,7 @@ async def test_disconnect_and_subscribe(service: PhoneService) -> None:
     port.connect()
     with pytest.raises(GattWriteRejected):
         write(service, Char.CLOCK, fixture("clock"))
-    assert len(port.characteristics) == 11
+    assert len(port.characteristics) == 12
     assert port.characteristics[GARMIN_CHAR_UUID].props == {"write", "write_no_response"}
     await port.stop()
 
@@ -415,3 +415,15 @@ async def test_run_ble_open_mode_warns(tmp_path: Path, caplog: Any) -> None:
     caplog.clear()
     await run_ble(RuntimeConfig(state_dir=tmp_path), runtime, stop, fake=True)
     assert "open mode" not in caplog.text
+
+
+def test_clock_write_puts_payload_t_in_phone_time(service: PhoneService, clock: Clock) -> None:
+    """Pi monotonic (~100 s) and phone epoch (~1.8e9 s) differ; payload t must be phone time."""
+    unlock(service)
+    phone_ms = fixture("clock")["phone_ms"]
+    write(service, Char.CLOCK, {"phone_ms": phone_ms})
+    clock.advance(2.5)
+    for char in (Char.ALERT, Char.PHYSIO):
+        body = json.loads(service.port.read(char.uuid))
+        assert body["t_src"] == "phone"
+        assert body["t"] == pytest.approx(phone_ms / 1000 + 2.5, abs=0.01)

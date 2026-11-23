@@ -32,6 +32,7 @@ def health_reader(
         physio_source=runtime.physio_source,
         config=config,
         state_dir=config.state_dir,
+        extra_diag=runtime.diagnostics,
     )
     return probe
 
@@ -63,7 +64,7 @@ async def run_ble(
         runtime.player,
         settings_store,
         incident_sink,
-        time.time,
+        time.monotonic,
         AuthGate(
             load_or_create_token(config.state_dir / "token"), open_mode=config.ble_open
         ),
@@ -72,6 +73,7 @@ async def run_ble(
         start_calibration=runtime.frame_source.start_calibration,
         apply_phone_calibration=runtime.frame_source.apply_phone_calibration,
         validate_outgoing=config.debug_validate,
+        watch_alert=runtime.watch_alert,
     )
     try:
         await port.start(config.ble_name)

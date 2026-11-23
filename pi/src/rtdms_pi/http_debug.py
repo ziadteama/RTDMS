@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import socket
 import threading
-import time
 from collections.abc import Callable, Mapping
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -58,12 +57,12 @@ class DebugServer:
             def do_GET(self) -> None:
                 s = state.snapshot()
                 if self.path == "/alert":
-                    payload = alert_payload(s.decision, time.time())
+                    payload = alert_payload(s.decision, s.t, state.phone_clock)
                 elif self.path == "/status":
                     settings = settings_provider() if settings_provider else None
                     payload = status_payload(s, settings)
                 elif self.path == "/physio":
-                    payload = physio_payload(s)
+                    payload = physio_payload(s, state.phone_clock)
                 elif self.path == "/health":
                     payload = probe()
                 else:

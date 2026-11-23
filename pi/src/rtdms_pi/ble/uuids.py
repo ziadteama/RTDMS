@@ -19,6 +19,7 @@ class Char(IntEnum):
     CLOCK = 8
     AUTH = 9
     HEALTH = 10
+    WATCH_ALERT = 11  # 0b: 2 raw bytes for the Garmin watch, not JSON (contract v1.3)
 
     @property
     def uuid(self) -> str:
@@ -26,6 +27,6 @@ class Char(IntEnum):
 
 
 def phone_uuid(nn: int) -> str:
-    if not 1 <= nn <= 10:
+    if not 1 <= nn <= 11:
         raise ValueError("unknown phone characteristic")
     return "1375193a-7edb-4a34-b3f2-18130239" + f"{nn:04x}"

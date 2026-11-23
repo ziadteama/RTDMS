@@ -27,6 +27,7 @@ class RuntimeConfig:
     fake_ble: bool = False
     ble_name: str = "RTDMS-Pi"
     ble_open: bool = False
+    sync_system_clock: bool = False
     debug_validate: bool = False
     repo_root: Path = Path(__file__).resolve().parents[3]
 
@@ -65,6 +66,7 @@ class RuntimeConfig:
         )
         p.add_argument("--rotate", type=int, choices=[0, 90, 180, 270], default=0)
         p.add_argument("--physiology", action="store_true")
+        p.add_argument("--sync-system-clock", action="store_true", default=False)
         p.add_argument("--ble", action=argparse.BooleanOptionalAction, default=None)
         p.add_argument("--fake-ble", action="store_true")
         p.add_argument("--ble-name", default=os.getenv("RTDMS_BLE_NAME", "RTDMS-Pi"))

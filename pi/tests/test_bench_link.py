@@ -38,11 +38,11 @@ def test_contract_snapshot_and_properties() -> None:
     services = [SimpleNamespace(uuid=SERVICE, characteristics=chars)]
     listing, errors = check_services(services)
     assert not errors
-    assert len(listing[0]["characteristics"]) == 11
+    assert len(listing[0]["characteristics"]) == 12
     chars[-1].properties = ["write"]
     assert check_services(services)[1] == ["garmin"]
     services[0].uuid = "wrong service"
-    assert len(check_services(services)[1]) == 11
+    assert len(check_services(services)[1]) == 12
 
 
 def test_notification_metrics_include_silent_edges() -> None:

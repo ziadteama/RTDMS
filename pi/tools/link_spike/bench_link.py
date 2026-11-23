@@ -23,14 +23,14 @@ from link_spike.metrics import calculate_percentiles  # noqa: E402
 
 # Contract snapshot: checked against ble/uuids.py and phone_service.py by unit tests.
 SERVICE = "0000fff0-0000-1000-8000-00805f9b34fb"
-NAMES = "alert status physio settings command result incident clock auth health".split()
+NAMES = "alert status physio settings command result incident clock auth health watch_alert".split()
 UUIDS = {name: f"1375193a-7edb-4a34-b3f2-18130239{i:04x}" for i, name in enumerate(NAMES, 1)}
 UUIDS["garmin"] = "1375193a-7edb-4a34-b3f2-18130239c8a8"
 PROPERTIES = {
     "alert": {"read", "notify"}, "status": {"read", "notify"},
     "physio": {"read", "notify"}, "settings": {"read", "write"},
     "command": {"write"}, "result": {"notify"}, "incident": {"write"},
-    "clock": {"write"}, "auth": {"write"}, "health": {"read"},
+    "clock": {"write"}, "auth": {"write"}, "health": {"read"}, "watch_alert": {"read", "notify"},
     "garmin": {"write", "write-without-response"},
 }
 STEPS = ("discovery", "before_auth", "notifications", "command_rtt", "alert_change", "reconnect")

@@ -10,6 +10,8 @@ from types import MappingProxyType
 
 from dms_fusion import AlertPattern, FusionDecision
 
+from .clock import PhoneClock
+
 
 def freeze(value: object) -> object:
     if isinstance(value, dict):
@@ -47,7 +49,7 @@ class PhoneReport:
 @dataclass(frozen=True)
 class PhysioReport:
     raw: Mapping[str, object]
-    t: float  # reception time, never refreshed merely by reading latest()
+    t: float  # sample time in Pi monotonic seconds, never refreshed merely by reading latest()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "raw", freeze(dict(self.raw)))
@@ -57,6 +59,7 @@ class PhysioReport:
 class DecisionSnapshot:
     pattern: AlertPattern = AlertPattern.NONE
     reasons: tuple[str, ...] = ()
+    emergency: str | None = None
 
 
 @dataclass(frozen=True)
@@ -80,13 +83,14 @@ class RuntimeState:
         stale_s: float = 2.0,
         physio_stale_s: float = 10.0,
         clock: Callable[[], float] = time.monotonic,
+        phone_clock: PhoneClock | None = None,
     ) -> None:
         self.stale_s = stale_s
         self.physio_stale_s = physio_stale_s
         self.clock = clock
         self._lock = threading.Lock()
         self._data = Snapshot()
-        self._clock_offset_ms: int | None = None
+        self.phone_clock = phone_clock if phone_clock is not None else PhoneClock(monotonic=clock)
         self._decision_listeners: list[Callable[[DecisionSnapshot], None]] = []
 
     def update_frame(
@@ -116,8 +120,12 @@ class RuntimeState:
 
     def set_decision(self, decision: FusionDecision) -> None:
         with self._lock:
-            changed = self._data.decision.pattern != decision.pattern
-            current = DecisionSnapshot(decision.pattern, tuple(decision.reasons))
+            changed = (self._data.decision.pattern, self._data.decision.emergency) != (
+                decision.pattern, decision.emergency
+            )
+            current = DecisionSnapshot(
+                decision.pattern, tuple(decision.reasons), decision.emergency
+            )
             self._data = replace(self._data, decision=current)
             if changed:
                 for callback in self._decision_listeners:
@@ -150,9 +158,5 @@ class RuntimeState:
 
     @property
     def clock_offset_ms(self) -> int | None:
-        with self._lock:
-            return self._clock_offset_ms
-
-    def set_clock_offset(self, offset: int | None) -> None:
-        with self._lock:
-            self._clock_offset_ms = offset
+        offset = self.phone_clock.offset_ms
+        return None if offset is None else int(offset)
