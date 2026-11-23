@@ -170,12 +170,19 @@ def test_map_status_calibration() -> None:
     )
     assert f2.face is not None and f2.face.calibration == "failed" and f2.face.calibrated is False
 
-    # otherwise None (do not guess "calibrating")
+    # the exact message the drowsiness module sets when a run starts (drowsiness.py)
     f3 = map_status(
         {"face": True, "drowsiness": {"face": True, "calibrated": False, "message": "calibrating"}},
         100,
     )
-    assert f3.face is not None and f3.face.calibration is None
+    assert f3.face is not None and f3.face.calibration == "calibrating"
+
+    # a new Pi-camera run over an older profile is still visible, and so is its failure
+    for msg, want in (("calibrating", "calibrating"), ("calibration failed: no face", "failed")):
+        f = map_status(
+            {"face": True, "drowsiness": {"face": True, "calibrated": True, "message": msg}}, 100
+        )
+        assert f.face is not None and f.face.calibration == want
 
     f4 = map_status(
         {
