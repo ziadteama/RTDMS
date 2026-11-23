@@ -169,3 +169,17 @@ def test_status_payload_no_face_or_camera_lost() -> None:
     assert p2["face"] is False
     for k in ("perclos", "openness", "blink_rate", "closure_ms"):
         assert k not in p2
+
+
+def test_status_carries_calibration_step_within_budget() -> None:
+    from rtdms_pi.payloads import status_payload
+    from rtdms_pi.state import FaceReport, PhoneReport, Snapshot
+
+    face = FaceReport(state="alert", face=True, perclos=0.123, openness=0.456, blink_rate=12.3,
+                      closure_ms=1234.0, calibrated=True, calibration="calibrating",
+                      calibration_step="closed", calibration_left_s=2.345)
+    snap = Snapshot(face=face, phone=PhoneReport(call=False, texting=False, phone_p=0.12),
+                    camera_ok=True, fps=29.9, temp_c=48.1)
+    d = status_payload(snap)
+    assert d["calibration_step"] == "closed" and d["calibration_left_s"] == 2.3
+    assert len(to_json_bytes(d)) <= 240

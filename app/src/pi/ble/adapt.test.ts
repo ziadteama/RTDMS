@@ -51,3 +51,10 @@ test.each(['ok', 'calibrating', 'failed', 'lost', 'unknown', null, undefined, 1]
   const parsed = parseStatus(adaptStatus({ fps: 1, face: true, state: 'alert', calibration }));
   expect(parsed?.drowsiness?.calibration).toBe(['ok', 'calibrating', 'failed', 'lost'].includes(calibration as string) ? calibration : null);
 });
+
+test.each(['waiting_face', 'countdown_open', 'open', 'countdown_closed', 'closed'])(
+  'BLE preserves calibration step %s and remaining seconds', (calibration_step) => {
+    expect(parseStatus(adaptStatus({ fps: 1, face: true, state: 'alert', calibration_step, calibration_left_s: 2.5 }))?.drowsiness)
+      .toMatchObject({ calibration_step, calibration_left_s: 2.5 });
+  },
+);

@@ -32,6 +32,8 @@ export type PiDrowsiness = {
   face: boolean;
   calibrated: boolean;
   calibration: 'ok' | 'calibrating' | 'failed' | 'lost' | null;
+  calibration_step: 'waiting_face' | 'countdown_open' | 'open' | 'countdown_closed' | 'closed' | null;
+  calibration_left_s: number | null;
   message: string;
   ms: number;
 };

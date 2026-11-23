@@ -77,6 +77,18 @@
         "number",
         "null"
       ]
+    },
+    "calibration_step": {
+      "enum": [
+        "waiting_face",
+        "countdown_open",
+        "open",
+        "countdown_closed",
+        "closed"
+      ]
+    },
+    "calibration_left_s": {
+      "type": "number"
     }
   }
 }

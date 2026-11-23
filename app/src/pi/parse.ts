@@ -53,6 +53,8 @@ function parseDrowsiness(v: unknown): PiDrowsiness | undefined {
     face: bool(v.face),
     calibrated: bool(v.calibrated),
     calibration: oneOf(v.calibration, ['ok', 'calibrating', 'failed', 'lost'] as const),
+    calibration_step: oneOf(v.calibration_step, ['waiting_face', 'countdown_open', 'open', 'countdown_closed', 'closed'] as const),
+    calibration_left_s: num(v.calibration_left_s),
     message: str(v.message) ?? '',
     ms: num(v.ms) ?? 0,
   };

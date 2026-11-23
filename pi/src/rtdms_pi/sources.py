@@ -72,6 +72,8 @@ def number(value: object) -> float | None:
     return None
 
 
+CALIBRATION_STEPS = ("waiting_face", "countdown_open", "open", "countdown_closed", "closed")
+
 def map_status(status: dict[str, Any], t: float) -> FrameResult:
     d = status.get("drowsiness")
     visible = status.get("face") is True
@@ -103,6 +105,10 @@ def map_status(status: dict[str, Any], t: float) -> FrameResult:
             face=visible,
             calibrated=calibrated,
             calibration=calibration,
+            calibration_step=d.get("calibration_step")
+            if d.get("calibration_step") in CALIBRATION_STEPS
+            else None,
+            calibration_left_s=number(d.get("calibration_left_s")),
         )
     hybrid = status.get("hybrid")
     phone = None

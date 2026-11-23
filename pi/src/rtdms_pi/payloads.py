@@ -71,6 +71,8 @@ def status_payload(
         "closure_ms",
         "calibrated",
         "calibration",
+        "calibration_step",
+        "calibration_left_s",
         "camera_covered",
         "call",
         "texting",
@@ -87,6 +89,10 @@ def status_payload(
             d["calibrated"] = f.calibrated
         if f.calibration in ("ok", "calibrating", "failed", "lost"):
             d["calibration"] = f.calibration
+        if f.calibration_step is not None:
+            d["calibration_step"] = f.calibration_step
+            if number(f.calibration_left_s) is not None:
+                d["calibration_left_s"] = round(float(f.calibration_left_s or 0.0), 1)
     if p:
         d.update(call=p.call, texting=p.texting, phone_p=number(p.phone_p))
     if number(s.temp_c) is not None:

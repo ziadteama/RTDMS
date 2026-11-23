@@ -39,6 +39,8 @@ const V2 = {
     face: true,
     calibrated: true,
     calibration: null,
+    calibration_step: null,
+    calibration_left_s: null,
     message: 'calibrated',
     ms: 6.1,
   },
@@ -226,4 +228,19 @@ test.each(['ok', 'calibrating', 'failed', 'lost', 'unknown', null, undefined, 1]
   const parsed = parseStatus({ fps: 1, face: true, drowsiness: { calibration, message: 'calibrated' } });
   expect(parsed?.drowsiness?.calibration).toBe(['ok', 'calibrating', 'failed', 'lost'].includes(calibration as string) ? calibration : null);
   expect(parsed?.drowsiness?.message).toBe('calibrated');
+});
+
+test.each(['waiting_face', 'countdown_open', 'open', 'countdown_closed', 'closed'])(
+  'HTTP parses calibration step %s and remaining seconds', (calibration_step) => {
+    expect(parseStatus({ ...INITIAL, drowsiness: { calibration_step, calibration_left_s: 0 } })?.drowsiness)
+      .toMatchObject({ calibration_step, calibration_left_s: 0 });
+  },
+);
+
+test.each([undefined, null, 'unknown', 42, {}, []])('unknown step %p becomes null', (calibration_step) => {
+  expect(parseStatus({ ...INITIAL, drowsiness: { calibration_step } })?.drowsiness?.calibration_step).toBeNull();
+});
+
+test.each([undefined, null, '3', NaN, Infinity, {}, []])('invalid seconds %p become null', (calibration_left_s) => {
+  expect(parseStatus({ ...INITIAL, drowsiness: { calibration_left_s } })?.drowsiness?.calibration_left_s).toBeNull();
 });

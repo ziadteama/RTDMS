@@ -51,6 +51,10 @@ class Calibration:
                        ("closed", c.closed_phase_s, "Now CLOSE your eyes and keep them closed.")]
         self.index, self.counting_down, self.t_phase = 0, True, time.monotonic()
         self.collector, self.results = None, {}
+        # Machine-readable step for the phone, which follows it instead of running its own timers:
+        # waiting_face | countdown_open | open | countdown_closed | closed, plus seconds left.
+        self.step: str = "waiting_face"
+        self.left_s: float | None = None
 
     def update(self, res) -> tuple[list[str], bool]:
         key, duration, prompt = self.phases[self.index]
@@ -58,9 +62,11 @@ class Calibration:
         if self.counting_down:
             if not res.face_present:
                 self.t_phase = now
+                self.step, self.left_s = "waiting_face", None
                 return [prompt, "waiting for your face..."], False
             remaining = self.COUNTDOWN_S - (now - self.t_phase)
             if remaining > 0:
+                self.step, self.left_s = f"countdown_{key}", round(remaining, 1)
                 return [prompt, f"starting in {int(remaining) + 1}..."], False
             self.counting_down = False
             self.collector = self._collector_cls(self.cfg.settle_s).start()
@@ -69,6 +75,7 @@ class Calibration:
             a = res.angles or (None, None, None)
             col.push(ear=res.ear_raw, h=res.gaze_h, v=res.gaze_v, yaw=a[0], pitch=a[1], roll=a[2])
         total = duration + self.cfg.settle_s
+        self.step, self.left_s = key, round(max(0.0, total - col.elapsed), 1)
         if col.elapsed < total:
             left = "settle..." if col.settling else f"{max(0.0, total - col.elapsed):0.1f}s left"
             return [prompt, left], False
@@ -194,6 +201,8 @@ class Drowsiness:
             "face": res.face_present,
             "calibrated": self.calibrated,
             "message": self.message,
+            "calibration_step": self.calib.step if self.calib is not None else None,
+            "calibration_left_s": self.calib.left_s if self.calib is not None else None,
             "ms": round(res.total_ms, 1),
         }
 
