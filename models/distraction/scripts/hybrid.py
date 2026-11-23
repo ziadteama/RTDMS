@@ -4,12 +4,11 @@ Per frame, from the face mesh:
   upper-body crop (2.5 x face size, 224 px)  -> action classifier (call, drinking, eating,
                                                 hand_on_face, normal, other, texting)
   two ear crops (1.2 x face width, 128 px)   -> phone-in-hand classifier (ears)
-  lap crop (2.5 x face size under the chin)  -> phone-in-hand classifier (lap)
+  (texting and its lap check are removed: head-down is face-model distraction)
   CALL    = action "call" in >= 70% of the last 2 s AND mean ear phone prob > 0.5
-  TEXTING = action "texting" in >= 70% of the last 1.5 s AND mean lap phone prob > 0.4
 Crops get the same 1st-99th percentile contrast stretch as in training. Models are INT8 NCNN
-exports from D:/rtdms-data/action_v1 (REPORT_v2.md). The phone checks only run while the action
-classifier says call / texting, so they cost nothing the rest of the time.
+exports from D:/rtdms-data/action_v1 (REPORT_v2.md). The ear phone check only runs while the action
+classifier says call, so it costs nothing the rest of the time.
 """
 
 from __future__ import annotations
@@ -23,9 +22,15 @@ import yaml
 
 from hybrid_alerts import CLASSES, AlertLogic
 
+# Classes never reported: eating (not used, decision D28; mislabels ordinary frames on the Pi
+# camera) and texting (removed: looking down at a phone is caught as head-down distraction by the
+# face model, so the texting model and its lap check are not run).
+DROPPED = [CLASSES.index("eating"), CLASSES.index("texting")]
+DRINKING = CLASSES.index("drinking")  # its score is reported every frame (p_drinking)
+
 R_EAR, L_EAR, LIP_T, LIP_B = 234, 454, 13, 14
 LAP_SIDE, LAP_DOWN = 2.5, 1.25
-EAR_P, LAP_P = 0.5, 0.4
+EAR_P = 0.5
 
 
 def square(img, cx, cy, side):
@@ -97,9 +102,7 @@ class Hybrid:
         d = Path(model_dir)
         self.action = Ncnn(d / "action_n224_int8_ncnn_model", CLASSES, threads)
         self.ear = Ncnn(d / "phone_ear_n128_int8_ncnn_model", ["phone_in_hand"], threads)
-        self.lap = Ncnn(d / "phone_lap_n128_int8_ncnn_model", ["phone_in_hand"], threads)
-        self.logic = AlertLogic(alerts=("call", "texting"), use_talk=False, lap_p=LAP_P,
-                                phone_p=EAR_P, min_p={"texting": 0.0})
+        self.logic = AlertLogic(alerts=("call",), use_talk=False, phone_p=EAR_P)
         self.last: dict = {}
         self.boxes = None
 
@@ -109,22 +112,23 @@ class Hybrid:
         if lm is None:
             self.boxes = None
             out = {"face": False, "call": False, "texting": False, "action": None, "p": None,
-                   "ear": None, "lap": None, "ms": 0.0}
+                   "p_drinking": None, "ear": None, "lap": None, "ms": 0.0}
             self.last = out
             return out
         (up, er, el, lap), self.boxes, lip = crops(gray, np.asarray(lm, np.float64))
-        probs = self.action(up)
+        probs = np.array(self.action(up), dtype=np.float64)
+        probs[DROPPED] = 0.0  # the next best class is reported instead
         top = CLASSES[int(probs.argmax())]
-        ear = lapp = None
+        ear = None
         if top == "call":
             ear = float(max(self.ear(er)[0], self.ear(el)[0]))
-        elif top == "texting":
-            lapp = float(self.lap(lap)[0])
-        state, onsets = self.logic.update(t, probs, ear, lip, lapp)
-        out = {"face": True, "call": state["call"], "texting": state["texting"], "action": top,
+        state, onsets = self.logic.update(t, probs, ear, lip)
+        out = {"face": True, "call": state["call"], "texting": False, "action": top,
                "p": round(float(probs.max()), 2),
-               "ear": None if ear is None else round(ear, 2),
-               "lap": None if lapp is None else round(lapp, 2),
+               # the drinking score even when another class narrowly wins, so a consumer can
+               # average it over time instead of counting a flickering top label
+               "p_drinking": round(float(probs[DRINKING]), 2),
+               "ear": None if ear is None else round(ear, 2), "lap": None,
                "onsets": onsets, "ms": round((time.perf_counter() - t0) * 1000, 1)}
         self.last = out
         return out

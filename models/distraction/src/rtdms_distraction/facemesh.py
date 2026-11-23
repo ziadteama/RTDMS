@@ -253,18 +253,29 @@ class FaceCropper:
 
         return [(tx, ty, side) for ty in starts(y0, h) for tx in starts(x0, w)]
 
-    def crop(self, view: np.ndarray) -> tuple[np.ndarray, float, float, float]:
-        """-> (crop resized to crop_size, x0, y0, scale) where view = x0 + crop_px / scale."""
+    def crop(self, view: np.ndarray, src: np.ndarray | None = None,
+             src_map: tuple[float, float, float] | None = None
+             ) -> tuple[np.ndarray, float, float, float]:
+        """-> (crop resized to crop_size, x0, y0, scale) where view = x0 + crop_px / scale.
+
+        With src (the full-resolution gray frame) and src_map = (ox, oy, k), frame = o + view * k,
+        the same box is cut from src instead: more real pixels, same view coordinates."""
         if not self.tracking:
             self.box = self.tiles[self._k % len(self.tiles)]
             self._k += 1
         x0, y0, side = self.box
         n = self.cfg.crop_size
         scale = n / side
-        # Affine crop handles boxes that run off the view edge (filled black).
-        m = np.array([[scale, 0, -x0 * scale], [0, scale, -y0 * scale]], dtype=np.float64)
-        out = cv2.warpAffine(view, m, (n, n), flags=cv2.INTER_LINEAR,
+        img, sx, sy, s = view, x0, y0, scale
+        if src is not None and src_map is not None:
+            ox, oy, k = src_map
+            img, sx, sy, s = src, ox + x0 * k, oy + y0 * k, scale / k
+        # Affine crop handles boxes that run off the image edge (filled black).
+        m = np.array([[s, 0, -sx * s], [0, s, -sy * s]], dtype=np.float64)
+        out = cv2.warpAffine(img, m, (n, n), flags=cv2.INTER_LINEAR,
                              borderMode=cv2.BORDER_CONSTANT)
+        if out.ndim == 2:
+            out = cv2.cvtColor(out, cv2.COLOR_GRAY2RGB)
         return out, x0, y0, scale
 
     def update(self, landmarks: np.ndarray | None) -> None:
@@ -364,11 +375,13 @@ class FaceMesh:
             if cfg.driver_lock else None
         self._tiles_seen = 0
 
-    def process(self, view_rgb: np.ndarray, t: float) -> FaceObservation | None:
+    def process(self, view_rgb: np.ndarray, t: float, src: np.ndarray | None = None,
+                src_map: tuple[float, float, float] | None = None) -> FaceObservation | None:
+        """src / src_map: optional full-resolution frame to cut the crop from (FaceCropper)."""
         lock = self.lock
         if lock is not None and lock.expire(t):  # driver lost > relock_after_s: search again
             self.cropper.tracking, self._tiles_seen = False, 0
-        crop, x0, y0, scale = self.cropper.crop(view_rgb)
+        crop, x0, y0, scale = self.cropper.crop(view_rgb, src, src_map)
         raw = self.backend.process(crop, t)
         if raw is not None:
             raw.pixels = raw.pixels / scale + (x0, y0)
