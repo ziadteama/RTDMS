@@ -23,6 +23,8 @@ import yaml
 
 from hybrid_alerts import CLASSES, AlertLogic
 
+EATING = CLASSES.index("eating")
+
 R_EAR, L_EAR, LIP_T, LIP_B = 234, 454, 13, 14
 LAP_SIDE, LAP_DOWN = 2.5, 1.25
 EAR_P, LAP_P = 0.5, 0.4
@@ -113,7 +115,10 @@ class Hybrid:
             self.last = out
             return out
         (up, er, el, lap), self.boxes, lip = crops(gray, np.asarray(lm, np.float64))
-        probs = self.action(up)
+        probs = np.array(self.action(up), dtype=np.float64)
+        # Eating is not used (decision D28) and on the Pi camera the classifier calls ordinary
+        # frames "eating" all the time: drop the class so the next best class is reported.
+        probs[EATING] = 0.0
         top = CLASSES[int(probs.argmax())]
         ear = lapp = None
         if top == "call":

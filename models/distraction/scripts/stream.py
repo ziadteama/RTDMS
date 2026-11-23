@@ -88,7 +88,7 @@ document.getElementById('t').innerHTML=h}catch(e){}}setInterval(tick,500);tick()
 # driver was calling or drinking. While the v2 classifier sees one of these (and for a short hold
 # after it, while the hand moves away), drowsiness is not fed the face: eyes unavailable, not
 # closed. The phone / drinking outputs themselves are unchanged.
-OCCLUDING = frozenset({"call", "texting", "drinking", "eating", "hand_on_face"})
+OCCLUDING = frozenset({"call", "texting", "drinking", "hand_on_face"})  # no eating: dropped
 OCCLUDED_P = 0.5
 OCCLUDED_HOLD_S = 1.0
 
