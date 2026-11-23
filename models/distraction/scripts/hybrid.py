@@ -26,6 +26,7 @@ from hybrid_alerts import CLASSES, AlertLogic
 # camera) and texting (removed: looking down at a phone is caught as head-down distraction by the
 # face model, so the texting model and its lap check are not run).
 DROPPED = [CLASSES.index("eating"), CLASSES.index("texting")]
+DRINKING = CLASSES.index("drinking")  # its score is reported every frame (p_drinking)
 
 R_EAR, L_EAR, LIP_T, LIP_B = 234, 454, 13, 14
 LAP_SIDE, LAP_DOWN = 2.5, 1.25
@@ -111,7 +112,7 @@ class Hybrid:
         if lm is None:
             self.boxes = None
             out = {"face": False, "call": False, "texting": False, "action": None, "p": None,
-                   "ear": None, "lap": None, "ms": 0.0}
+                   "p_drinking": None, "ear": None, "lap": None, "ms": 0.0}
             self.last = out
             return out
         (up, er, el, lap), self.boxes, lip = crops(gray, np.asarray(lm, np.float64))
@@ -124,6 +125,9 @@ class Hybrid:
         state, onsets = self.logic.update(t, probs, ear, lip)
         out = {"face": True, "call": state["call"], "texting": False, "action": top,
                "p": round(float(probs.max()), 2),
+               # the drinking score even when another class narrowly wins, so a consumer can
+               # average it over time instead of counting a flickering top label
+               "p_drinking": round(float(probs[DRINKING]), 2),
                "ear": None if ear is None else round(ear, 2), "lap": None,
                "onsets": onsets, "ms": round((time.perf_counter() - t0) * 1000, 1)}
         self.last = out

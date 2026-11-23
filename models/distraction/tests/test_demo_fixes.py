@@ -34,6 +34,16 @@ def test_eating_and_texting_are_never_reported(monkeypatch, dropped):
     assert out["texting"] is False and out["lap"] is None
 
 
+def test_drinking_score_reported_even_when_other_wins(monkeypatch):
+    h = make_hybrid(monkeypatch, "other", 0.5)
+    probs = np.zeros(len(CLASSES))
+    probs[CLASSES.index("other")], probs[CLASSES.index("drinking")] = 0.55, 0.4
+    h.action = lambda up: probs
+    out = h.feed(0.1, np.zeros((4, 4), np.uint8), np.zeros((478, 2)))
+    assert out["action"] == "other" and out["p_drinking"] == 0.4
+    assert h.feed(0.2, None, None)["p_drinking"] is None  # no face
+
+
 def test_call_still_reported(monkeypatch):
     out = make_hybrid(monkeypatch, "call").feed(0.0, np.zeros((4, 4), np.uint8),
                                                 np.zeros((478, 2)))
