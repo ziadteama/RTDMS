@@ -9,7 +9,13 @@ from dms_fusion import AlertPattern, decide
 from rtdms_pi.buzzer import PatternPlayer, RecordingBuzzer
 from rtdms_pi.payloads import status_payload
 from rtdms_pi.runtime import Runtime
-from rtdms_pi.sources import FrameResult, NullPhysioSource, ScriptedFrameSource, map_status
+from rtdms_pi.sources import (
+    CAMERA_ARGS,
+    FrameResult,
+    NullPhysioSource,
+    ScriptedFrameSource,
+    map_status,
+)
 from rtdms_pi.state import FaceReport, PhoneReport, PhysioReport, RuntimeState
 
 
@@ -240,15 +246,7 @@ def test_stream_hook_and_shutdown(monkeypatch: pytest.MonkeyPatch, clock: Clock)
         assert isinstance(source.shared, Shared)
         assert seen[0].face.state == "drowsy"
         assert source.camera_ok
-        assert arguments == [
-            "--hybrid",
-            "--drowsiness",
-            "--no-detect",
-            "--face-backend",
-            "litert",
-            "--rotate",
-            "90",
-        ]
+        assert arguments == [*CAMERA_ARGS, "--rotate", "90"]  # production flags, start_stream.sh
         clock.advance(3)
         assert not source.camera_ok
     finally:

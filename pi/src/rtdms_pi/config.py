@@ -16,6 +16,7 @@ class RuntimeConfig:
     physio_stale_s: float = 10.0
     tick_rate: float = 1.0
     http_port: int = 8080
+    stream_port: int = 0  # camera page, MJPEG, /status, /calibrate from the pipeline; 0 = off
     incident_port: int = 8081
     host: str = "::"
     state_dir: Path = Path("/var/lib/rtdms")
@@ -65,6 +66,12 @@ class RuntimeConfig:
             "--state-dir", type=Path, default=Path(os.getenv("STATE_DIRECTORY", "/var/lib/rtdms"))
         )
         p.add_argument("--rotate", type=int, choices=[0, 90, 180, 270], default=0)
+        p.add_argument(
+            "--stream-port",
+            type=int,
+            default=int(os.getenv("RTDMS_STREAM_PORT", "0")),
+            help="serve the camera page, /stream.mjpg, /status and /calibrate here (0 = off)",
+        )
         p.add_argument("--physiology", action="store_true")
         p.add_argument("--sync-system-clock", action="store_true", default=False)
         p.add_argument("--ble", action=argparse.BooleanOptionalAction, default=None)

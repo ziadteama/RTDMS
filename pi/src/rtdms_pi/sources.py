@@ -115,6 +115,12 @@ def map_status(status: dict[str, Any], t: float) -> FrameResult:
     )
 
 
+# The production camera configuration (models/distraction start_stream.sh on the Pi): face mesh
+# drowsiness + v2 hybrid phone alerts, no box detector, texting alerts off.
+CAMERA_ARGS = ("--no-rectify", "--roi", "full", "--drowsiness", "--no-texting", "--hybrid",
+               "--no-detect")
+
+
 class StreamPipelineSource:
     """Pi-only adapter; not verified on hardware. Shared remains available for MJPEG."""
 
@@ -165,17 +171,14 @@ class StreamPipelineSource:
 
         self.shared = _HookedShared()
         self.shared._ready = True
-        args = stream.parse_args(
-            [
-                "--hybrid",
-                "--drowsiness",
-                "--no-detect",
-                "--face-backend",
-                "litert",
-                "--rotate",
-                str(self.config.rotate),
-            ]
-        )
+        args = stream.parse_args([*CAMERA_ARGS, "--rotate", str(self.config.rotate)])
+        if self.config.stream_port:
+            # Same page, MJPEG, /status and /calibrate as the standalone camera service; frames are
+            # only encoded while a viewer is connected.
+            server = stream.DualStackServer(
+                (self.config.host, self.config.stream_port), stream.make_handler(self.shared)
+            )
+            threading.Thread(target=server.serve_forever, daemon=True, name="stream-http").start()
 
         def run() -> None:
             try:
