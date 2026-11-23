@@ -17,6 +17,7 @@ jest.mock('expo-sqlite/kv-store', () => ({ Storage: {
 jest.mock('./pi', () => ({ pi: jest.fn() }));
 jest.mock('./emergency', () => ({ triggerSos: jest.fn() }));
 jest.mock('./unresponsive', () => ({ startUnresponsiveMonitor: () => () => {} }));
+jest.mock('./watch-ack-cancel', () => ({ startWatchAckCancel: () => () => {} }));
 
 beforeEach(() => {
   jest.useFakeTimers();

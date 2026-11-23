@@ -1,11 +1,11 @@
 /**
  * Crash / SOS flow: log the incident, ask the Pi to save its clip, open the countdown, and when it
- * runs out send SMS with a Google Maps link to every contact, then call the configured number or first contact.
- * Android sends and calls without a tap (sahi-native); elsewhere it falls back to the composer.
+ * runs out send WhatsApp (relay) + SMS with a Google Maps link to every contact.
+ * Android sends SMS without a tap (sahi-native); elsewhere it falls back to the composer.
+ * No phone call / 123 dial — messaging only.
  */
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
-import { Linking, Platform } from 'react-native';
 
 import SahiNative from '@modules/sahi-native';
 import { t } from '@/i18n';
@@ -23,7 +23,6 @@ import { startSosChannels, type ContactChannelState } from './sos-channels';
 import { currentTripId } from './trips';
 
 export const SOS_NOTIFICATION_ID = 2001;
-export const STAGE_TWO_DELAY_MS = 15_000;
 
 /** ~20 Hz |a| in g, enough to draw the impact. */
 function downsample(motion: MotionSample[]): [number, number][] {
@@ -62,7 +61,7 @@ export function triggerSos(kind: 'crash' | 'manual' | 'unresponsive', e?: CrashE
   if (tripId !== null)
     db.addEvent(tripId, at, kind === 'manual' ? 'sos' : kind, String(id), e ? String(e.gPeak) : null);
 
-  // Persist before delivery; the Pi link never blocks the countdown, SMS or call.
+  // Persist before delivery; the Pi link never blocks the countdown or messaging.
   void incidentQueue.enqueue({ client_id: incidentClientId(), localId: id,
     t_crash: at, g_peak: e?.gPeak ?? 0, lat: live.location?.lat ?? null,
     lon: live.location?.lon ?? null }).then(() => incidentQueue.flush()).catch(() => {});
@@ -93,27 +92,22 @@ async function bestLocation(): Promise<{ lat: number; lon: number } | null> {
   return known;
 }
 
-export type CallProgressState = 'none' | 'waiting' | 'starting' | 'calling' | 'failed';
-
 export type SosProgressInfo = {
   sent?: number;
-  number?: string;
-  callState?: CallProgressState;
   contacts?: ContactChannelState[];
-  /** Demo mode: nothing real was sent or dialed. */
+  /** Demo mode: nothing real was sent. */
   demo?: boolean;
 };
 
-export type SosProgress = (step: 'sms' | 'waiting' | 'call' | 'done', info: SosProgressInfo) => void;
+export type SosProgress = (step: 'sms' | 'done', info: SosProgressInfo) => void;
 
-/** Countdown expired (or "Send now"): parallel WhatsApp relay + link-free SMS, then the call. */
+/** Countdown expired (or "Send now"): parallel WhatsApp relay + link-free SMS. No phone call. */
 export async function runEmergency(id: number, onProgress: SosProgress): Promise<void> {
   const { contacts } = useSecure.getState();
-  const { callTarget, emergencyNumber } = useSettings.getState();
   const incident = db.getIncident(id);
   if (incident?.outcome === 'cancelled') return;
   if (useSettings.getState().demo) {
-    // Demo never sends real messages or places real calls, and never fabricates results.
+    // Demo never sends real messages, and never fabricates results.
     onProgress('done', { demo: true });
     return;
   }
@@ -143,39 +137,18 @@ export async function runEmergency(id: number, onProgress: SosProgress): Promise
     },
   });
 
-  const numbers = contacts.map((c) => c.phone);
-  const number = callTarget === 'contact' && numbers[0] ? numbers[0] : emergencyNumber;
-  onProgress('waiting', { number, callState: 'waiting', sent: latestSent, contacts: latestContacts });
-
-  await new Promise<void>((resolve) => setTimeout(resolve, STAGE_TWO_DELAY_MS));
+  // Give SMS / WhatsApp a moment to report first status, then settle the incident.
+  await new Promise<void>((resolve) => setTimeout(resolve, 1500));
   if (db.getIncident(id)?.outcome === 'cancelled') {
     channels.stop();
     return;
   }
 
-  // Real state: "starting" before dial returns, then "calling" or "failed"
-  onProgress('call', { number, callState: 'starting', sent: latestSent, contacts: latestContacts });
-  const called = await dial(number);
-  const callState: CallProgressState = called ? 'calling' : 'failed';
-  db.saveIncident(id, { called: number, outcome: latestSent > 0 || called ? 'sent' : 'failed' });
+  db.saveIncident(id, { outcome: latestSent > 0 ? 'sent' : 'failed' });
   SahiNative?.cancel(SOS_NOTIFICATION_ID);
-  onProgress('done', { sent: latestSent, number, callState, contacts: latestContacts });
+  onProgress('done', { sent: latestSent, contacts: latestContacts });
 }
 
 export function announceCountdown(seconds: number): void {
   speak('voice.sos', { s: seconds });
-}
-
-async function dial(number: string): Promise<boolean> {
-  let called = false;
-  if (SahiNative && Platform.OS === 'android') {
-    try {
-      await SahiNative.call(number);
-      called = true;
-    } catch {
-      called = false;
-    }
-  }
-  if (!called) await Linking.openURL(`tel:${number}`).catch(() => {});
-  return called;
 }

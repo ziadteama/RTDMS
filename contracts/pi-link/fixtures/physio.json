@@ -10,6 +10,7 @@
   "quality": "good",
   "t": 1795189202.4,
   "worn": true,
+  "ack_age_s": null,
   "hr_baseline_bpm": 74.0,
   "hr_delta_bpm": -3.0,
   "hr_trend_bpm_per_10min": -0.8,

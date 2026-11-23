@@ -84,6 +84,8 @@ export type PiPhysio = {
   hr_baseline_bpm: number | null;
   hr_delta_bpm: number | null;
   hr_trend_bpm_per_10min: number | null;
+  /** Seconds since the watch "I'm OK" press; null if never / unknown. Fresh when ≤ ~2. */
+  ack_age_s: number | null;
   quality: SignalQuality | null;
   hrv_state: HrvState | null;
   rmssd_ms: number | null;
