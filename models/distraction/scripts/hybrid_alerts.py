@@ -1,14 +1,16 @@
 """Alert logic of the v2 action classifier (copy of D:/rtdms-data/action_v1/src/alerts.py; see hybrid.py).
 
-- call: the classifier says "call" in >= 70% of the frames of the last 2 s, AND
-  (phone-in-hand probability at either ear > PHONE_P on average over the window
-   OR the driver is talking: lip-gap standard deviation over the window > TALK_STD).
-- hand_on_face: never raises a phone alert (it is simply not "call").
+- call (either path, last 2 s, window must span >= 80% of 2 s):
+  A) ear phone > PHONE_P on >= 70% of frames in the window (Pi IR: action often says
+     "drinking" during a real call; hybrid scores the ear on call/drinking/hand_on_face), OR
+  B) top class "call" on >= 70% of frames (and mean call prob >= MIN_P) AND
+     (mean ear phone > PHONE_P OR lip-gap std > TALK_STD).
+- hand_on_face: never raises a phone alert by itself (it is simply not "call").
 - texting / drinking / eating: the class in >= 70% of the frames of the last 1.5 s.
 - v2 (hybrid): texting also needs the phone-in-hand probability on the lap crop > lap_p on
   average over its window (lap_p=None = off); `alerts` limits which alerts this logic raises.
 - every alert also needs the class's mean probability over its window >= MIN_P[class]
-  (tuned on SynDD-val, see DECISIONS.md D12; 0 = off).
+  (tuned on SynDD-val, see DECISIONS.md D12; 0 = off) — except call path A (ear-majority).
 A window only counts once it spans at least 80% of its length; a gap of more than 1 s with no
 face frame clears the history. An alert stays on while its condition holds; a new onset needs
 REFRACTORY seconds after the previous alert ended (so one long call = one event).
@@ -62,19 +64,32 @@ class AlertLogic:
             ok = False
             if fr is not None:
                 k = self.classes.index(a)
-                ok = sum(h[1] == k for h in fr) >= self.frac * len(fr) and \
-                    sum(h[4][k] for h in fr) / len(fr) >= self.min_p[a]
-                if ok and a == "call" and (self.use_phone or self.use_talk):
+                if a == "call":
+                    # Path A: sustained phone at the ear (works when action is mislabelled drinking).
+                    ear_hits = sum(
+                        1 for h in fr if h[2] is not None and h[2] > self.phone_p
+                    )
+                    ear_majority = self.use_phone and ear_hits >= self.frac * len(fr)
+                    # Path B: original — majority top-class call + ear or talk confirm.
+                    call_majority = (
+                        sum(h[1] == k for h in fr) >= self.frac * len(fr)
+                        and sum(h[4][k] for h in fr) / len(fr) >= self.min_p[a]
+                    )
                     ps = [h[2] for h in fr if h[2] is not None]
                     phone_ok = self.use_phone and bool(ps) and sum(ps) / len(ps) > self.phone_p
                     lips = [h[3] for h in fr]
                     m = sum(lips) / len(lips)
                     sd = (sum((x - m) ** 2 for x in lips) / len(lips)) ** 0.5
                     talk_ok = self.use_talk and len(lips) >= 3 and sd > self.talk_std
-                    ok = phone_ok or talk_ok
-                if ok and a == "texting" and self.lap_p is not None:
-                    ls = [h[5] for h in fr if h[5] is not None]
-                    ok = bool(ls) and sum(ls) / len(ls) > self.lap_p
+                    ok = ear_majority or (
+                        call_majority and (phone_ok or talk_ok or not (self.use_phone or self.use_talk))
+                    )
+                else:
+                    ok = sum(h[1] == k for h in fr) >= self.frac * len(fr) and \
+                        sum(h[4][k] for h in fr) / len(fr) >= self.min_p[a]
+                    if ok and a == "texting" and self.lap_p is not None:
+                        ls = [h[5] for h in fr if h[5] is not None]
+                        ok = bool(ls) and sum(ls) / len(ls) > self.lap_p
             if ok and not self.on[a] and t - self.off_t[a] >= REFRACTORY:
                 onsets.append(a)
                 self.on[a] = True

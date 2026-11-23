@@ -216,9 +216,18 @@ def pipeline_loop(args, shared: Shared) -> None:
             hl = None
             if held is not None:
                 v = res.view if res.view.ndim == 2 else cv2.cvtColor(res.view, cv2.COLOR_BGR2GRAY)
+                # Veto drinking if call is latched OR the ear crop already sees a phone (phone at
+                # cheek often tops as "drinking", so waiting for the 2 s call latch is too late).
+                ear = None if hy is None else hy.get("ear")
+                phone_on = bool(
+                    hy is not None and (
+                        hy["call"] or hy["texting"]
+                        or (isinstance(ear, (int, float)) and float(ear) > 0.5)
+                    )
+                )
                 hl = held.feed(t, v, res.face.landmarks if res.face is not None else None,
                                res.face.pitch_deg if res.face is not None else None,
-                               bool(hy is not None and (hy["call"] or hy["texting"])))
+                               phone_on)
                 for a in hl["onsets"]:
                     print(f"[event] t={t:.2f} {a} ALERT", flush=True)
             if n % 15 == 0:

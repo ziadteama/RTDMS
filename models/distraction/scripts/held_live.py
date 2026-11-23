@@ -8,7 +8,7 @@ Hand at the mouth + something in the hand -> DRINKING (IR product; eating not re
 - held_food3.onnx on that 128 px grey crop: cup_bottle / empty_hand / food; P(cup)+P(food) is the
   object score. Alert name is always drinking.
 - ON when >= 3 of the last 5 samples have an object (threshold from held_params.json p); OFF at
-  <= 1 of 5. Phone veto while the v2 call/texting alert is on.
+  <= 1 of 5. Phone veto while call/texting is on OR the ear crop already sees a phone (> 0.5).
 
 OpenCV DNN for the ONNX cup model (the Pi has no onnxruntime).
 """
