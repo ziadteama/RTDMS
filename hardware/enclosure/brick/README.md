@@ -69,7 +69,7 @@ The light-sensor notches assume the camera is upright, with the left IR board's 
 | 2 | camera clips → front bosses | 6–8 mm | pan |
 | 5 | lid → posts (4 corners + 1 behind the Pi) | 6–8 mm | countersunk (flush); pan works too |
 
-The screws cut their own thread into the printed holes. No nuts or inserts needed.
+The screw holes are 2.8 mm everywhere (clearance size). The M2.5 screws do not cut a thread, so they hold by clamping and friction only; if a post is loose, add a drop of glue or use a nut/insert.
 
 ## Assembly
 

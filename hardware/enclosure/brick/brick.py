@@ -116,9 +116,9 @@ def shell():
     ]
     cuts += [cyl(IR_D, WALL + 2, (sx * IR_DX, -1, CAM_ZC), (0, 1, 0)) for sx in (-1, 1)]
     cuts += [cyl(LDR_D, WALL + 2, (x, -1, CAM_ZC + z), (0, 1, 0)) for x, z in LDR]
-    cuts += [cyl(2.1, 7.0, (sx * CLIP_SCREW_X, BAR_Y0 + 0.01, CAM_ZC), (0, -1, 0)) for sx in (-1, 1)]
-    cuts += [cyl(2.1, 4.5, (*pb(*h), PCB_Z0 + 0.01), (0, 0, -1)) for h in PI_HOLES]
-    cuts += [cyl(2.1, 10.0, (x, y, H_SHELL + 0.01), (0, 0, -1)) for x, y in POSTS]   # M2.5 self-tapping
+    cuts += [cyl(2.8, 7.0, (sx * CLIP_SCREW_X, BAR_Y0 + 0.01, CAM_ZC), (0, -1, 0)) for sx in (-1, 1)]
+    cuts += [cyl(2.8, 4.5, (*pb(*h), PCB_Z0 + 0.01), (0, 0, -1)) for h in PI_HOLES]
+    cuts += [cyl(2.8, 10.0, (x, y, H_SHELL + 0.01), (0, 0, -1)) for x, y in POSTS]   # M2.5 (2.8 mm hole)
     # back: USB-C (fits an overmoulded plug) + vents
     cuts.append(ybox(pb(USBC_NX, 0)[0], D - WALL - 1, PCB_Z0 + PCB_T + 1.65, 14.0, WALL + 2, 8.5, 3.0))
     cuts += [ybox(0, D - WALL - 1, z, 44.0, WALL + 2, 3.0, 1.45) for z in (13.0, 18.0, 23.0)]
