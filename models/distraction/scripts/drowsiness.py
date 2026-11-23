@@ -119,12 +119,6 @@ class Drowsiness:
         cfg.landmarker.backend = backend
         cfg.landmarker.model_path = model_path
         cfg.landmarker.num_threads = 1
-        # The eyes-open reference adapts toward a percentile of the last 5 min of eye ratios. The
-        # default 95th followed the widest moments and noise spikes on this far, noisy camera
-        # (measured on the Pi: relaxed open eyes EAR p50 0.22, p90 0.31), so relaxed eyes read
-        # 30-40 % open. Eyes are open most of the time and blinks sit in the low tail, so the
-        # 60th percentile is the driver's typical open eye: relaxed eyes read ~100 %.
-        cfg.calibration.adapt_percentile = 60.0
         self.cfg, self.w, self.h = cfg, width, height
         self.profile_name, self.profile_dir = profile_name, profile_dir
         self.profile, self.calibrated = DriverProfile.load_or_default(profile_name, profile_dir)
@@ -133,6 +127,13 @@ class Drowsiness:
         self.banner: list[str] = []
         self.message = "" if self.calibrated else "not calibrated: press Calibrate"
         self.report = None
+        # Set when a calibration ends: the eyes are usually still shut from its closed step, and
+        # those seconds read as a microsleep and a 100 % PERCLOS (a false drowsy alert right after
+        # calibrating, seen on the Pi). Nothing is judged until the eyes are seen open (or
+        # REOPEN_GRACE_S passes); then drowsiness starts from an empty history.
+        self.reopen_deadline: float | None = None
+
+    REOPEN_GRACE_S = 5.0
 
     def _new_pipeline(self):
         from dms_face.pipeline import FacePipeline
@@ -174,6 +175,7 @@ class Drowsiness:
 
     def feed(self, t: float, landmarks) -> dict:
         """landmarks: (478, 2) driver-view pixels from the distraction pipeline, or None."""
+        from dms_face.blink import EyeState
         from dms_face.landmarker import LandmarkFrame
 
         if landmarks is None:
@@ -182,7 +184,12 @@ class Drowsiness:
             pts = np.asarray(landmarks, dtype=np.float64)[:, :2]
             self.given.frame = LandmarkFrame(None, pts, len(pts) >= 478, None, None)
         res = self.pipe.process(None, t)
-        if res.report is not None:
+        if self.reopen_deadline is not None:
+            if res.eye_state is EyeState.OPEN or t >= self.reopen_deadline:
+                self.pipe.close()
+                self.pipe = self._new_pipeline()
+                self.reopen_deadline = None
+        elif res.report is not None:
             self.report = res.report
         if self.calib is not None:
             self.banner, done = self.calib.update(res)
@@ -195,6 +202,7 @@ class Drowsiness:
                 except ValueError as e:  # eyes did not separate: keep the old profile
                     self.message = f"calibration failed: {e}"
                 self.calib, self.banner = None, []
+                self.report, self.reopen_deadline = None, t + self.REOPEN_GRACE_S
         r = self.report
         return {
             "state": r.state.value if r else "starting",
