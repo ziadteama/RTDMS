@@ -36,7 +36,7 @@ All code merged and the Pi runtime deployed (23 Nov). What is left needs hands o
 
 | Item | State |
 |---|---|
-| **Build the watch app** (draft PR #82, written but never compiled) on the Windows machine with `garmin/build.ps1 -App rr_stream`; fix any compile errors; sideload | **needs the user** |
+| Watch app v2 (#82) | **built, installed and working (23 Nov)**; if you changed code to make it compile, push it |
 | P1 watch checks: accelerometer with HR/RR, vibration patterns, notify subscription, hold-UP ACK, battery over 30 min | needs the user + watch |
 | Real watch → Pi: `/physio` shows HR, worn, quality; `/health` `physio_diag` offset spread < 100 ms | needs the watch near the Pi |
 | Phone on contract v1.3 (JS only, Metro reload): clock every 60 s, `t_src: "phone"` on Pi payloads, HR switch in Settings, Diagnostics shows quality/baseline/trend | needs the phone |
@@ -44,6 +44,18 @@ All code merged and the Pi runtime deployed (23 Nov). What is left needs hands o
 | Unresponsive-driver SOS end to end (eyes closed ≥ 8 s → MAX → +10/20 s → phone countdown) | needs camera + phone |
 | Concurrent CPU with the camera models (physiology path measured alone: 0.35 % of one core) | needs camera |
 | Enable `sync_system_clock` on the Pi (needs CAP_SYS_TIME or a sudo rule; the Pi's UTC is already right, only its time zone is HST) | optional |
+
+## Next (after the 23 Nov morning test)
+
+| Item | State |
+|---|---|
+| Camera mounted at eye level, then retest with frames: normal / call / texting / looking down | needs the user |
+| Head-pitch guard for the false "eyes closed" when looking down | not started |
+| Watch echo latency (p50 0.9 s): send the echo ahead of the watch's queue | next watch build |
+| App detection settings (sensitivity) applied on the Pi | not started |
+| Eating/drinking in fusion (D28: ignored until decided) | later |
+| Optional agy cross-review of the alert policy (#90, #91) | optional |
+| Pi: BLE open mode off once pairing mode exists; hotspot on `wlan0` | see Hardware work |
 
 ## App
 

@@ -171,3 +171,7 @@ The FR265 on USB shows up as `091e:0003`, a vendor-specific interface bound to t
   (`gvfs-backends` or `jmtpfs`).
 - Building the app here needs Java 17, the Connect IQ SDK for Linux and the developer key. The
   build scripts (`garmin/build.ps1`, `sideload.ps1`) are Windows-only.
+
+## Status 23 Nov, morning
+
+Watch app v2 built, installed and working on the FR265: real HR, worn flag, vibration and the "I'm OK" ACK. Watch → Pi → phone verified together. The alert shown on the wrist is the Pi's stable alert episode, not the raw per-frame decision (see [[Project Log 2026-11]], "23 Nov, morning"). Open: echo latency p50 about 0.9 s (echo queued behind the watch's send queue) and watch offset spread 0.5–2.3 s; both need a watch-side change.

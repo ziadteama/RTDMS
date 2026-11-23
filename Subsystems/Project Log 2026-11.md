@@ -159,6 +159,48 @@ Lessons:
 - **Docker images copy only listed paths:** a runtime artifact (the shadow model) must be added to
   `pi/Dockerfile`, or tests pass locally and fail in Docker.
 
+## 23 Nov, morning: hardware in the loop
+
+First run with the camera, phone and watch together. All of it is merged on `main` (#82, #85–#92).
+
+- **Pi camera does the calibration, the phone only starts it (#87–#89).** The phone-camera flow was
+  the cause of the inverted eye values (open 0.06, closed 0.28): the app and the unit ran their own
+  timers. The unit now publishes `calibration_step` and `calibration_left_s` (contract v1.4) and the
+  app follows them; the old phone flow stays under Diagnostics only. Calibration also fixed the false
+  "eyes closed" while upright.
+- **Alert spam fixed with one alert policy (#90 Pi, #91 phone, contract v1.5).** Two problems were
+  reported: alerts during calibration, and alerts overlapping and repeating. Real log: the face state
+  flickered drowsy / none every second, and the watch alternated MAX and repeated every 0.3 s.
+  Now `AlertPolicy` in `fusion/`: one alert at a time by priority, held 3 s after its cause clears,
+  per-level cooldowns (beep 10 s, repeated 5 s, continuous 3 s, MAX none), a new `episode` number per
+  new alert or escalation, and silence while calibrating (the SOS count is also reset there). The
+  phone presents each episode **once**: sound, voice and notification, each new line stops the
+  previous speech, voice repeats at most every 8 s, quiet during calibration. The watch follows the
+  Pi's stable alert. "I'm OK" now restarts the unresponsive count instead of flapping.
+- **Verified on hardware:** camera 30 fps in-process; Pi at 0.23 % of one core idle and 0.35 % with
+  the watch streaming; phone and watch connected to the Pi at the same time; real watch HR, worn flag,
+  vibration and the "I'm OK" ACK; eyes closed → MAX → SOS countdown on the phone → reset; phone call
+  detected → continuous alert.
+- **Still wrong:** looking down gives a false "eyes closed" (needs a head-pitch guard); the camera
+  mount is poor (face found in 11 of 60 frames: mount at eye level); texting untested; watch echo
+  latency p50 about 0.9 s because the echo waits behind the watch's send queue (fix on the watch:
+  send the echo first); watch-to-Pi clock offset spread 0.5–2.3 s.
+- **Persistent deployment (#92).** The Pi now starts the product by itself at power-on (see
+  [[Pi Runtime]], "Boot and persistence"). The Pi's Wi-Fi profile for the phone hotspot is system-wide,
+  autoconnects with unlimited retries.
+
+Lessons:
+- **Never open Sahi from `localhost:8081` without the USB tunnel.** It gives a blank dark screen with
+  only the dev-menu button. Use the Tailscale address `100.86.213.114:8081`.
+- **Metro serves stale code after branch switches:** restart with `--clear` and force-stop the app.
+- **Expo Router lazy-loads screens**, so grepping the entry bundle proves nothing about a screen.
+- **Wireless adb works over Tailscale** (phone `100.108.251.72`, port changes per toggle; find it with
+  a port scan of 30000–46000).
+- **A probe request can start a real action:** a test POST to `/calibrate` ran a calibration. Probe
+  with GET, or on a copy.
+- **A delegated agent that reboots the Pi mid-test loses the connection:** announce reboots on the
+  board and keep one controlled reboot only.
+
 ## Open product and technical questions
 
 See [[Open Items and Next Steps]].
