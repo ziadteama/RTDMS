@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RTDMS Live</title>
+<style>
+:root{
+  --bg:#0b0e13;--panel:#141a22;--panel2:#1a212b;--line:#26303c;--text:#e8edf3;--dim:#8a97a8;
+  --ok:#2fbf71;--warn:#f2b632;--crit:#ff4d4f;--info:#4ea1ff;--off:#4a5563;
+  --r:14px;--gap:clamp(8px,1vw,18px);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:clamp(13px,1.05vw,20px)/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-variant-numeric:tabular-nums;overflow:hidden}
+body{display:grid;grid-template-rows:auto 1fr auto;gap:var(--gap);padding:var(--gap)}
+header{display:flex;align-items:center;gap:1.2em}
+header h1{font-size:1.35em;margin:0;font-weight:700;letter-spacing:.02em}
+header h1 span{color:var(--dim);font-weight:500}
+.live{display:inline-flex;align-items:center;gap:.4em;font-weight:700;color:var(--crit);font-size:.9em}
+.live i{width:.65em;height:.65em;border-radius:50%;background:var(--crit);animation:blink 1.2s infinite}
+.sim{display:none;background:var(--warn);color:#111;font-weight:800;padding:.15em .6em;border-radius:6px}
+body.mock .sim{display:inline-block}body.mock .live{display:none}
+.links{margin-left:auto;display:flex;gap:1.1em;color:var(--dim);font-size:.9em}
+.links span::before{content:"";display:inline-block;width:.6em;height:.6em;border-radius:50%;
+  background:var(--off);margin-right:.4em;vertical-align:middle}
+.links span.ok::before{background:var(--ok)}
+main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:var(--gap);min-height:0}
+.cam{position:relative;background:#000;border-radius:var(--r);overflow:hidden;border:3px solid var(--line);
+  display:flex;align-items:center;justify-content:center;min-height:0}
+.cam img{width:100%;height:100%;object-fit:contain;display:block}
+.cam .ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:var(--dim);gap:.5em;font-size:1.2em}
+.cam .ph b{font-size:1.4em;color:var(--text)}
+.cam.crit{border-color:var(--crit);animation:pulse 1s infinite}
+.cam.warn{border-color:var(--warn)}
+.banner{position:absolute;left:0;right:0;top:0;padding:.55em 1em;font-size:1.6em;font-weight:800;
+  text-align:center;letter-spacing:.03em;transform:translateY(-110%);transition:transform .2s}
+.banner.on{transform:none}
+.banner.warn{background:rgba(242,182,50,.92);color:#111}
+.banner.crit{background:rgba(255,77,79,.93);color:#fff}
+.calib{position:absolute;inset:auto 0 0 0;padding:1em;background:rgba(10,14,20,.82);text-align:center;display:none}
+.calib.on{display:block}
+.calib b{display:block;font-size:2em}
+.calib small{color:var(--dim);font-size:1em}
+.side{display:grid;grid-template-rows:auto 1fr;gap:var(--gap);min-height:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:clamp(10px,1.1vw,22px);
+  display:flex;flex-direction:column;gap:.45em;min-height:0;position:relative;transition:border-color .2s,background .2s}
+.card h2{margin:0;font-size:.8em;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);font-weight:700}
+.card .big{font-size:2.1em;font-weight:800;line-height:1.05}
+.card .sub{color:var(--dim);font-size:.92em}
+.card.ok .big{color:var(--ok)}.card.warn .big{color:var(--warn)}.card.crit .big{color:var(--crit)}
+.card.warn{border-color:rgba(242,182,50,.55)}
+.card.crit{border-color:var(--crit);background:linear-gradient(180deg,rgba(255,77,79,.16),var(--panel) 70%)}
+.card.off{opacity:.5}.card.off .big{color:var(--dim)}
+.alert .big{font-size:2.5em}
+.chips{display:flex;flex-wrap:wrap;gap:.4em}
+.chips span{background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:.1em .7em;font-size:.9em}
+.tiles{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:var(--gap);min-height:0}
+.bar{height:.6em;background:var(--panel2);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.bar i{display:block;height:100%;width:0;background:var(--info);transition:width .2s}
+.row{display:flex;justify-content:space-between;gap:.6em;font-size:.92em}
+.row b{font-weight:700}
+.heart .big{display:flex;align-items:baseline;gap:.25em}
+.heart .big small{font-size:.45em;color:var(--dim);font-weight:600}
+.heart .icon{display:inline-block;color:var(--crit);font-size:.8em;transform-origin:center}
+.heart .icon.beat{animation:beat var(--beat,0.85s) infinite}
+.note{margin-top:auto;font-size:.78em;color:var(--dim)}
+footer{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--gap)}
+.m{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:.5em .9em}
+.m b{display:block;font-size:1.55em;font-weight:800}
+.m span{color:var(--dim);font-size:.78em;text-transform:uppercase;letter-spacing:.1em}
+.m.warn b{color:var(--warn)}.m.crit b{color:var(--crit)}
+@keyframes blink{50%{opacity:.25}}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(255,77,79,.35)}}
+@keyframes beat{0%,60%,100%{transform:scale(1)}15%{transform:scale(1.3)}30%{transform:scale(1.05)}}
+@media (max-width:900px){body{overflow:auto;height:auto}main{grid-template-columns:1fr}
+  .cam{aspect-ratio:4/3}footer{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>RTDMS <span>Real-Time Driver Monitoring</span></h1>
+  <span class="live"><i></i>LIVE</span><span class="sim">SIMULATED DATA</span>
+  <div class="links"><span id="l-camera">Camera</span><span id="l-alert">Fusion</span>
+    <span id="l-watch">Watch</span><span id="l-health">Pi health</span></div>
+</header>
+<main>
+  <section class="cam" id="cam">
+    <img id="img" alt="">
+    <div class="ph" id="ph"><b>Camera</b><span id="ph-msg">connecting…</span></div>
+    <div class="banner" id="banner"></div>
+    <div class="calib" id="calib"><b id="calib-t"></b><small id="calib-s"></small></div>
+  </section>
+  <section class="side">
+    <div class="card alert" id="c-alert"><h2>Fusion decision</h2>
+      <div class="big" id="a-big">—</div><div class="sub" id="a-sub"></div><div class="chips" id="a-chips"></div></div>
+    <div class="tiles">
+      <div class="card" id="c-eyes"><h2>Eyes · drowsiness</h2>
+        <div class="big" id="e-big">—</div><div class="sub" id="e-sub"></div>
+        <div class="row"><span>Eye openness</span><b id="e-open">—</b></div><div class="bar"><i id="e-openbar"></i></div>
+        <div class="row"><span>PERCLOS</span><b id="e-perclos">—</b></div><div class="bar"><i id="e-perclosbar"></i></div>
+        <div class="row"><span>Blinks / min</span><b id="e-blink">—</b></div></div>
+      <div class="card" id="c-phone"><h2>Phone use</h2>
+        <div class="big" id="p-big">—</div><div class="sub" id="p-sub"></div>
+        <div class="row"><span>Classifier sees</span><b id="p-action">—</b></div>
+        <div class="row"><span>Phone at ear</span><b id="p-ear">—</b></div>
+        <div class="row"><span>Phone in lap</span><b id="p-lap">—</b></div></div>
+      <div class="card" id="c-drink"><h2>Drinking</h2>
+        <div class="big" id="d-big">—</div><div class="sub" id="d-sub"></div>
+        <div class="note">Detection only: drinking is shown here but does not raise an alert.</div></div>
+      <div class="card heart" id="c-heart"><h2>Heart rate · Garmin watch</h2>
+        <div class="big"><span class="icon" id="h-icon">&#9829;</span><span id="h-bpm">—</span><small>bpm</small></div>
+        <div class="sub" id="h-sub"></div>
+        <div class="row"><span>Baseline</span><b id="h-base">—</b></div>
+        <div class="row"><span>Signal</span><b id="h-q">—</b></div></div>
+    </div>
+  </section>
+</main>
+<footer>
+  <div class="m" id="m-fps"><span>Frame rate</span><b>—</b></div>
+  <div class="m" id="m-proc"><span>Processing / frame</span><b>—</b></div>
+  <div class="m" id="m-rtt"><span>Pi → watch alert</span><b>—</b></div>
+  <div class="m" id="m-temp"><span>CPU temperature</span><b>—</b></div>
+  <div class="m" id="m-cpu"><span>CPU load</span><b>—</b></div>
+  <div class="m" id="m-power"><span>Power</span><b>—</b></div>
+</footer>
+<script>
+const $=id=>document.getElementById(id);
+const pct=v=>v==null?'—':Math.round(v*100)+'%';
+const r0=v=>v==null?'—':Math.round(v);
+function card(id,level){$(id).className='card '+(id==='c-heart'?'heart ':'')+(id==='c-alert'?'alert ':'')+level}
+function metric(id,text,level){const e=$(id);e.className='m '+(level||'');e.querySelector('b').textContent=text}
+
+// [headline, level, alert pattern sent to the phone app and the watch]
+const PATTERN={none:['Driver attentive','ok','No alert'],
+  short_beep:['Attention','warn','Short beep'],
+  repeated:['Drowsiness alert','crit','Repeated beeps + vibration'],
+  continuous:['Distraction alert','crit','Continuous alert'],
+  max:['MAXIMUM ALERT','crit','Maximum alert + strong vibration']};
+const STATE={alert:['Awake','ok'],warning:['Eyes closing','warn'],drowsy:['DROWSY','crit'],
+  distracted:['Looking away','warn'],unavailable:['Can’t see eyes','off'],starting:['Starting…','off']};
+const STEP={waiting_face:['Look at the camera','waiting for your face'],
+  countdown_open:['Get ready: look ahead','starts in'],open:['Look straight ahead','blink normally'],
+  countdown_closed:['Get ready: close your eyes','starts in'],closed:['Keep your eyes closed','hold still']};
+
+let streamSet=false;
+function setStream(s,mock){
+  if(streamSet)return;streamSet=true;
+  if(mock||!s){$('ph-msg').textContent=mock?'Simulated data: no camera attached':'no camera';return}
+  let h=s.host||location.hostname;if(h.includes(':')&&!h.startsWith('['))h='['+h+']';
+  const url=`${location.protocol}//${h}:${s.port}/stream.mjpg`;
+  const img=$('img');
+  img.onload=()=>{$('ph').style.display='none';img.style.visibility=''};
+  img.onerror=()=>{$('ph').style.display='';img.style.visibility='hidden';$('ph-msg').textContent='camera stream offline, retrying…';
+    setTimeout(()=>{img.src=url+'?t='+Date.now()},2000)};
+  img.src=url;
+}
+
+function render(s){
+  document.body.classList.toggle('mock',!!s.mock);
+  setStream(s.stream,s.mock);
+  for(const k of ['camera','alert','watch','health'])$('l-'+k).className=s.links[k]&&s.links[k].ok?'ok':'';
+
+  // fusion decision
+  const a=s.alert;let camLevel='';
+  if(!a){card('c-alert','off');$('a-big').textContent='Offline';$('a-sub').textContent='Pi runtime not answering';$('a-chips').innerHTML=''}
+  else{const [t,l,sub]=PATTERN[a.pattern]||[a.pattern,'warn',''];card('c-alert',l);camLevel=l==='ok'?'':l;
+    $('a-big').textContent=t;$('a-sub').textContent=(a.emergency?'Emergency: driver not responding':sub)+(a.episode?` · episode ${a.episode}`:'');
+    $('a-chips').innerHTML=(a.reasons||[]).map(r=>`<span>${r.replace(/[<&]/g,'')}</span>`).join('')}
+  const b=$('banner');
+  if(a&&a.pattern!=='none'){b.className='banner on '+camLevel;b.textContent=(PATTERN[a.pattern]||[a.pattern])[0]+((a.reasons||[]).length?' · '+a.reasons[0]:'')}
+  else b.className='banner';
+
+  // eyes
+  const e=s.eyes;
+  if(!e){card('c-eyes','off');$('e-big').textContent='Offline';$('e-sub').textContent='camera not answering'}
+  else{let [t,l]=STATE[e.state]||[e.state||'—','off'];if(!e.face){t='No face';l='off'}
+    card('c-eyes',l);$('e-big').textContent=t;
+    $('e-sub').textContent=e.closure_ms>300?`Eyes closed ${(e.closure_ms/1000).toFixed(1)} s`:(e.calibrated?'Calibrated to this driver':'Not calibrated');
+    $('e-open').textContent=pct(e.openness);$('e-openbar').style.width=pct(e.openness==null?0:Math.min(1,e.openness));
+    $('e-perclos').textContent=e.perclos==null?'—':pct(e.perclos)+(e.perclos_valid?'':' (warming up)');
+    $('e-perclosbar').style.width=pct(e.perclos||0);$('e-perclosbar').style.background=e.state==='drowsy'?'var(--crit)':'var(--info)';
+    $('e-blink').textContent=r0(e.blink_rate)}
+  const st=e&&e.calibration_step;
+  if(st&&STEP[st]){$('calib').className='calib on';$('calib-t').textContent='Calibrating · '+STEP[st][0];
+    $('calib-s').textContent=e.calibration_left_s!=null?`${STEP[st][1]} · ${Math.ceil(e.calibration_left_s)} s`:STEP[st][1]}
+  else $('calib').className='calib';
+  $('cam').className='cam '+camLevel;
+
+  // phone
+  const p=s.phone;
+  if(!p){card('c-phone','off');$('p-big').textContent='Offline';$('p-sub').textContent=''}
+  else{const on=p.call||p.texting;card('c-phone',on?'crit':'ok');
+    $('p-big').textContent=p.call?'PHONE CALL':p.texting?'TEXTING':'No phone';
+    $('p-sub').textContent=on?'Alert raised':'Hands and ears clear';
+    $('p-action').textContent=p.action?`${p.action} ${pct(p.p)}`:'—';$('p-ear').textContent=pct(p.ear);$('p-lap').textContent=pct(p.lap)}
+
+  // drinking
+  const d=s.drinking;
+  if(!d){card('c-drink','off');$('d-big').textContent='Offline';$('d-sub').textContent=''}
+  else{card('c-drink',d.detected?'warn':'ok');$('d-big').textContent=d.detected?'DRINKING':'Not drinking';
+    $('d-sub').textContent=d.p!=null?`Classifier confidence ${pct(d.p)}`:'No cup at the mouth'}
+
+  // heart
+  const h=s.heart;const icon=$('h-icon');
+  if(!h||!h.watch_connected||h.hr_bpm==null){card('c-heart','off');$('h-bpm').textContent='—';icon.className='icon';
+    $('h-sub').textContent=!h?'Pi runtime not answering':!h.watch_connected?'Watch not connected':'Waiting for heart rate';
+    $('h-base').textContent='—';$('h-q').textContent='—'}
+  else{card('c-heart',h.worn===false?'warn':'ok');$('h-bpm').textContent=Math.round(h.hr_bpm);
+    icon.className='icon beat';icon.style.setProperty('--beat',(60/Math.max(30,h.hr_bpm)).toFixed(2)+'s');
+    $('h-sub').textContent=h.worn===false?'Watch not on the wrist':(h.delta_bpm!=null?`${h.delta_bpm>0?'+':''}${h.delta_bpm.toFixed(0)} bpm vs baseline`:'');
+    $('h-base').textContent=h.baseline_bpm!=null?Math.round(h.baseline_bpm)+' bpm':'learning…';$('h-q').textContent=h.quality||'—'}
+
+  // perf
+  const f=s.perf||{};
+  metric('m-fps',f.fps==null?'—':f.fps.toFixed(1)+' fps',f.fps!=null&&f.fps<8?'warn':'');
+  metric('m-proc',f.processing_ms==null?'—':Math.round(f.processing_ms)+' ms',f.processing_ms>150?'warn':'');
+  metric('m-rtt',f.watch_rtt_p50_ms==null?'—':`${r0(f.watch_rtt_p50_ms)} ms`+(f.watch_rtt_p95_ms!=null?` · p95 ${r0(f.watch_rtt_p95_ms)}`:''),f.watch_rtt_p95_ms>100?'warn':'');
+  metric('m-temp',f.temp_c==null?'—':f.temp_c.toFixed(0)+' °C',f.temp_c>=80?'crit':f.temp_c>=70?'warn':'');
+  metric('m-cpu',f.cpu_pct==null?'—':Math.round(f.cpu_pct)+' %',f.cpu_pct>90?'warn':'');
+  // vcgencmd get_throttled bits: 0 under-voltage now, 2 throttled now (16+ = happened since boot)
+  const thr=f.throttled,v=f.volts_5v!=null?` · ${f.volts_5v.toFixed(2)} V`:'';
+  metric('m-power',thr==null?'—':(thr&1?'Under-voltage':thr&4?'Throttled':'OK')+v,thr!=null&&thr&5?'crit':'');
+}
+
+async function poll(){
+  try{const r=await fetch('state',{cache:'no-store'});render(await r.json())}
+  catch(e){for(const k of ['camera','alert','watch','health'])$('l-'+k).className=''}
+  setTimeout(poll,250);
+}
+document.addEventListener('keydown',e=>{if(e.key==='f'||e.key==='F'){
+  document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}});
+poll();
+</script>
+</body>
+</html>
