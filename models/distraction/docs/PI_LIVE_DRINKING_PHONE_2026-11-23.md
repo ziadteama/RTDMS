@@ -84,5 +84,28 @@ scripts under `_scratch/` (local only, not committed).
 - Fusion still does not alert on drinking (D28); dashboard is detection display.
 - Optional later: fingertips / MediaPipe Hands — rejected for head-pressed hands + cost; ear
   veto is the cheap phone fix.
-- `papa-johns` marks drinking working; call ear-majority landed after that tag — retag or add a
-  second checkpoint when committing.
+- Checkpoints: `papa-johns` (drinking), `SUPER-Papa-Johns` (drinking + call ear-majority).
+
+## Open issue (solve later): matte black flask / dark bottle on IR
+
+**Seen:** 23 Nov live Pi demo after `SUPER-Papa-Johns`. Plastic / clearer bottle → drinking on.
+Matte **black flask** at the lips → **hand at mouth yes**, **object ≈ 0.29** (threshold `p=0.5`
+from `held_params.json`) → **Not drinking**. Action often `other`; ear `-` (not a phone case).
+
+**Not the YOLO box detector** (`--no-detect`). The score is `held_food3` (128 px gray crop:
+cup_bottle / empty_hand / food). Geometry worked; the classifier treated the dark flask like an
+empty hand / non-cup.
+
+**Likely cause:** training cups/bottles (SynDD / 3MDAD-style, clearer IR edges) do not match a
+matte black flask on NoIR. Domain gap, not a missing “hand at mouth” gate.
+
+**Do not “fix” by only lowering `p` without new hard negatives** — that raises empty-hand /
+phone false drinks.
+
+**Later work:**
+1. Capture IR crops of this flask (and similar dark bottles) at the mouth on the product camera;
+   add to held training / fine-tune `held_food3` (or a successor) with driver-held-out val.
+2. Keep plastic-bottle regression and phone-at-ear veto in the test plan.
+3. Optional contact sheet in `_scratch/` if re-recorded (do not commit frames with faces).
+
+**Owner zone:** `phone/` / `models/distraction/`. Tracked also in [[Open Items and Next Steps]].
