@@ -119,6 +119,11 @@ class Drowsiness:
         cfg.landmarker.backend = backend
         cfg.landmarker.model_path = model_path
         cfg.landmarker.num_threads = 1
+        # No slow drift of the eyes-open reference: 100 % stays the driver's eyes in the
+        # calibration's look-ahead step until the next calibration. Logged on the Pi: with drift
+        # on (95th percentile of 5 min) it rose 0.12 -> 0.19 in 2 min while the eyes did not change,
+        # so relaxed open eyes slid from ~90 % to ~45 % open.
+        cfg.calibration.adapt_enabled = False
         self.cfg, self.w, self.h = cfg, width, height
         self.profile_name, self.profile_dir = profile_name, profile_dir
         self.profile, self.calibrated = DriverProfile.load_or_default(profile_name, profile_dir)
@@ -216,6 +221,13 @@ class Drowsiness:
             "ear": None if res.ear_filtered is None else round(res.ear_filtered, 3),
             "ear_open": round(self.pipe.adapter.adapted_ear_open, 3),
             "ear_closed": round(self.profile.ear_closed, 3),
+            # head angles relative to the calibrated neutral pose, and the iris gaze, as the
+            # face model's looking-away rule sees them (diagnosis)
+            "d_yaw": None if not res.angles else round(res.angles[0] - self.profile.yaw0, 1),
+            "d_pitch": None if not res.angles else round(res.angles[1] - self.profile.pitch0, 1),
+            "gaze_h": None if res.gaze_h is None else round(res.gaze_h, 3),
+            "gaze_v": None if res.gaze_v is None else round(res.gaze_v, 3),
+            "gaze_dev": None if res.gaze_dev is None else round(res.gaze_dev, 3),
             "face": res.face_present,
             "calibrated": self.calibrated,
             "message": self.message,

@@ -48,6 +48,7 @@ def res(eye, state):
     report = SimpleNamespace(state=SimpleNamespace(value=state), reasons=[], perclos=1.0,
                              perclos_valid=True, blink_rate=None, closure_ms=3000)
     return SimpleNamespace(eye_state=eye, report=report, openness_smooth=None, ear_filtered=None,
+                           angles=None, gaze_h=None, gaze_v=None, gaze_dev=None,
                            face_present=True, total_ms=0.0)
 
 
