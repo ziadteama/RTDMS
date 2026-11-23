@@ -6,6 +6,7 @@ from collections import deque
 
 from dms_fusion import AlertPattern
 
+MAX_LIVE_RTT_S = 2.0  # longer means the watch was not listening when the change went out
 _PATTERN_INDEX = {pattern: index for index, pattern in enumerate(AlertPattern)}
 
 
@@ -28,13 +29,18 @@ class WatchAlert:
             return self._value
 
     def sent(self, value: bytes, now: float) -> None:
+        """Record when a CHANGED value went out; keep-alives are not timed.
+
+        A watch that connects after a change only sees the value through a keep-alive, so its echo
+        says nothing about link latency; such late echoes are dropped in `echo`.
+        """
         with self._lock:
-            self._sent.setdefault(value[1], now)  # keep-alives resend the same seq
+            self._sent.setdefault(value[1], now)
 
     def echo(self, seq: int, arrival: float) -> None:
         with self._lock:
             sent = self._sent.pop(seq, None)
-            if sent is not None and arrival >= sent:
+            if sent is not None and 0 <= arrival - sent <= MAX_LIVE_RTT_S:
                 self._rtts.append((arrival - sent) * 1000)
 
     def diagnostics(self) -> dict[str, object]:

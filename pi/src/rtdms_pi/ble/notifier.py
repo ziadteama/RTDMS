@@ -111,15 +111,16 @@ class Notifier:
                 alert_payload(decision, now, self.state.phone_clock), now, keepalive=False
             )
             if self.watch is not None:
-                self._send_watch(self.watch.change(decision.pattern), now)
+                self._send_watch(self.watch.change(decision.pattern), now, timed=True)
 
-    def _send_watch(self, value: bytes, now: float) -> None:
+    def _send_watch(self, value: bytes, now: float, *, timed: bool = False) -> None:
         """Garmin watch alert: 2 raw bytes on every change, then a 5 s keep-alive."""
         if self.watch is None or self.emit_raw is None:
             return
         try:
             self.emit_raw(Char.WATCH_ALERT, value)
-            self.watch.sent(value, now)
+            if timed:
+                self.watch.sent(value, now)
         except Exception:
             logging.getLogger(__name__).exception("BLE notify failed: WATCH_ALERT")
         self._watch_at = now
