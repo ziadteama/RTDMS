@@ -69,7 +69,7 @@ export type PiStatus = PayloadTime & {
 
 /** Shared optional source metadata; status time may be absent on older units. */
 export type PayloadTime = { t?: number; t_src?: 'phone' | 'pi' };
-export type PiAlert = PayloadTime & { pattern: AlertPattern; reasons: string[]; t: number; emergency?: 'unresponsive' };
+export type PiAlert = PayloadTime & { pattern: AlertPattern; episode: number | null; reasons: string[]; t: number; emergency?: 'unresponsive' };
 
 /** physiology HrvSnapshot.state / QualityState (models/physiology garmin_hrv.py, types.py). */
 export type HrvState = 'warmup' | 'valid' | 'degraded' | 'bad' | 'stale';

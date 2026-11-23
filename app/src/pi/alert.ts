@@ -17,7 +17,7 @@ export type HapticKind = 'none' | 'tap' | 'warning' | 'error';
 export type AlertPresentation = {
   /** Post a phone notification when this pattern starts (the Pi buzzer sounds at the same time). */
   notify: boolean;
-  /** Speak the voice line when the pattern starts, and again every `repeatMs` while it lasts. */
+  /** Speak the voice line when the pattern starts, and at most once per 8 seconds while it lasts. */
   voice: boolean;
   repeatMs: number | null;
   haptic: HapticKind;

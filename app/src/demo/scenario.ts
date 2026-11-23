@@ -112,7 +112,7 @@ export function statusAt(t: number, calibration?: { message: string; calibrated:
 
 export function alertAt(t: number): PiAlert {
   const p = phaseAt(t);
-  return { pattern: p.pattern, reasons: p.alertReasons, t: round(t, 2) };
+  return { pattern: p.pattern, episode: null, reasons: p.alertReasons, t: round(t, 2) };
 }
 
 export function physioAt(t: number): PiPhysio {

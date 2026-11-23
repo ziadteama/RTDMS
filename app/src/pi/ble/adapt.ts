@@ -1,4 +1,5 @@
 /** Contract BLE payloads → the HTTP shape consumed by the app parsers. */
+import { parseEpisode } from '../episode';
 import { ALERT_PATTERNS } from '../types';
 import type { BleNotifyKind } from './types';
 
@@ -27,7 +28,7 @@ export function adaptPhysio(v: unknown): Obj | null {
 export function adaptAlert(v: unknown): Obj | null {
   if (!object(v) || !ALERT_PATTERNS.some((p) => p === v.pattern) || !number(v.t) ||
       !Array.isArray(v.reasons) || !v.reasons.every((r) => typeof r === 'string')) return null;
-  return pick(v, ['pattern', 'reasons', 't', 't_src', 'emergency']);
+  return { ...pick(v, ['pattern', 'reasons', 't', 't_src', 'emergency']), episode: parseEpisode(v.episode) };
 }
 
 export const adaptNotify = (kind: BleNotifyKind, value: unknown): Obj | null =>

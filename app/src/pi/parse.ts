@@ -2,6 +2,8 @@
  * Parsers for Pi responses. Bad or partial input yields null (or a null field), never a guess:
  * the repo-wide rule "bad input → null output" applies to the app too.
  */
+import { parseEpisode } from './episode';
+
 import {
   ALERT_PATTERNS,
   type AlertPattern,
@@ -103,7 +105,7 @@ export function parseAlert(v: unknown): PiAlert | null {
   if (!isObj(v)) return null;
   const pattern = oneOf<AlertPattern>(v.pattern, ALERT_PATTERNS);
   if (!pattern || num(v.t) === null || !Array.isArray(v.reasons) || !v.reasons.every((r) => typeof r === 'string')) return null;
-  return { pattern, reasons: strs(v.reasons), ...parseTime(v), t: num(v.t)!,
+  return { pattern, episode: parseEpisode(v.episode), reasons: strs(v.reasons), ...parseTime(v), t: num(v.t)!,
     ...(v.emergency === 'unresponsive' ? { emergency: 'unresponsive' as const } : {}) };
 }
 

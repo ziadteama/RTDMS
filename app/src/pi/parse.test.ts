@@ -102,7 +102,7 @@ describe('parseStatus', () => {
 describe('other endpoints', () => {
   it('parses /alert and rejects unknown patterns', () => {
     expect(parseAlert({ pattern: 'max', reasons: ['face drowsy'], t: 3 })).toEqual({
-      pattern: 'max',
+      pattern: 'max', episode: null,
       reasons: ['face drowsy'],
       t: 3,
     });
