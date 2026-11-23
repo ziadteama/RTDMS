@@ -24,9 +24,11 @@ from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.request import urlopen
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 HERE = Path(__file__).resolve().parent
+COMMANDS = ("/calibrate", "/reset")  # POSTs relayed to the camera server
 FAST_S = 0.25  # camera status, alert, physio
 HEALTH_S = 5.0  # /health runs vcgencmd on the Pi: keep it slow
 TIMEOUT_S = 0.5
@@ -163,8 +165,9 @@ class Dashboard:
             "physio": Source(rt and rt + "/physio", clock),
             "health": Source(rt and rt + "/health", clock),
         }
-        # The camera MJPEG is relayed through this server, so the page needs one address only.
-        self.stream_url = None if mock else f"http://{host}:{stream_port}/stream.mjpg"
+        # The camera MJPEG and its commands are relayed through this server: one address only.
+        self.camera_base = None if mock else f"http://{host}:{stream_port}"
+        self.stream_url = self.camera_base and self.camera_base + "/stream.mjpg"
         self.drink = DrinkDebounce()
         self.drinking = False
         self.lock = threading.Lock()
@@ -292,6 +295,30 @@ def make_handler(dash: Dashboard) -> type[BaseHTTPRequestHandler]:
                 self._relay(dash.stream_url)
             else:
                 self._send(404, "text/plain", b"not found")
+
+        def do_POST(self) -> None:  # noqa: N802
+            path = self.path.split("?", 1)[0]
+            if path not in COMMANDS:
+                self._send(404, "text/plain", b"not found")
+            elif dash.camera_base is None:
+                self._reply(409, "not available with simulated data")
+            else:
+                self._command(dash.camera_base + path)
+
+        def _command(self, url: str) -> None:
+            """POST with an empty body to the camera server (calibrate = Pi-camera calibration,
+            reset = clear the drowsiness readings) and pass its answer back."""
+            try:
+                with urlopen(Request(url, data=b"", method="POST"), timeout=3) as r:
+                    self._send(r.status, "application/json", r.read(4096) or b'{"ok": true}')
+            except HTTPError as e:
+                why = "not on this Pi yet" if e.code == 404 else f"camera said {e.code}"
+                self._reply(e.code, why)
+            except OSError:
+                self._reply(502, "camera server not answering")
+
+        def _reply(self, code: int, error: str) -> None:
+            self._send(code, "application/json", json.dumps({"ok": False, "error": error}).encode())
 
         def _relay(self, url: str) -> None:
             """Copy the camera's MJPEG through; the camera only encodes while someone watches."""

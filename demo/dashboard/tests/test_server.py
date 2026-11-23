@@ -191,6 +191,59 @@ def test_stream_offline_is_502():
         srv.shutdown()
 
 
+def post(url):
+    from urllib.request import Request
+
+    try:
+        with urlopen(Request(url, data=b"", method="POST")) as r:
+            return r.status, json.load(r)
+    except OSError as e:  # HTTPError
+        body = e.read()
+        return e.code, json.loads(body) if body.startswith(b"{") else body
+
+
+def test_commands_are_relayed_to_the_camera():
+    got = []
+
+    class Cam(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802
+            got.append((self.path, self.headers.get("Content-Length")))
+            ok = self.path == "/calibrate"
+            self.send_response(200 if ok else 404)
+            self.end_headers()
+            self.wfile.write(b'{"ok": true}' if ok else b"")
+
+        def log_message(self, *a):
+            pass
+
+    cam = ThreadingHTTPServer(("127.0.0.1", 0), Cam)
+    threading.Thread(target=cam.serve_forever, daemon=True).start()
+    d = server.Dashboard("127.0.0.1", cam.server_address[1], 9, mock=False)
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), server.make_handler(d))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        assert post(base + "/calibrate") == (200, {"ok": True})
+        assert got == [("/calibrate", "0")]  # empty body = Pi-camera calibration
+        assert post(base + "/reset") == (404, {"ok": False, "error": "not on this Pi yet"})
+        assert post(base + "/shutdown")[0] == 404 and len(got) == 2  # not relayed
+    finally:
+        srv.shutdown()
+        cam.shutdown()
+
+
+def test_commands_without_camera_or_in_mock():
+    for mock, code in ((False, 502), (True, 409)):
+        d = server.Dashboard("127.0.0.1", 9, 9, mock=mock)
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), server.make_handler(d))
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            status, body = post(f"http://127.0.0.1:{srv.server_address[1]}/calibrate")
+            assert status == code and body["ok"] is False
+        finally:
+            srv.shutdown()
+
+
 def test_http_routes():
     d = server.Dashboard("127.0.0.1", 8080, 8090, mock=True)
     d.tick()

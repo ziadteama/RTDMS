@@ -22,7 +22,14 @@ header h1 span{color:var(--dim);font-weight:500}
 .live i{width:.65em;height:.65em;border-radius:50%;background:var(--crit);animation:blink 1.2s infinite}
 .sim{display:none;background:var(--warn);color:#111;font-weight:800;padding:.15em .6em;border-radius:6px}
 body.mock .sim{display:inline-block}body.mock .live{display:none}
-.links{margin-left:auto;display:flex;gap:1.1em;color:var(--dim);font-size:.9em}
+.actions{margin-left:auto;display:flex;gap:.6em;align-items:center}
+.actions button{font:inherit;font-size:.85em;font-weight:700;color:var(--text);background:var(--panel2);
+  border:1px solid var(--line);border-radius:8px;padding:.35em .9em;cursor:pointer}
+.actions button:hover{border-color:var(--info)}
+.actions button:disabled{opacity:.5;cursor:default}
+#toast{font-size:.85em;color:var(--dim);min-width:12em;text-align:right}
+#toast.err{color:var(--warn)}
+.links{display:flex;gap:1.1em;color:var(--dim);font-size:.9em}
 .links span::before{content:"";display:inline-block;width:.6em;height:.6em;border-radius:50%;
   background:var(--off);margin-right:.4em;vertical-align:middle}
 .links span.ok::before{background:var(--ok)}
@@ -83,6 +90,9 @@ footer{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--gap)}
 <header>
   <h1>RTDMS <span>Real-Time Driver Monitoring</span></h1>
   <span class="live"><i></i>LIVE</span><span class="sim">SIMULATED DATA</span>
+  <div class="actions"><span id="toast"></span>
+    <button id="b-cal" title="Eye calibration on the Pi camera: look ahead, then close your eyes">Calibrate</button>
+    <button id="b-reset" title="Clear PERCLOS, the eye-closure timer and blink history">Reset</button></div>
   <div class="links"><span id="l-camera">Camera</span><span id="l-alert">Fusion</span>
     <span id="l-watch">Watch</span><span id="l-health">Pi health</span></div>
 </header>
@@ -232,6 +242,17 @@ async function poll(){
   catch(e){for(const k of ['camera','alert','watch','health'])$('l-'+k).className=''}
   setTimeout(poll,250);
 }
+let toastTimer;
+function toast(text,err){const t=$('toast');t.textContent=text;t.className=err?'err':'';
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.textContent=''},4000)}
+async function command(path,btn,okText){
+  btn.disabled=true;
+  try{const r=await fetch(path,{method:'POST'});let j={};try{j=await r.json()}catch(e){}
+    if(r.ok&&j.ok!==false)toast(okText);else toast((btn.textContent)+': '+(j.error||('error '+r.status)),true)}
+  catch(e){toast(btn.textContent+': dashboard not answering',true)}
+  setTimeout(()=>{btn.disabled=false},1500)}
+$('b-cal').onclick=e=>command('calibrate',e.target,'Calibration started: look ahead');
+$('b-reset').onclick=e=>command('reset',e.target,'Readings cleared');
 document.addEventListener('keydown',e=>{if(e.key==='f'||e.key==='F'){
   document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}});
 poll();
