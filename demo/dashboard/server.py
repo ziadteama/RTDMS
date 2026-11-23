@@ -34,11 +34,12 @@ HEALTH_S = 5.0  # /health runs vcgencmd on the Pi: keep it slow
 TIMEOUT_S = 0.5
 STALE_S = {"camera": 1.5, "alert": 2.0, "physio": 2.0, "health": 15.0}
 
-# Drinking is only exposed as the classifier's top class per frame; debounce it with the same
-# numbers as models/distraction/scripts/hybrid_alerts.py (WIN["drinking"], MIN_P["drinking"], FRAC).
-# Display only: fusion ignores drinking on purpose (decision D28), so it never raises an alert.
+# Drinking is only exposed as the classifier's top class per frame; debounce it with the window
+# and fraction of models/distraction/scripts/hybrid_alerts.py (WIN["drinking"], FRAC). The
+# confidence floor is 0.5 here (hybrid_alerts uses 0.7), lowered for the demo camera at the
+# user's request. Display only: fusion ignores drinking on purpose (decision D28), no alert.
 DRINK_WIN_S = 1.5
-DRINK_MIN_P = 0.7
+DRINK_MIN_P = 0.5
 DRINK_FRAC = 0.7
 DRINK_MIN_SAMPLES = 3
 

@@ -155,7 +155,7 @@ const STEP={waiting_face:['Look at the camera','waiting for your face'],
   countdown_open:['Get ready: look ahead','starts in'],open:['Look straight ahead','blink normally'],
   countdown_closed:['Get ready: close your eyes','starts in'],closed:['Keep your eyes closed','hold still']};
 
-let streamSet=false;
+let streamSet=false,openHist=[];
 function setStream(s,mock){
   if(streamSet)return;streamSet=true;
   if(mock||!s){$('ph-msg').textContent=mock?'Simulated data: no camera attached':'no camera';return}
@@ -188,7 +188,10 @@ function render(s){
   else{let [t,l]=STATE[e.state]||[e.state||'—','off'];if(!e.face){t='No face';l='off'}
     card('c-eyes',l);$('e-big').textContent=t;
     $('e-sub').textContent=e.closure_ms>300?`Eyes closed ${(e.closure_ms/1000).toFixed(1)} s`:(e.calibrated?'Calibrated to this driver':'Not calibrated');
-    $('e-open').textContent=pct(e.openness);$('e-openbar').style.width=pct(e.openness==null?0:Math.min(1,e.openness));
+    // display only: median of the last ~1 s (4 polls); blink/PERCLOS/alerts use the raw signal
+    if(e.openness!=null){openHist.push(e.openness);if(openHist.length>4)openHist.shift()}else openHist=[];
+    const os=openHist.length?[...openHist].sort((a,b)=>a-b)[Math.floor(openHist.length/2)]:null;
+    $('e-open').textContent=pct(os);$('e-openbar').style.width=pct(os==null?0:Math.min(1,os));
     $('e-perclos').textContent=e.perclos==null?'—':pct(e.perclos)+(e.perclos_valid?'':' (warming up)');
     $('e-perclosbar').style.width=pct(e.perclos||0);$('e-perclosbar').style.background=e.state==='drowsy'?'var(--crit)':'var(--info)';
     $('e-blink').textContent=r0(e.blink_rate)}

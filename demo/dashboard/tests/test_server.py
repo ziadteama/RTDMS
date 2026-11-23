@@ -122,8 +122,12 @@ def test_drinking_debounce():
     assert db.update(0.75, "normal", 0.9)  # 3 of 4 = 75 % still holds
     assert not db.update(1.0, "normal", 0.9)  # 3 of 5 = 60 %
     db.reset()
-    for i in range(6):  # low confidence never counts
-        assert not db.update(i * 0.25, "drinking", 0.6)
+    for i in range(3):  # 50 % confidence is enough
+        db.update(i * 0.25, "drinking", 0.5)
+    assert db.update(0.75, "drinking", 0.5)
+    db.reset()
+    for i in range(6):  # below 50 % never counts
+        assert not db.update(i * 0.25, "drinking", 0.45)
     db.reset()
     for i in range(6):
         db.update(i * 0.25, "drinking", 0.9)
