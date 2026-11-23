@@ -88,6 +88,18 @@ All 15 screens × dark / light × English / Arabic: `app/docs/screenshots/`.
 > no language switch (voice alerts in feature 2 are English only). The table is kept as the original
 > MVP record.
 
+## Contract v1.3 changes (23 Nov)
+
+- `clock` written on connect and every 60 s (a missed refresh retries; the connect-time write
+  stays fatal because it is how a token-mode unit signals missing auth).
+- Pi-derived trip events and heart-rate samples use payload `t` when `t_src` is "phone".
+- Heart rate is not a fatigue signal any more: no "Heart rate shows fatigue" copy; quality,
+  baseline, delta, trend and PRV only in hidden Diagnostics.
+- Settings → privacy: **Save heart rate with trips** (default on); deleting a trip deletes its
+  heart rate, events and incidents. A documented, consented exception to [[4.3 Ethics]].
+- `alert.emergency = "unresponsive"` starts the SOS countdown (kind `unresponsive`, message "The
+  driver is not responding.") once per episode, never on top of another pending SOS.
+
 ## Bluetooth link (app side)
 
 Contract: `contracts/pi-link/CONTRACT.md` v1.2. Code in `app/src/pi/ble/` (`react-native-ble-plx` 3.5.1 plus its Expo config plugin; permissions `BLUETOOTH_SCAN` with `neverForLocation` and `BLUETOOTH_CONNECT`).

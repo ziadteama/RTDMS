@@ -76,6 +76,7 @@ archived in [[Coordination Board 2026-11]].
 | D25 | 23 Nov | **Two clocks:** phone = what time it is (all payload `t` = UTC epoch ms in phone time), Pi monotonic = how long and which came first; watch samples timed from `watch_ms`, not arrival | Payload `t` used three clocks; buffered watch packets were stamped on arrival | [[Physiology New Approach]] |
 | D26 | 23 Nov | Pi saves no heart data (research CSV only with `--csv` / `RESEARCH_LOG=1`); phone keeps trip HR on the phone with an off switch and delete-with-trip | Report §4.3; user choice | [[Physiology New Approach]] |
 | D27 | 23 Nov | The Garmin FR265 replaces the MAX30102 bracelet and the vibration motor (wrist vibration + "I'm OK"); unresponsive-driver SOS in scope | User | [[Physiology New Approach]] |
+| D28 | 23 Nov | **The eating / drinking / food model is not part of fusion** until it is figured out and validated; `decide()` ignores those outputs (test) | User | `fusion/` |
 
 ## Evidence collected
 
@@ -133,6 +134,30 @@ archived in [[Coordination Board 2026-11]].
 - P0 done on two branches, not merged: `fusion/physio-guard` (physiology no longer changes live alerts; fusion 8, Pi 207 tests pass) and `physio/no-default-log` (physiology 132 pass; 5 pre-existing ruff errors in `tools/mpddf_*.py` left alone).
 - Watch on the dev machine's USB is in Garmin mode (`091e:0003`, `garmin_gps` driver), not MTP; no Connect IQ SDK, Java or MTP client here yet.
 - Plan: [[Physiology New Approach]].
+
+### Night of 23 Nov: heart-rate plan carried through (user asleep, full orchestration)
+
+- Merged: #77 packet v2 + WatchClock + HrStream, #78 fusion EmergencyMonitor / ShadowTracker /
+  BreakReminder + D28 guard, #79 contract v1.3, #80 app v1.3, #81 MPD-DF shadow score, #83 Pi
+  wiring, #84 watch round-trip fix. Draft #82 watch app (not compiled).
+- Deployed to the Pi (`~/rtdms-pi`, backups `.bak-20261123-*`); over-the-air test with the dev
+  machine acting as the watch passed; 0.35 % of one core while streaming. Evidence table in
+  [[Physiology New Approach]].
+- Codex implemented the core pieces; agy did read-only cross-reviews and found **6 real defects**
+  that tests had missed (wall clock passed as the monotonic clock → payload `t` near 1970;
+  incident window on wall time → empty clips; whole physio report cached → ACK hidden for 1 s;
+  double SOS over a pending crash SOS; HTTP `/health` missing diagnostics; incident id from
+  monotonic time). Two of its claims were wrong and were not applied (connect-time clock write is
+  the auth signal; `snapshot.t` is never 0).
+
+Lessons:
+- **Codex errors can hide behind unrelated stderr.** Its usage limit showed only as a Notion MCP
+  auth line in stderr; the real message was in `events.jsonl` (`turn.failed`). Codex quota ran
+  out at ~01:30 (resets 05:57); the orchestrator finished the Pi wiring itself.
+- **agy writes headless only with `--dangerously-skip-permissions`** (not approved), so agy stays
+  the read-only reviewer; its reviews paid for themselves.
+- **Docker images copy only listed paths:** a runtime artifact (the shadow model) must be added to
+  `pi/Dockerfile`, or tests pass locally and fail in Docker.
 
 ## Open product and technical questions
 

@@ -32,14 +32,18 @@ The single list of what is **not** done. Update it when something moves.
 
 ## Heart rate (Garmin) — plan in [[Physiology New Approach]]
 
+All code merged and the Pi runtime deployed (23 Nov). What is left needs hands or hardware:
+
 | Item | State |
 |---|---|
-| P0: fusion ignores physiology for live alerts; no default heart-data log | **done on branches, not merged** (`fusion/physio-guard`, `physio/no-default-log`) |
-| Contract v1.3 CR (one `t`, physio v2 fields, 60 s clock, packet v2) | not posted |
-| P1: watch capability check (accelerometer, contact, vibration, notify subscribe, battery) | needs the user: watch USB mode → MTP, or the Windows build machine |
-| P2–P5: HR pipeline, sync, phone HR UI, shadow score | not started |
-| P6–P7: wrist vibration + "I'm OK", unresponsive-driver SOS | later |
-| Remove the WESAD artifact and "Heart rate shows fatigue" string from the live path | in P2 / P4 |
+| **Build the watch app** (draft PR #82, written but never compiled) on the Windows machine with `garmin/build.ps1 -App rr_stream`; fix any compile errors; sideload | **needs the user** |
+| P1 watch checks: accelerometer with HR/RR, vibration patterns, notify subscription, hold-UP ACK, battery over 30 min | needs the user + watch |
+| Real watch → Pi: `/physio` shows HR, worn, quality; `/health` `physio_diag` offset spread < 100 ms | needs the watch near the Pi |
+| Phone on contract v1.3 (JS only, Metro reload): clock every 60 s, `t_src: "phone"` on Pi payloads, HR switch in Settings, Diagnostics shows quality/baseline/trend | needs the phone |
+| Round-trip latency Pi → watch (target < 100 ms): needs an alert change (camera back, or a phone test alert wired to a decision) | needs camera or phone |
+| Unresponsive-driver SOS end to end (eyes closed ≥ 8 s → MAX → +10/20 s → phone countdown) | needs camera + phone |
+| Concurrent CPU with the camera models (physiology path measured alone: 0.35 % of one core) | needs camera |
+| Enable `sync_system_clock` on the Pi (needs CAP_SYS_TIME or a sudo rule; the Pi's UTC is already right, only its time zone is HST) | optional |
 
 ## App
 
