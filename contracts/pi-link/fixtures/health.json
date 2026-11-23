@@ -16,5 +16,14 @@
     "physiology": "running",
     "fusion": "running"
   },
-  "wifi": "off"
+  "wifi": "off",
+  "physio_diag": {
+    "watch_offset_spread_ms": 38,
+    "late_packets": 0,
+    "shadow_agree": 3,
+    "shadow_disagree": 1,
+    "shadow_only": 2,
+    "watch_alert_rtt_p50_ms": 42,
+    "watch_alert_rtt_p95_ms": 88
+  }
 }

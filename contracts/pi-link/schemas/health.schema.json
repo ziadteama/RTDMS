@@ -70,6 +70,54 @@
         "on",
         "clients"
       ]
+    },
+    "physio_diag": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "watch_offset_spread_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "late_packets": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "shadow_agree": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "shadow_disagree": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "shadow_only": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "watch_alert_rtt_p50_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "watch_alert_rtt_p95_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
     }
   }
 }

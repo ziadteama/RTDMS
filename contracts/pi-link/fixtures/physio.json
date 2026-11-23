@@ -5,9 +5,13 @@
     845,
     850
   ],
-  "fatigue_probability": 0.31,
   "hrv_state": "valid",
   "rmssd_ms": 35.1,
   "quality": "good",
-  "t": 1795189202.4
+  "t": 1795189202.4,
+  "worn": true,
+  "hr_baseline_bpm": 74.0,
+  "hr_delta_bpm": -3.0,
+  "hr_trend_bpm_per_10min": -0.8,
+  "t_src": "phone"
 }
