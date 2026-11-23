@@ -108,6 +108,7 @@ def merge(cam: Json | None, alert: Json | None, physio: Json | None, health: Jso
         h = cam.get("hybrid") or {}
         out["eyes"] = {
             "face": bool(cam.get("face")),
+            "occluded": bool(d.get("occluded")),  # hand / phone / cup at the face
             "state": d.get("state"),
             "openness": num(d.get("openness")),
             "perclos": num(d.get("perclos")),

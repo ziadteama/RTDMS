@@ -186,8 +186,9 @@ function render(s){
   const e=s.eyes;
   if(!e){card('c-eyes','off');$('e-big').textContent='Offline';$('e-sub').textContent='camera not answering'}
   else{let [t,l]=STATE[e.state]||[e.state||'—','off'];if(!e.face){t='No face';l='off'}
+    if(e.occluded){t='Eyes hidden';l='off'}
     card('c-eyes',l);$('e-big').textContent=t;
-    $('e-sub').textContent=e.closure_ms>300?`Eyes closed ${(e.closure_ms/1000).toFixed(1)} s`:(e.calibrated?'Calibrated to this driver':'Not calibrated');
+    $('e-sub').textContent=e.occluded?'Hand, phone or cup at the face: not counted':e.closure_ms>300?`Eyes closed ${(e.closure_ms/1000).toFixed(1)} s`:(e.calibrated?'Calibrated to this driver':'Not calibrated');
     $('e-open').textContent=pct(e.openness);$('e-openbar').style.width=pct(e.openness==null?0:Math.min(1,e.openness));
     $('e-perclos').textContent=e.perclos==null?'—':pct(e.perclos)+(e.perclos_valid?'':' (warming up)');
     $('e-perclosbar').style.width=pct(e.perclos||0);$('e-perclosbar').style.background=e.state==='drowsy'?'var(--crit)':'var(--info)';
