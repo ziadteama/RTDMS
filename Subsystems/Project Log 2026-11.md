@@ -77,6 +77,13 @@ archived in [[Coordination Board 2026-11]].
 | D26 | 23 Nov | Pi saves no heart data (research CSV only with `--csv` / `RESEARCH_LOG=1`); phone keeps trip HR on the phone with an off switch and delete-with-trip | Report §4.3; user choice | [[Physiology New Approach]] |
 | D27 | 23 Nov | The Garmin FR265 replaces the MAX30102 bracelet and the vibration motor (wrist vibration + "I'm OK"); unresponsive-driver SOS in scope | User | [[Physiology New Approach]] |
 | D28 | 23 Nov | **The eating / drinking / food model is not part of fusion** until it is figured out and validated; `decide()` ignores those outputs (test) | User | `fusion/` |
+| D29 | 23 Nov | **Live demo dashboard** is a separate `demo/dashboard/` server on the Pi (:8000); it reads the camera (:8080) and runtime (:8090) and changes neither | One screen for the audience; no risk to tested code the night before | [[Demo Prep 2026-11-23]] |
+| D30 | 23 Nov | The runtime-owned camera draws the face mesh (`--mesh`); no `--profile pi` (the Pi bundle's `pipeline.yaml` already picks LiteRT) | Mesh missing on the product unit; the Pi has no `configs/profiles/` | PR #94 |
+| D31 | 23 Nov | Face crop from the full-resolution frame on the Pi (`facemesh.hires_crop`) | Far driver: ~50 px face, 1-2 px eyes; calibration separation 0.054 -> 0.183 | [[Demo Prep 2026-11-23]] |
+| D32 | 23 Nov | No phone-classifier gate on drowsiness; the face model's head-angle eye gate is the only one | The gate hid the eyes in 66 % of frames and stalled calibration | [[Demo Prep 2026-11-23]] |
+| D33 | 23 Nov | **Texting removed**; head-down is face-model distraction (report: off-road > 2 s); eating and texting are never reported by the v2 classifier | User; texting / eating labels fired on ordinary frames | [[Demo Prep 2026-11-23]] |
+| D34 | 23 Nov | Eyes-open reference **frozen at calibration**; no drowsiness verdict until the eyes reopen after a calibration (5 s cap) | Drift 0.12 -> 0.19 in 2 min made relaxed eyes read 45 %; false drowsy alert after calibrating | [[Demo Prep 2026-11-23]] |
+| D35 | 23 Nov | Dashboard drinking = 1.5 s mean of the drinking score >= 0.4 (still display only, D28) | The top label flickers drinking/other mid-sip | [[Demo Prep 2026-11-23]] |
 
 ## Evidence collected
 
@@ -200,6 +207,22 @@ Lessons:
   with GET, or on a copy.
 - **A delegated agent that reboots the Pi mid-test loses the connection:** announce reboots on the
   board and keep one controlled reboot only.
+
+### Evening of 23 Nov: demo prep on the real Pi
+
+- Live demo dashboard on the Pi (:8000), face mesh on the runtime camera, full-resolution face
+  crop, texting removed, eyes-open reference frozen at calibration, post-calibration grace,
+  drinking averaged. Driven by four recorded sessions on the Pi. Decisions D29-D35; detail,
+  evidence and the report audit in [[Demo Prep 2026-11-23]].
+- Pre-release branch `demo/pre-2026-11-23` merges `pi/camera-demo-flags`, `distraction/occlusion-gate`,
+  `demo/live-dashboard` and this docs branch; nothing on `main` yet.
+
+Lessons:
+- **Record before tuning.** A frame + status recorder on the Pi turned three guesses (eyes gate,
+  calibration, drinking threshold) into measured causes; two of the guesses were wrong.
+- **Check the Pi's own config before adding flags.** `--profile pi` would have stopped the camera:
+  the Pi has no `configs/profiles/`.
+- **`deploy.sh` is not Windows-safe** (Windows `find` in Git Bash): one tar over ssh, md5 check.
 
 ## Open product and technical questions
 
