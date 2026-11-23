@@ -134,6 +134,22 @@ def test_drinking_debounce_averages_the_score():
     assert db.mean == 0.9
 
 
+def test_held_result_is_the_drinking_light():
+    clock = Clock()
+    d = server.Dashboard("127.0.0.1", 9, 9, mock=False, clock=clock)
+    d.sources["camera"].url = None  # tick must not overwrite the sample
+    cheek = {"face": True, "hybrid": {"face": True, "action": "drinking", "p": 0.9,
+                                      "p_drinking": 0.89, "ear": 0.8},
+             "held": {"eating_drinking": False, "kind": None, "object": None, "near": False}}
+    d.sources["camera"].set(cheek)
+    d.tick()
+    assert d.state()["drinking"]["detected"] is False
+    d.sources["camera"].set({**cheek, "held": {"eating_drinking": True, "kind": "drinking",
+                                               "object": 0.97, "near": True}})
+    d.tick()
+    assert d.state()["drinking"] == {"face": True, "detected": True, "p": 0.97}
+
+
 def test_watch_disconnected_link():
     s = server.merge(None, None, {"watch_connected": False}, None, False)
     assert s["heart"]["watch_connected"] is False and s["heart"]["hr_bpm"] is None

@@ -34,10 +34,9 @@ HEALTH_S = 5.0  # /health runs vcgencmd on the Pi: keep it slow
 TIMEOUT_S = 0.5
 STALE_S = {"camera": 1.5, "alert": 2.0, "physio": 2.0, "health": 15.0}
 
-# Drinking: the classifier judges each frame alone and, mid-sip from a frontal camera, scores
-# drinking and "other" about equally, so the top label flickers. The camera now reports the
-# drinking score every frame (hybrid p_drinking); its mean over 1.5 s (hybrid_alerts.py's
-# drinking window) >= 0.4 shows drinking. Display only: fusion ignores drinking (decision D28).
+# Drinking: when the camera reports `held` (hand at the mouth + cup), that result is the light.
+# Older cameras have no `held` key: fall back to the action-classifier score averaged over 1.5 s.
+# Display only: fusion ignores drinking (decision D28).
 DRINK_WIN_S = 1.5
 DRINK_MEAN_P = 0.4
 DRINK_MIN_SAMPLES = 3
@@ -200,9 +199,15 @@ class Dashboard:
                 self.drink.reset()
                 self.drinking = False
             else:
-                h = cam.get("hybrid") or {}
-                self.drinking = self.drink.update(now, h.get("action"), h.get("p"),
-                                                  h.get("p_drinking"))
+                held = cam.get("held")
+                if isinstance(held, dict):
+                    self.drink.reset()
+                    self.drinking = bool(held.get("eating_drinking")) and held.get("kind") == "drinking"
+                    self.drink.mean = num(held.get("object"))
+                else:
+                    h = cam.get("hybrid") or {}
+                    self.drinking = self.drink.update(now, h.get("action"), h.get("p"),
+                                                      h.get("p_drinking"))
 
     def state(self) -> Json:
         now = self.clock()
