@@ -80,6 +80,9 @@ class FaceMeshConfig:
     min_tracking_confidence: float = 0.5
     crop_size: int = 256
     crop_scale: float = 2.2
+    # Cut the face crop from the full-resolution camera frame instead of the downscaled view
+    # (plain, unrectified ROI only): about 2x the real pixels on a far-away face and its eyes.
+    hires_crop: bool = False
     search_region: list[float] = field(default_factory=lambda: [0.0, 0.0, 1.0, 0.7])
     search_tile: float = 0.45
     lost_reset_frames: int = 5
