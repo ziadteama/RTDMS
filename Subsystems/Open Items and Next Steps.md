@@ -13,6 +13,22 @@ updated: 2026-11-23
 
 The single list of what is **not** done. Update it when something moves.
 
+## Live demo (23 Nov evening) — detail in [[Demo Prep 2026-11-23]]
+
+Handoff for the next agent: [[Handoff 2026-11-23 Demo]].
+
+| Item | State |
+|---|---|
+| "Looking away" while looking ahead (iris gaze 0.183 > 0.16 with the head within limits) | measurement fields deployed; 1-minute test and fix pending |
+| Hand / phone at the cheek read as drinking (66-89 %) | proposal "call wins" pending |
+| Camera placement: side = good drinking/phone, poor eyes; frontal close = good eyes | demo compromise 50-80 cm, 25-30 deg to the side, recalibrate |
+| Pi rebooted by itself 5 times on 23 Nov (2 from moving it) | check the 27 W supply and cable before the demo |
+| Merge PR #94, `distraction/occlusion-gate`, `demo/live-dashboard` (pre-release `demo/pre-2026-11-23`) | not merged |
+| `RTDMS-reset` uncommitted work (`/reset`, post-calibration grace) overlaps `drowsiness.py` / `stream.py` | reconcile before merging |
+| Eye-closure alert at 1.5 s vs report 2-3 s | decide code or report wording |
+| App clean-ups: Diagnostics "Texting" row, "(EAR)" label, demo-mode texting phase | optional |
+| `deploy.sh` fails silently from Git Bash on Windows | fix or document |
+
 ## Hardware work (needs the Pi, the phone or a car)
 
 | Item | State | Notes |

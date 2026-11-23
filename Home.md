@@ -20,9 +20,11 @@ Project 2 (the build phase this repo is for).
 
 ## Implementation (Project 2)
 
+- [[Handoff 2026-11-23 Demo]] — **next agent: start here** (live demo prep paused on 23 Nov; what is where, the Pi's state, next steps)
 - [[Open Items and Next Steps]] — **what is not done yet** (hardware, app, SOS, product questions)
 - [[MVP Readiness]] — is what we have enough for an MVP? (22 Nov: phone-side yes, full chain no; the gaps and the order to close them)
 - [[Project Log 2026-11]] — decisions, evidence and lessons of 21–22 Nov 2026
+- [[Demo Prep 2026-11-23]] — live demo dashboard, distraction/calibration fixes from recorded Pi sessions, report audit (23 Nov evening)
 - [[Orchestration Playbook]] · [[Dev Environment and Test Devices]] · [[Coordination Board 2026-11]] — how the agents work, how to run and test everything, the raw trail
 - [[Agent Guide]] — **start here if you're an agent about to dev, explore, or delegate work**
 - [[Models Index]] — status of all models + fusion/alert/firmware
