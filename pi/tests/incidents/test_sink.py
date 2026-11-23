@@ -118,3 +118,10 @@ def test_sink_selects_frames_by_monotonic_time(tmp_path: Path) -> None:
     assert len(lines) > 200  # 20 s before + 5 s after at 10 fps, minus ring edges
     meta = json.loads((tmp_path / inc_id / "meta.json").read_text())
     assert meta["created"] == 1.79e9 + 103.0
+
+
+def test_sink_without_crash_time_uses_wall_time_for_the_id(tmp_path: Path) -> None:
+    ring = FrameRing(seconds=30.0, fps=10.0)
+    sink = RingIncidentSink(ring=ring, store=IncidentStore(root=tmp_path), clock=lambda: 103.0,
+                            wall=lambda: 1795189202.4, scheduler=FakeScheduler())
+    assert sink.report({"client_id": "no-time"}) == "2026-11-20T15-40-02-400Z"

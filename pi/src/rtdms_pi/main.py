@@ -144,6 +144,7 @@ def main() -> None:
             physio_source=runtime.physio_source,
             config=config,
             state_dir=config.state_dir,
+            extra_diag=runtime.diagnostics,
         )
         debug_server = DebugServer(
             runtime.state,

@@ -69,7 +69,8 @@ class RingIncidentSink:
         if t_crash_raw is not None:
             t_crash = int(t_crash_raw)
             return (t_crash, now_ms, False)
-        return (now_ms, now_ms, False)
+        # No crash time: id from wall time (a monotonic value would read as 1970).
+        return (int(self.wall() * 1000), now_ms, False)
 
     def _schedule_snapshot(
         self,

@@ -32,10 +32,7 @@ def health_reader(
         physio_source=runtime.physio_source,
         config=config,
         state_dir=config.state_dir,
-        extra_diag=lambda: {
-            **(runtime.safety.diagnostics() if runtime.safety else {}),
-            **(runtime.watch_alert.diagnostics() if runtime.watch_alert else {}),
-        },
+        extra_diag=runtime.diagnostics,
     )
     return probe
 

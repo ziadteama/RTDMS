@@ -100,3 +100,29 @@ def test_missing_shadow_model_runs(clock: Clock, tmp_path: Path) -> None:
     eyes(rt, clock, 0, state="drowsy")
     assert rt.state.snapshot().decision.pattern is AlertPattern.REPEATED
     rt.stop()
+
+
+def test_face_lost_after_trigger_keeps_counting(clock: Clock) -> None:
+    rt = make(clock)
+    eyes(rt, clock, 9000)
+    clock.advance(20)
+    rt.on_frame(FrameResult(FaceReport(state="unavailable", face=False), None, 15, None,
+                            True, clock()))  # slumped out of view
+    assert rt.state.snapshot().decision.emergency == "unresponsive"
+    rt.stop()
+
+
+def test_emergency_change_notifies_phone_at_once(service, clock: Clock) -> None:
+    import json
+
+    from dms_fusion import FusionDecision
+
+    from rtdms_pi.ble.uuids import Char
+
+    service.state.set_decision(FusionDecision(AlertPattern.MAX, ["driver not responding"]))
+    service.notifier.step()
+    service.state.set_decision(FusionDecision(AlertPattern.MAX, ["emergency: unresponsive"],
+                                              emergency="unresponsive"))
+    service.notifier.step()  # same pattern, same tick: must still go out now
+    alerts = [json.loads(d) for u, d in service.port.notifications if u == Char.ALERT.uuid]
+    assert alerts[-1]["emergency"] == "unresponsive"

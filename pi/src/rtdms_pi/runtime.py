@@ -78,6 +78,13 @@ class Runtime:
         self.state.set_decision(decision)
         self.player.set_pattern(decision.pattern)
 
+    def diagnostics(self) -> dict[str, object]:
+        """Shadow counts and watch round-trip figures for health.physio_diag (BLE and HTTP)."""
+        return {
+            **(self.safety.diagnostics() if self.safety else {}),
+            **(self.watch_alert.diagnostics() if self.watch_alert else {}),
+        }
+
     def tick(self) -> None:
         with self._lock:
             if not self._stop.is_set():
