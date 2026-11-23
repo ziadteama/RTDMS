@@ -20,6 +20,7 @@ export type LiveState = {
   alert: PiAlert | null;
   /** null = not known yet, false = this Pi has no /alert (older stream.py). */
   alertSupported: boolean | null;
+  calibrating: boolean;
   physio: PiPhysio | null;
   physioSupported: boolean | null;
   /** GPS speed (km/h), null when there is no fix with speed. */
@@ -39,6 +40,7 @@ export const INITIAL_LIVE: LiveState = {
   status: null,
   alert: null,
   alertSupported: null,
+  calibrating: false,
   physio: null,
   physioSupported: null,
   speedKmh: null,

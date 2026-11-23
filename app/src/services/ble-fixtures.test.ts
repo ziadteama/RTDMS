@@ -24,7 +24,7 @@ test('both BLE consumers populate fields from the contract fixtures', async () =
     expect(live.status?.drowsiness).toMatchObject({ state: 'drowsy', perclos: 0.31, calibrated: true });
     expect(live.status?.hybrid).toMatchObject({ call: false, texting: true, p: 0.91 });
     expect(live.physio).toEqual(fixture('physio'));
-    expect(live.alert).toEqual(fixture('alert'));
+    expect(live.alert).toEqual({ ...(fixture('alert') as object), episode: null });
     expect(parseStatus(await transport.get('/status'))).toEqual(live.status);
     expect(parsePhysio(await transport.get('/physio'))).toEqual(live.physio);
     expect(parseAlert(await transport.get('/alert'))).toEqual(live.alert);

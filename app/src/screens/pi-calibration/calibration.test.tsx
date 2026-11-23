@@ -187,3 +187,20 @@ jest.mock('react-native-reanimated', () => ({
   useReducedMotion: () => true,
   cubicBezier: () => () => 0,
 }));
+
+test('alert mute follows starting/following and clears on done, failed and unmount', async () => {
+  const { result, unmount } = await renderHook(usePiCalibration);
+  await act(async () => result.current.start());
+  expect(useLive.getState().calibrating).toBe(true);
+  await status('calibrating');
+  expect(useLive.getState().calibrating).toBe(true);
+  await status('ok');
+  expect(useLive.getState().calibrating).toBe(false);
+  await act(async () => result.current.start());
+  await advance(15000);
+  expect(useLive.getState().calibrating).toBe(false);
+  await act(async () => result.current.start());
+  expect(useLive.getState().calibrating).toBe(true);
+  await unmount();
+  expect(useLive.getState().calibrating).toBe(false);
+});

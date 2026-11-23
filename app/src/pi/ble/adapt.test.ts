@@ -19,7 +19,7 @@ test('contract physio preserves v2 fields', () => {
 });
 
 test('contract alert already matches the HTTP shape', () => {
-  expect(parseAlert(adaptAlert(fixture('alert')))).toEqual(fixture('alert'));
+  expect(parseAlert(adaptAlert(fixture('alert')))).toEqual({ ...(fixture('alert') as object), episode: null });
 });
 
 test.each([

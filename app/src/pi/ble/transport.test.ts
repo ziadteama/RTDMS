@@ -65,7 +65,7 @@ describe('BleTransport', () => {
       fakeLink.emit('physio', physioObj);
 
       await expect(transport.get('/status')).resolves.toEqual(adaptNotify('status', statusObj));
-      await expect(transport.get('/alert')).resolves.toEqual(alertObj);
+      await expect(transport.get('/alert')).resolves.toEqual({ ...alertObj, episode: null });
       await expect(transport.get('/physio')).resolves.toEqual(adaptNotify('physio', physioObj));
     });
   });
