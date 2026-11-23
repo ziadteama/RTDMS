@@ -35,16 +35,26 @@ def test_seq_wraps() -> None:
     assert value == bytes((2, 0))
 
 
-def test_echo_round_trip_uses_first_send(service: PhoneService, clock: Clock) -> None:
+def test_echo_round_trip_is_timed_from_the_change(service: PhoneService, clock: Clock) -> None:
     service.state.set_decision(FusionDecision(AlertPattern.REPEATED, []))
-    service.notifier.step()  # seq 1 sent at t=100
-    clock.advance(5)
-    service.notifier.step()  # keep-alive resend of seq 1 must not reset the send time
+    service.notifier.step()  # seq 1 sent (a change) at t=100
     clock.advance(0.04)
     packet = RrPacket(1, 1000, 70, (), version=2, contact=True, motion=0, echo_seq=1)
     service.port.write(GARMIN_CHAR_UUID, encode(packet))
     diag = service.watch_alert.diagnostics()
-    assert diag["watch_alert_rtt_p50_ms"] == round(5040.0, 3)
+    assert diag["watch_alert_rtt_p50_ms"] == round(40.0, 3)
     service.port.write(GARMIN_CHAR_UUID, encode(RrPacket(2, 2000, 70, (), version=2,
                                                          echo_seq=1)))
     assert service.watch_alert.diagnostics() == diag  # one sample per seq
+
+
+def test_late_watch_echo_is_not_latency(service: PhoneService, clock: Clock) -> None:
+    service.notifier.step()  # seq 0 only ever goes out as a keep-alive: never timed
+    service.state.set_decision(FusionDecision(AlertPattern.MAX, []))
+    service.notifier.step()  # seq 1 change at t=100, but no watch is listening
+    clock.advance(10)
+    service.notifier.step()  # keep-alive delivers seq 1 to a watch that just connected
+    for seq, echo in ((1, 1), (2, 0)):
+        packet = RrPacket(seq, seq * 1000, 70, (), version=2, echo_seq=echo)
+        service.port.write(GARMIN_CHAR_UUID, encode(packet))
+    assert service.watch_alert.diagnostics()["watch_alert_rtt_p50_ms"] is None
