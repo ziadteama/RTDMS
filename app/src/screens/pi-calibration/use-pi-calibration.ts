@@ -4,37 +4,41 @@ import { speak } from '@/services/alerts';
 import { pi } from '@/services/pi';
 import { useLive } from '@/state/live';
 
-import { CLOSED_MS, initial, OPEN_MS, reduce, RESULT_TIMEOUT_MS } from './machine';
+import { initial, reduce, RESPONSE_TIMEOUT_MS, RUN_TIMEOUT_MS, stepCopy } from './machine';
 
 export function usePiCalibration() {
   const [state, dispatch] = useReducer(reduce, initial);
   const active = useRef(false);
+  const run = useRef(0);
   const online = useLive((s) => s.connection === 'online');
+  const running = state.phase === 'starting' || state.phase === 'following';
   useEffect(() => useLive.subscribe((next, prev) => {
     if (active.current && next.status !== prev.status) dispatch({ type: 'status', value: next.status?.drowsiness });
   }), []);
-  const { phase } = state;
   useEffect(() => {
-    if (phase === 'done' || phase === 'failed') active.current = false;
+    if (!running) { active.current = false; return; }
+    const response = setTimeout(() => dispatch({ type: 'no-response' }), RESPONSE_TIMEOUT_MS);
+    const cap = setTimeout(() => dispatch({ type: 'fail' }), RUN_TIMEOUT_MS);
+    return () => { clearTimeout(response); clearTimeout(cap); };
+  }, [running]);
+  const { phase, step } = state;
+  useEffect(() => {
     if (phase === 'done') speak('cal.done');
-    if (phase === 'open') speak('cal.step1');
-    if (phase === 'closed') speak('cal.step2');
-    if (phase === 'waiting') speak('cal.waiting');
-    const duration = phase === 'open' ? OPEN_MS : phase === 'closed' ? CLOSED_MS : phase === 'waiting' ? RESULT_TIMEOUT_MS : null;
-    if (duration === null) return;
-    const id = setTimeout(() => dispatch({ type: 'tick' }), duration);
-    return () => clearTimeout(id);
-  }, [phase]);
-  useEffect(() => () => { active.current = false; }, []);
+    if (phase === 'failed') speak('cal.failed');
+    // Speak when the unit starts a countdown (or waits for the face): once per prompt, ahead of it.
+    if (phase === 'following' && (step === 'waiting_face' || step === 'countdown_open' || step === 'countdown_closed')) speak(stepCopy[step]);
+  }, [phase, step]);
+  useEffect(() => () => { active.current = false; run.current += 1; }, []);
   const start = async () => {
     if (active.current || !online) return;
     active.current = true;
+    const attempt = ++run.current;
     dispatch({ type: 'start' });
     try {
       await pi().send('POST', '/calibrate');
     } catch {
-      if (active.current) dispatch({ type: 'fail' });
+      if (active.current && attempt === run.current) dispatch({ type: 'fail' });
     }
   };
-  return { phase: state.phase, online, start };
+  return { ...state, online, start };
 }

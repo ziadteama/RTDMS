@@ -93,6 +93,8 @@ export function statusAt(t: number, calibration?: { message: string; calibrated:
       face,
       calibrated: calibration?.calibrated ?? true,
       calibration: null,
+      calibration_step: null,
+      calibration_left_s: null,
       message: calibration?.message ?? 'calibrated',
       ms: msDrowsy,
     },

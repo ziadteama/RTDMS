@@ -40,7 +40,7 @@ test.each([
 test('Diagnostics links to the preserved legacy phone flow', async () => {
   const view = await render(<Diagnostics />);
   await fireEvent.press(view.getByText('Phone-camera eye calibration (legacy)'));
-  expect(router.push).toHaveBeenCalledWith('/eye-calibration');
+  expect(router.push).toHaveBeenCalledWith('/phone-calibration');
 });
 
 jest.mock('react-native-reanimated', () => ({
@@ -49,3 +49,12 @@ jest.mock('react-native-reanimated', () => ({
   useReducedMotion: () => true,
   cubicBezier: () => () => 0,
 }));
+
+test.each([
+  ['calibrating', true, 'In progress'], ['calibration failed: no face', true, 'Not done'],
+  ['calibrated', true, 'Done'],
+])('Settings follows the HTTP message %s when there is no calibration field', async (message, calibrated, label) => {
+  useLive.setState({ status: parseStatus({ fps: 1, face: true, drowsiness: { message, calibrated } }) });
+  const view = await render(<UnitSection />);
+  expect(view.getByText(label)).toBeTruthy();
+});

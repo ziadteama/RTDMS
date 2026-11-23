@@ -17,7 +17,7 @@ export function Diagnostics() {
       <ConnectionDiag />
       <RawMetrics />
       <Section title={dx('diag.calibration')}>
-        <Row label={dx('diag.phoneCalibration')} chevron onPress={() => router.push('/eye-calibration')} />
+        <Row label={dx('diag.phoneCalibration')} chevron onPress={() => router.push('/phone-calibration')} />
       </Section>
     </Screen>
   );
