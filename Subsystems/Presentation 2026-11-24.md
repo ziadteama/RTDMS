@@ -17,7 +17,7 @@ aliases:
 
 ↑ [[Home]] | [[Handoff 2026-11-23 Demo]] | [[Demo Prep 2026-11-23]] | [[Agent Guide]]
 
-Tag: **`Final Blow`** on `main`. Night-of freeze for the 24 Nov live demo.
+Tag: **`Final-Blow`** on `main` (GitHub release title: Final Blow). Night-of freeze for the 24 Nov live demo.
 
 ## What must be ON (agent checklist)
 
@@ -78,7 +78,7 @@ Dashboard: open `http://100.113.107.122:8000` (or Pi LAN IP if presenting off Ta
 
 | Piece | Location |
 |---|---|
-| Git freeze | `main` @ tag `Final Blow` |
+| Git freeze | `main` @ tag `Final-Blow` |
 | Pi runtime | `~/rtdms-pi`, venv `~/rtdms/.venv`, unit `rtdms-pi-user` |
 | Dashboard | `~/rtdms-demo/dashboard`, unit `rtdms-dashboard` :8000 |
 | Camera stream / status | :8080 |
