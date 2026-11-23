@@ -92,6 +92,7 @@ export function statusAt(t: number, calibration?: { message: string; calibrated:
       openness: face ? round(Math.max(0, p.openness + wobble(t, 10) * 0.04), 2) : null,
       face,
       calibrated: calibration?.calibrated ?? true,
+      calibration: null,
       message: calibration?.message ?? 'calibrated',
       ms: msDrowsy,
     },

@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
 
-import { EyeCalibrationScreen } from '@/screens/calibration';
+import { PiCalibrationScreen } from '@/screens/pi-calibration';
 
 export default function OnboardingEyeCalibrationRoute() {
   return (
-    <EyeCalibrationScreen
+    <PiCalibrationScreen
       isOnboarding
       onDone={() => router.push('/emergency-contacts')}
     />

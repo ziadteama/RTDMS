@@ -1,3 +1,7 @@
+import { router } from 'expo-router';
+
+import { Row, Section } from '@/components/list';
+import { dx } from '@/i18n/diagnostics';
 import { Screen } from '@/components/screen';
 
 import { ConnectionDiag } from './connection';
@@ -12,6 +16,9 @@ export function Diagnostics() {
       <DetectionTuning />
       <ConnectionDiag />
       <RawMetrics />
+      <Section title={dx('diag.calibration')}>
+        <Row label={dx('diag.phoneCalibration')} chevron onPress={() => router.push('/eye-calibration')} />
+      </Section>
     </Screen>
   );
 }

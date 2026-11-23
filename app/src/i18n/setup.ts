@@ -1,18 +1,5 @@
 /** Setup, calibration and consent copy. */
 export const setup = {
-  // Calibration
-  'cal.title': 'Set up driving position',
-  'cal.intro': 'Sit parked in your driving position. Takes 13 seconds.',
-  'cal.step1': 'Look at the road with your eyes open',
-  'cal.step2': 'Close your eyes',
-  'cal.waiting': 'Saving driving position…',
-  'cal.done': 'Position saved',
-  'cal.failed': 'Setup failed: {m}',
-  'cal.start': 'Start',
-  'cal.again': 'Try again',
-  'cal.close': 'Done',
-  'cal.offline': 'Connect to your Sahi unit first.',
-
   // Eye calibration
   'cal.eye.title': 'Eye calibration',
   'cal.eye.subtitle': 'Personalise eye-closure detection for your eyes.',

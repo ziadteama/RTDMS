@@ -19,7 +19,7 @@ export default function OnboardingLayout() {
       <Stack.Screen name="consent" options={{ title: t('onb.consent.title') }} />
       <Stack.Screen name="permissions" options={{ title: t('onb.perm.title') }} />
       <Stack.Screen name="connect" options={{ title: t('onb.pair.title') }} />
-      <Stack.Screen name="eye-calibration" options={{ title: t('cal.eye.title') }} />
+      <Stack.Screen name="eye-calibration" options={{ title: t('cal.title') }} />
       <Stack.Screen name="emergency-contacts" options={{ title: t('onb.contacts.title') }} />
     </Stack>
   );

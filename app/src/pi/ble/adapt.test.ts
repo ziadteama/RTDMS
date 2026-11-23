@@ -46,3 +46,8 @@ test('invalid required field types are dropped', () => {
   expect(adaptPhysio({ watch_connected: true, t: '1' })).toBeNull();
   expect(adaptAlert({ pattern: 'none', reasons: [1], t: 1 })).toBeNull();
 });
+
+test.each(['ok', 'calibrating', 'failed', 'lost', 'unknown', null, undefined, 1])('calibration %s survives adaptation and is validated', (calibration) => {
+  const parsed = parseStatus(adaptStatus({ fps: 1, face: true, state: 'alert', calibration }));
+  expect(parsed?.drowsiness?.calibration).toBe(['ok', 'calibrating', 'failed', 'lost'].includes(calibration as string) ? calibration : null);
+});

@@ -11,6 +11,7 @@ import { Screen } from '@/components/screen';
 import { StateIndicator } from '@/components/state-indicator';
 import { Text } from '@/components/text';
 import { translateReason, useT } from '@/i18n';
+import { calibrationState } from '@/pi/calibration-state';
 import { driverState } from '@/pi/alert';
 import { triggerSos } from '@/services/emergency';
 import { gpsLost } from '@/services/monitor';
@@ -84,14 +85,13 @@ function StatusPill() {
 function State({ size }: { size: 'compact' | 'full' }) {
   const t = useT();
   const paused = useSettings((s) => s.paused);
-  const eyeCal = useSettings((s) => s.eyeCalibration);
   const state = useDriverState();
   const pattern = useLive((s) => s.alert?.pattern ?? null);
   const reasons = useLive(useShallow((s) => s.alert?.reasons ?? EMPTY));
-  const calMessage = useLive((s) => (s.status?.drowsiness && !s.status.drowsiness.calibrated ? s.status.drowsiness.message : null));
-  const showCalHint = !reasons.length && (!eyeCal || Boolean(calMessage));
+  const calibration = useLive((s) => calibrationState(s.status?.drowsiness));
+  const showCalHint = !reasons.length && calibration === 'notDone';
   const detail = reasons.length ? reasons.map((r) => translateReason(r)).join(' · ') : showCalHint ? t('live.calibrate') : undefined;
-  const onDetailPress = showCalHint && !reasons.length ? () => router.push('/eye-calibration') : undefined;
+  const onDetailPress = showCalHint && !reasons.length ? () => router.push('/calibrate') : undefined;
 
   return (
     <StateIndicator

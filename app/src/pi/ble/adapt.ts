@@ -12,7 +12,7 @@ export function adaptStatus(v: unknown): Obj | null {
       !['starting', 'unavailable', 'alert', 'distracted', 'warning', 'drowsy'].includes(v.state)) return null;
   return {
     ...pick(v, ['fps', 'face', 'temp_c', 't', 't_src']),
-    drowsiness: pick(v, ['state', 'face', 'perclos', 'openness', 'blink_rate', 'closure_ms', 'calibrated']),
+    drowsiness: pick(v, ['state', 'face', 'perclos', 'openness', 'blink_rate', 'closure_ms', 'calibrated', 'calibration']),
     hybrid: { ...pick(v, ['face', 'call', 'texting']), ...('phone_p' in v ? { p: v.phone_p } : {}) },
   };
 }
