@@ -278,8 +278,8 @@ def test_watchdog_drops_frozen_camera(clock: Clock) -> None:
     dropped = threading.Event()
     original = state.set_decision
 
-    def observe(decision: object) -> None:
-        original(decision)
+    def observe(decision: object, episode: int = 0) -> None:
+        original(decision, episode)
         if decision.pattern == AlertPattern.NONE:
             dropped.set()
 

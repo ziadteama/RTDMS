@@ -76,3 +76,31 @@ def test_decide_maps_stages():
     fired = m.update(20, In(closure_ms=CLOSED))
     d = decide(face={"state": "drowsy"}, emergency=fired)
     assert d.pattern is AlertPattern.MAX and d.emergency == "unresponsive"
+
+
+def test_ack_restarts_the_count_instead_of_flapping():
+    m = EmergencyMonitor()
+    worn = {"worn": True, "wrist_still_s": 60}
+    assert m.update(0, In(closure_ms=CLOSED, **worn)).stage is EmergencyStage.WAITING
+    assert m.update(2, In(closure_ms=11000, ack=True, **worn)).stage is EmergencyStage.NORMAL
+    # eyes still shut, ACK no longer fresh: no re-escalation until 8 s after the response
+    stages = [m.update(t, In(closure_ms=11000 + (t - 2) * 1000, **worn)).stage
+              for t in (2.3, 3, 6, 9.9)]
+    assert all(s is EmergencyStage.NORMAL for s in stages)
+    assert m.update(10, In(closure_ms=19000, **worn)).stage is EmergencyStage.WAITING
+
+
+def test_wrist_movement_also_restarts_the_count():
+    m = EmergencyMonitor()
+    m.update(0, In(closure_ms=CLOSED, worn=True, wrist_still_s=60))
+    assert m.update(3, In(closure_ms=12000, worn=True, wrist_still_s=0.5)).stage is (
+        EmergencyStage.NORMAL)
+    assert m.update(3.3, In(closure_ms=12300, worn=True, wrist_still_s=0.8)).stage is (
+        EmergencyStage.NORMAL)
+
+
+def test_eyes_opening_clears_the_restart_rule():
+    m = EmergencyMonitor()
+    m.update(0, In(closure_ms=CLOSED))
+    m.update(1, In(closure_ms=0))  # eyes open: full reset
+    assert m.update(2, In(closure_ms=CLOSED)).stage is EmergencyStage.WAITING

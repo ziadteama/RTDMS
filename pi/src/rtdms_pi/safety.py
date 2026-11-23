@@ -6,13 +6,18 @@ from typing import TypedDict
 
 from dms_fusion import FusionDecision
 from dms_fusion.break_reminder import BreakReminder
-from dms_fusion.emergency import EmergencyInputs, EmergencyMonitor, EmergencyStatus
+from dms_fusion.emergency import EmergencyInputs, EmergencyMonitor, EmergencyStage, EmergencyStatus
+from dms_fusion.policy import AlertPolicy, PolicyOutput
 from dms_fusion.shadow import ShadowTracker
 from dms_physiology.model import LogisticModel
 
 from .sources import number
 from .state import Snapshot
 
+
+def calibrating(s: Snapshot) -> bool:
+    f = s.face
+    return bool(f and (f.calibration == "calibrating" or f.calibration_step is not None))
 
 class SafetyInputs(TypedDict):
     emergency: EmergencyStatus
@@ -36,8 +41,12 @@ class Safety:
         self.reminder = BreakReminder()
         self.shadow = ShadowTracker()
         self.model = load_shadow(model_path)
+        self.policy = AlertPolicy()
 
     def inputs(self, s: Snapshot) -> SafetyInputs:
+        if calibrating(s):  # eyes shut on purpose: no emergency count may carry over
+            self.monitor.reset()
+            return {"emergency": EmergencyStatus(EmergencyStage.NORMAL), "break_due": False}
         present = bool(s.camera_ok and s.face and s.face.face)
         raw = s.physio.raw if s.physio else {}
         ack_age = number(raw.get("ack_age_s"))
@@ -51,6 +60,12 @@ class Safety:
             hr_quality=quality if isinstance(quality, str) else None,
         ))
         return {"emergency": status, "break_due": self.reminder.due(s.t, present)}
+
+    def finish(self, raw: FusionDecision, s: Snapshot) -> PolicyOutput:
+        """Per-frame decision -> stable alert episode (the only thing outputs may act on)."""
+        out = self.policy.update(s.t, raw, calibrating=calibrating(s))
+        self.observe(out.decision, s)
+        return out
 
     def observe(self, decision: FusionDecision, s: Snapshot) -> None:
         raw = s.physio.raw if s.physio else {}

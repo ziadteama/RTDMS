@@ -40,6 +40,11 @@
         "phone",
         "pi"
       ]
+    },
+    "episode": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "alert policy episode: starts once per value (v1.5)"
     }
   }
 }

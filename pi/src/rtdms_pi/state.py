@@ -62,6 +62,7 @@ class DecisionSnapshot:
     pattern: AlertPattern = AlertPattern.NONE
     reasons: tuple[str, ...] = ()
     emergency: str | None = None
+    episode: int = 0  # alert policy episode: outputs start once per value
 
 
 @dataclass(frozen=True)
@@ -120,13 +121,14 @@ class RuntimeState:
         with self._lock:
             self._data = replace(self._data, physio=report, physio_t=report.t if report else None)
 
-    def set_decision(self, decision: FusionDecision) -> None:
+    def set_decision(self, decision: FusionDecision, episode: int = 0) -> None:
         with self._lock:
-            changed = (self._data.decision.pattern, self._data.decision.emergency) != (
-                decision.pattern, decision.emergency
+            old = self._data.decision
+            changed = (old.pattern, old.emergency, old.episode) != (
+                decision.pattern, decision.emergency, episode
             )
             current = DecisionSnapshot(
-                decision.pattern, tuple(decision.reasons), decision.emergency
+                decision.pattern, tuple(decision.reasons), decision.emergency, episode
             )
             self._data = replace(self._data, decision=current)
             if changed:

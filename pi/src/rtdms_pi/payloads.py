@@ -41,6 +41,9 @@ def alert_payload(
     }
     if decision.emergency == "unresponsive":
         d["emergency"] = "unresponsive"
+    episode = getattr(decision, "episode", 0)
+    if episode:
+        d["episode"] = episode
     while reasons and len(to_json_bytes(d)) > 240:
         reasons[-1] = reasons[-1][:-1]
         if not reasons[-1]:
