@@ -28,11 +28,12 @@ def _text(img, s, x, y, colour=(235, 235, 235), scale=0.48, thick=1):
 
 def render(res: FrameResult, fps: float | None = None, holder_zones=None, *, debug: bool = True,
            info: list[str] | None = None, classifier: dict[str, float] | None = None,
-           banner: str | None = None) -> np.ndarray:
+           banner: str | None = None, panel: bool = True) -> np.ndarray:
     """debug: draw mesh, zones, boxes and timings (off = clean view + state panel).
     info: extra panel lines (live mode: model, threshold, gray / flip).
     classifier: crop-classifier probabilities, drawn when a classifier exists.
-    banner: a prompt bar across the bottom of the view (guided mode)."""
+    banner: a prompt bar across the bottom of the view (guided mode).
+    panel: False returns the driver view only (presentation / dashboard)."""
     view = res.view.copy() if res.view.ndim == 3 else cv2.cvtColor(res.view, cv2.COLOR_GRAY2BGR)
     h, w = view.shape[:2]
 
@@ -61,67 +62,70 @@ def render(res: FrameResult, fps: float | None = None, holder_zones=None, *, deb
         cv2.rectangle(view, (0, h - 34), (w, h), (0, 0, 0), -1)
         _text(view, banner, 10, h - 11, (255, 255, 255), 0.6, 2)
 
-    panel = np.full((max(h, 560), PANEL_W, 3), (28, 24, 22), np.uint8)
+    if not panel:
+        return view
+
+    panel_img = np.full((max(h, 560), PANEL_W, 3), (28, 24, 22), np.uint8)
     y = 26
-    _text(panel, f"OVERALL: {res.level.upper()}", 12, y, LEVEL_COLOUR[res.level], 0.7, 2)
+    _text(panel_img, f"OVERALL: {res.level.upper()}", 12, y, LEVEL_COLOUR[res.level], 0.7, 2)
     y += 30
     for name, st in res.behaviours.items():
         col = LEVEL_COLOUR[st["level"]]
         raw = {True: "+", False: "-", None: "?"}[st["raw"]]
-        _text(panel, f"{name:<16} {st['level']:<7} r={st['ratio']:.2f} {raw}", 12, y, col)
+        _text(panel_img, f"{name:<16} {st['level']:<7} r={st['ratio']:.2f} {raw}", 12, y, col)
         y += 18
         if debug and st["why"]:
-            _text(panel, f"   {st['why'][:46]}", 12, y, (160, 160, 160), 0.4)
+            _text(panel_img, f"   {st['why'][:46]}", 12, y, (160, 160, 160), 0.4)
             y += 16
     y += 8
     bl = res.baseline
-    _text(panel, "baseline: " + ("ready" if bl["ready"] else f"calibrating {bl['progress']:.0%}"),
+    _text(panel_img, "baseline: " + ("ready" if bl["ready"] else f"calibrating {bl['progress']:.0%}"),
           12, y, (200, 200, 200))
     y += 20
     f = res.face
     if f is None:
         stale = res.evidence.stale_face
         msg = "face: none (zones from last face)" if stale else "face: none (holding state)"
-        _text(panel, msg, 12, y, (40, 40, 240))
+        _text(panel_img, msg, 12, y, (40, 40, 240))
         y += 20
     elif debug:
         dp = (f.pitch_deg - bl["pitch"]) if bl["ready"] and f.pitch_deg is not None and \
             bl["pitch"] is not None else None  # simple mode keeps no head-pose baseline
-        _text(panel, f"pitch {_f(f.pitch_deg)}  d {_f(dp)}  yaw {_f(f.yaw_deg)}", 12, y)
+        _text(panel_img, f"pitch {_f(f.pitch_deg)}  d {_f(dp)}  yaw {_f(f.yaw_deg)}", 12, y)
         y += 18
-        _text(panel, f"gaze_down {_f(f.gaze_down, 2)} ({f.gaze_source})  "
+        _text(panel_img, f"gaze_down {_f(f.gaze_down, 2)} ({f.gaze_source})  "
                      f"head_down {res.evidence.head_down_s:.1f}s", 12, y)
         y += 18
-        _text(panel, f"jaw {_f(f.jaw_open, 3)} ({f.jaw_source})  lips {f.lip_ratio:.2f}", 12, y)
+        _text(panel_img, f"jaw {_f(f.jaw_open, 3)} ({f.jaw_source})  lips {f.lip_ratio:.2f}", 12, y)
         y += 18
     ch = res.evidence.chewing
     if debug and ch is not None:
-        _text(panel, f"chew {'YES' if ch.chewing else 'no'} {ch.dominant_hz:.1f}Hz "
+        _text(panel_img, f"chew {'YES' if ch.chewing else 'no'} {ch.dominant_hz:.1f}Hz "
                      f"band {ch.band_fraction:.2f} amp {ch.amplitude:.3f}", 12, y)
         y += 18
     if classifier:
         y += 4
-        _text(panel, "crop classifier:", 12, y, (200, 200, 200))
+        _text(panel_img, "crop classifier:", 12, y, (200, 200, 200))
         y += 18
         for k, v in sorted(classifier.items(), key=lambda kv: -kv[1])[:5]:
-            _text(panel, f"   {k:<14} {v:.2f}", 12, y)
+            _text(panel_img, f"   {k:<14} {v:.2f}", 12, y)
             y += 16
     y += 8
     tm = res.timings_ms
     if debug:
-        _text(panel, "  ".join(f"{k[:4]} {v:.1f}" for k, v in tm.items()), 12, y,
+        _text(panel_img, "  ".join(f"{k[:4]} {v:.1f}" for k, v in tm.items()), 12, y,
               (180, 180, 180), 0.4)
         y += 18
     if fps is not None:
-        _text(panel, f"{fps:.1f} FPS  ({sum(tm.values()):.1f} ms/frame)", 12, y, (180, 180, 180))
+        _text(panel_img, f"{fps:.1f} FPS  ({sum(tm.values()):.1f} ms/frame)", 12, y, (180, 180, 180))
         y += 20
     for line in info or []:
-        _text(panel, line[:52], 12, y, (120, 200, 255), 0.45)
+        _text(panel_img, line[:52], 12, y, (120, 200, 255), 0.45)
         y += 17
 
-    if panel.shape[0] > h:
-        view = cv2.copyMakeBorder(view, 0, panel.shape[0] - h, 0, 0, cv2.BORDER_CONSTANT)
-    return np.hstack([view, panel[: view.shape[0]]])
+    if panel_img.shape[0] > h:
+        view = cv2.copyMakeBorder(view, 0, panel_img.shape[0] - h, 0, 0, cv2.BORDER_CONSTANT)
+    return np.hstack([view, panel_img[: view.shape[0]]])
 
 
 def _f(v, n=1):

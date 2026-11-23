@@ -289,7 +289,8 @@ def pipeline_loop(args, shared: Shared) -> None:
                     if hl["eating_drinking"]:
                         banner = (banner + "  |  " if banner else "") + alert
                 frame = render(res, fps, rcfg.phone_in_hand.holder_zones, debug=args.debug,
-                               info=info, banner=banner)
+                               info=None if args.no_panel else info, banner=banner,
+                               panel=not args.no_panel)
                 if args.mesh and res.face is not None:
                     draw_mesh(frame, res.face.landmarks)
                 if hybrid is not None:
@@ -417,6 +418,8 @@ def parse_args(argv=None):
     p.add_argument("--weights", help="override detector.weights (e.g. the INT8 model)")
     p.add_argument("--detect-every", type=int, help="run the detector every Nth frame")
     p.add_argument("--debug", action="store_true", help="draw face mesh, zones and timings")
+    p.add_argument("--no-panel", action="store_true",
+                   help="omit the right-hand debug status column (presentation / dashboard)")
     p.add_argument("--stream-fps", type=float, default=10.0, help="max frames sent per second")
     p.add_argument("--max-width", type=int, default=640, help="downscale the stream to this")
     p.add_argument("--jpeg-quality", type=int, default=70)

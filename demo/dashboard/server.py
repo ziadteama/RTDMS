@@ -2,13 +2,15 @@
 
 It reads what the Pi already serves and merges it into one JSON for the page:
   camera server  :8080  /status (face mesh drowsiness, v2 phone classifier, fps, ms, temp)
-                        /stream.mjpg (loaded by the browser directly, never proxied)
+                        /stream.mjpg (relayed through this server)
   Pi runtime     :8090  /alert (fusion decision), /physio (Garmin watch), /health (5 s)
+Optional laptop USB mirror of the Sahi app via adb screencap (--phone-mirror).
 Standard library only. Nothing is written to disk. A source that does not answer is shown as
 offline, never guessed.
 
   python3 server.py                     # on the Pi, open http://<pi>:8000
   python3 server.py --pi-host <pi-ip>   # on the laptop, reading the Pi over the network
+  python3 server.py --pi-host <pi-ip> --phone-mirror   # + USB Sahi screen in the phone bezel
   python3 server.py --mock              # scripted data, page shows SIMULATED
 """
 
@@ -17,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import subprocess
 import threading
 import time
 from collections import deque
@@ -33,6 +36,8 @@ FAST_S = 0.25  # camera status, alert, physio
 HEALTH_S = 5.0  # /health runs vcgencmd on the Pi: keep it slow
 TIMEOUT_S = 0.5
 STALE_S = {"camera": 1.5, "alert": 2.0, "physio": 2.0, "health": 15.0}
+PHONE_MIRROR_S = 0.4
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 # Drinking: when the camera reports `held` (hand at the mouth + cup), that result is the light.
 # Older cameras have no `held` key: fall back to the action-classifier score averaged over 1.5 s.
@@ -42,6 +47,57 @@ DRINK_MEAN_P = 0.4
 DRINK_MIN_SAMPLES = 3
 
 Json = dict[str, Any]
+
+
+class PhoneMirror:
+    """Latest PNG of the USB phone screen via `adb exec-out screencap -p` (laptop only)."""
+
+    def __init__(self, adb: str = "adb", interval_s: float = PHONE_MIRROR_S,
+                 clock: Callable[[], float] = time.monotonic) -> None:
+        self.adb, self.interval_s, self.clock = adb, interval_s, clock
+        self.png: bytes | None = None
+        self.ok = False
+        self.enabled = True
+        self.lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        if self._thread is not None:
+            return
+        self._thread = threading.Thread(target=self._loop, daemon=True, name="phone-mirror")
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def snapshot(self) -> tuple[bool, bytes | None]:
+        with self.lock:
+            return self.ok, self.png
+
+    def _loop(self) -> None:
+        while not self._stop.is_set():
+            started = self.clock()
+            png = self._capture()
+            with self.lock:
+                if png is not None:
+                    self.png, self.ok = png, True
+                else:
+                    self.ok = False
+            self._stop.wait(max(0.05, self.interval_s - (self.clock() - started)))
+
+    def _capture(self) -> bytes | None:
+        try:
+            proc = subprocess.run(
+                [self.adb, "exec-out", "screencap", "-p"],
+                capture_output=True, timeout=3, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        data = proc.stdout or b""
+        if proc.returncode != 0 or not data.startswith(PNG_MAGIC):
+            return None
+        return data
 
 
 class Source:
@@ -160,8 +216,10 @@ def merge(cam: Json | None, alert: Json | None, physio: Json | None, health: Jso
 
 class Dashboard:
     def __init__(self, pi_host: str, stream_port: int, runtime_port: int, mock: bool,
-                 clock: Callable[[], float] = time.monotonic) -> None:
+                 clock: Callable[[], float] = time.monotonic,
+                 phone_mirror: PhoneMirror | None = None) -> None:
         self.clock, self.mock = clock, mock
+        self.phone_mirror = phone_mirror
         host = f"[{pi_host}]" if ":" in pi_host else pi_host
         cam = None if mock else f"http://{host}:{stream_port}/status"
         rt = None if mock else f"http://{host}:{runtime_port}"
@@ -225,6 +283,11 @@ class Dashboard:
                                             and heart["hr_bpm"] is not None)}
         out["mock"] = self.mock
         out["stream"] = self.stream_url is not None
+        if self.phone_mirror is not None:
+            ok, _ = self.phone_mirror.snapshot()
+            out["phone_mirror"] = {"enabled": True, "ok": ok}
+        else:
+            out["phone_mirror"] = {"enabled": False, "ok": False}
         return out
 
     def run(self, stop: threading.Event) -> None:
@@ -307,8 +370,21 @@ def make_handler(dash: Dashboard) -> type[BaseHTTPRequestHandler]:
                 self._send(200, "application/json", json.dumps(dash.state()).encode())
             elif path == "/stream.mjpg" and dash.stream_url:
                 self._relay(dash.stream_url)
+            elif path == "/phone.png":
+                self._phone_png()
             else:
                 self._send(404, "text/plain", b"not found")
+
+        def _phone_png(self) -> None:
+            mirror = dash.phone_mirror
+            if mirror is None:
+                self._send(404, "text/plain", b"phone mirror off")
+                return
+            ok, png = mirror.snapshot()
+            if not ok or not png:
+                self._send(503, "text/plain", b"phone not mirrored")
+                return
+            self._send(200, "image/png", png)
 
         def do_POST(self) -> None:  # noqa: N802
             path = self.path.split("?", 1)[0]
@@ -374,12 +450,19 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--host", default="0.0.0.0", help="address this page listens on")
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--mock", action="store_true", help="scripted data, shown as SIMULATED")
+    ap.add_argument("--phone-mirror", action="store_true",
+                    help="USB screencap of the Sahi app via adb (run on the laptop)")
+    ap.add_argument("--adb", default="adb", help="adb binary for --phone-mirror")
     a = ap.parse_args(argv)
-    dash = Dashboard(a.pi_host, a.stream_port, a.runtime_port, a.mock)
+    mirror = PhoneMirror(adb=a.adb) if a.phone_mirror else None
+    if mirror is not None:
+        mirror.start()
+    dash = Dashboard(a.pi_host, a.stream_port, a.runtime_port, a.mock, phone_mirror=mirror)
     stop = threading.Event()
     threading.Thread(target=dash.run, args=(stop,), daemon=True, name="poll").start()
     server = ThreadingHTTPServer((a.host, a.port), make_handler(dash))
-    print(f"dashboard on http://{a.host}:{a.port}  ({'MOCK' if a.mock else a.pi_host})",
+    extra = " + phone mirror" if mirror else ""
+    print(f"dashboard on http://{a.host}:{a.port}  ({'MOCK' if a.mock else a.pi_host}{extra})",
           flush=True)
     try:
         server.serve_forever()
@@ -387,6 +470,8 @@ def main(argv: list[str] | None = None) -> None:
         pass
     finally:
         stop.set()
+        if mirror is not None:
+            mirror.stop()
 
 
 if __name__ == "__main__":

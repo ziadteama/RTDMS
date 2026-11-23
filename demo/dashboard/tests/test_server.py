@@ -271,8 +271,35 @@ def test_http_routes():
     base = f"http://127.0.0.1:{srv.server_address[1]}"
     try:
         with urlopen(base + "/") as r:
-            assert b"RTDMS" in r.read()
+            body = r.read()
+            assert b"RTDMS" in body and b"phone-col" in body and b"footer" not in body
         with urlopen(base + "/state?x=1") as r:
-            assert json.load(r)["mock"] is True
+            s = json.load(r)
+            assert s["mock"] is True
+            assert s["phone_mirror"] == {"enabled": False, "ok": False}
+    finally:
+        srv.shutdown()
+
+
+def test_phone_mirror_serves_png():
+    png = server.PNG_MAGIC + b"fake"
+
+    class FakeMirror(server.PhoneMirror):
+        def __init__(self):
+            super().__init__()
+            self.enabled = True
+            self.ok, self.png = True, png
+
+        def start(self):
+            pass
+
+    d = server.Dashboard("127.0.0.1", 8080, 8090, mock=True, phone_mirror=FakeMirror())
+    assert d.state()["phone_mirror"] == {"enabled": True, "ok": True}
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), server.make_handler(d))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with urlopen(f"http://127.0.0.1:{srv.server_address[1]}/phone.png") as r:
+            assert r.headers["Content-Type"] == "image/png"
+            assert r.read() == png
     finally:
         srv.shutdown()

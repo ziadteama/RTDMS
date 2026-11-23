@@ -134,7 +134,7 @@ def map_status(status: dict[str, Any], t: float) -> FrameResult:
 # bundle's own configs/pipeline.yaml already selects the LiteRT face mesh and the Pi has no
 # configs/profiles/ (deploy.sh never sends configs/).
 CAMERA_ARGS = ("--no-rectify", "--roi", "full", "--drowsiness", "--no-texting", "--hybrid",
-               "--held", "--no-detect", "--mesh")
+               "--held", "--no-detect", "--mesh", "--no-panel")
 
 
 class StreamPipelineSource:

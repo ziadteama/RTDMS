@@ -10,4 +10,4 @@ else DIST="$HERE/distraction"; FACE="$HERE/face"; fi
 cd "$DIST"
 export PYTHONPATH="$DIST/src:$FACE/src"
 exec "${RTDMS_PYTHON:-$HOME/rtdms/.venv/bin/python}" scripts/stream.py --profile pi --no-rectify --roi full --drowsiness --no-texting \
-    --hybrid --held --no-detect --mesh --rotate 180 "$@"
+    --hybrid --held --no-detect --mesh --no-panel --rotate 180 "$@"

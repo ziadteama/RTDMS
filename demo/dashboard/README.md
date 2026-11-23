@@ -2,16 +2,17 @@
 
 One full-screen page for the audience. It shows:
 
-- the camera with the face mesh, and the current fusion alert;
-- tiles for eyes/drowsiness, phone use, drinking and the Garmin watch heart rate;
-- frame rate, processing time per frame, Pi → watch alert round trip, CPU temperature, CPU load and power.
+- the camera (face mesh, no debug side column on the stream);
+- a phone bezel with the live Sahi app screen (USB `adb` mirror) or a simulated app face in `--mock`;
+- a status strip: fusion decision, eyes/drowsiness, phone use, drinking, Garmin heart rate.
 
 It only **reads** what the Pi already serves. It changes nothing on the Pi and stores nothing.
 
 | Source | Port | Used for |
 |---|---|---|
-| Camera server (`rtdms-pi --stream-port 8080`, or `rtdms-camera`) | 8080 | `/status` (eyes, phone, drinking, fps, ms, temp) and `/stream.mjpg` (relayed through :8000, so the page needs one address) |
+| Camera server (`rtdms-pi --stream-port 8080`, or `rtdms-camera`) | 8080 | `/status` (eyes, phone, drinking, fps, ms, temp) and `/stream.mjpg` (relayed through :8000) |
 | Pi runtime (`rtdms-pi --port 8090`) | 8090 | `/alert` (fusion decision), `/physio` (watch), `/health` (every 5 s) |
+| USB phone (optional, laptop) | adb | `/phone.png` screencap of the Sahi app inside the bezel |
 
 A source that does not answer shows **offline**. It never shows a guess.
 
@@ -29,6 +30,13 @@ On the laptop, reading the Pi over the network:
 python server.py --pi-host <pi-ip>                # open http://localhost:8000
 ```
 
+Laptop with the phone USB-connected and Sahi open (mirrors the app into the bezel):
+
+```bash
+adb reverse tcp:8081 tcp:8081   # if Metro is serving the app
+python server.py --pi-host <pi-ip> --phone-mirror
+```
+
 Rehearse without the Pi. This shows scripted data with a **SIMULATED DATA** badge, so it is never live:
 
 ```bash
@@ -43,15 +51,14 @@ scp -r demo/dashboard <user>@<pi>:~/rtdms-demo/
 
 ## On the day
 
-1. Start the product unit on the Pi (`rtdms-pi-user`: camera, Bluetooth, runtime). Then start `server.py`.
-2. Open `http://<pi>:8000` on the projector laptop and press **F** for full screen.
-3. Check that all four dots in the top right are green: Camera, Fusion, Watch, Pi health.
+1. Start the product unit on the Pi (`rtdms-pi-user`: camera, Bluetooth, runtime). Then start `server.py` (on the laptop with `--phone-mirror` if you want the app bezel live).
+2. Open `http://localhost:8000` (or `http://<pi>:8000`) on the projector laptop and press **F** for full screen.
+3. Check that the dots in the top right are green: Camera, Fusion, Watch, App, Pi.
 4. Prefer the LAN or the Pi hotspot over Tailscale, because a relayed connection makes the video lag.
 
 ## What the numbers mean
 
-- **Processing / frame** is the sum of the model stage times the camera reports (`/status` `ms`). No end-to-end measurement from capture to alert exists yet, so the page does not claim one.
-- **Pi → watch alert** is the Bluetooth round trip from an alert change to the watch's echo, median and p95 (`/health` `physio_diag`). It appears once the watch has received alerts.
-- **Drinking** is the classifier's drinking score averaged over the last 1.5 s (`p_drinking`, reported every frame even when another class narrowly wins); 40 % or more shows drinking. The top label alone flickers mid-sip. It is shown as a detection only: fusion does not alert on drinking (decision D28).
+- **Drinking** is shown as a detection only: fusion does not alert on drinking (decision D28). With `--held` on the camera, the held mouth+cup result is the light; older cameras fall back to the classifier drinking score averaged over 1.5 s.
+- **Phone bezel**: with `--phone-mirror`, the page polls `/phone.png` from `adb exec-out screencap -p`. Without it, mock mode draws a Sahi-like face that follows the fusion alert; live mode without mirror shows “USB phone mirror off”.
 
 Tests: `pytest demo/dashboard/tests`.
