@@ -119,6 +119,12 @@ class Drowsiness:
         cfg.landmarker.backend = backend
         cfg.landmarker.model_path = model_path
         cfg.landmarker.num_threads = 1
+        # The eyes-open reference adapts toward a percentile of the last 5 min of eye ratios. The
+        # default 95th followed the widest moments and noise spikes on this far, noisy camera
+        # (measured on the Pi: relaxed open eyes EAR p50 0.22, p90 0.31), so relaxed eyes read
+        # 30-40 % open. Eyes are open most of the time and blinks sit in the low tail, so the
+        # 60th percentile is the driver's typical open eye: relaxed eyes read ~100 %.
+        cfg.calibration.adapt_percentile = 60.0
         self.cfg, self.w, self.h = cfg, width, height
         self.profile_name, self.profile_dir = profile_name, profile_dir
         self.profile, self.calibrated = DriverProfile.load_or_default(profile_name, profile_dir)
@@ -198,6 +204,10 @@ class Drowsiness:
             "blink_rate": round(r.blink_rate, 1) if r and r.blink_rate is not None else None,
             "closure_ms": round(r.closure_ms) if r else 0,
             "openness": None if res.openness_smooth is None else round(res.openness_smooth, 2),
+            # raw eye ratio and the (adapted) eyes-open / closed references openness is scaled by
+            "ear": None if res.ear_filtered is None else round(res.ear_filtered, 3),
+            "ear_open": round(self.pipe.adapter.adapted_ear_open, 3),
+            "ear_closed": round(self.profile.ear_closed, 3),
             "face": res.face_present,
             "calibrated": self.calibrated,
             "message": self.message,
