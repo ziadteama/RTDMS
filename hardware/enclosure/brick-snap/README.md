@@ -4,6 +4,22 @@ Same outer box as [`../brick/`](../brick/README.md): **108.8 × 85 × 45 mm**, P
 IR camera on the front wall, USB-C and vents only. Same Pi and camera positions, so the camera
 openings, USB-C hole and vents are unchanged. **Only the way parts are held changed. No screws, no nuts, no glue.**
 
+## Revision 2 (design review)
+
+Fixes after a full review of the first version:
+
+1. **Camera clip could rock in its slot (would not have held the camera).** The slot had 0.4 mm of play. The pad's push
+   tipped the clip about the back lip, its pad backed off about 1.1 mm, and the 0.3 mm preload was gone. Now a **crush rib** on the
+   clip's front face (x = 47) is 0.1 mm bigger than the gap, so the clip is wedged flat against the lip with no room to rock.
+2. **Pad tip chamfered 0.5 mm**, so it rides over the IR board's top edge while the clip slides down instead of catching on it.
+3. **Arm roots strengthened:** 45° gussets where each arm meets the lid (1.0 mm inside, 0.6 mm outside). That corner is
+   where the arm bends most.
+4. **Inside top edge of the shell chamfered 1.0 mm (all round):** a lead-in for the hooks and room for the outer gusset.
+5. **Checks corrected:** the Pi 5 STEP board sits 0.2 mm lower than the real board on its 5.2 mm standoffs. The checks now lift
+   it, and the Pi now has **0 mm³** overlap with every part (the old 18 mm³ was this offset).
+
+Sections through the three holding points: ![sections](renders/sections.png)
+
 | Assembled | Exploded |
 |---|---|
 | ![assembled](renders/assembly.png) | ![exploded](renders/exploded.png) |
@@ -22,6 +38,8 @@ openings, USB-C hole and vents are unchanged. **Only the way parts are held chan
 - The window is cut **through** the wall. To open the lid, push each hook in from outside with a small
   screwdriver or a card edge, and lift. 4 hooks, 4 windows, 2 sides.
 - The lid's lip still centres it in the box (0.3 mm clearance), as in the screw version.
+- **Opening:** the hooks have flat tops, so the lid won't pop off on its own. Push both hooks on the left side in at once
+  (two small flat screwdrivers, about 1 mm), lift that side about 2 mm, then do the right side. Opening it often wears PLA arms.
 
 ### Pi 5
 - Pin Ø2.4 in the Pi's Ø2.7 holes; the pin pokes 0.8 mm through the board. The post has a Ø3.4 recess for the pin tip.
@@ -40,6 +58,8 @@ as in `../brick/`, so the screws only clamp (see the note there).
 ### Camera clips
 - The clip is the same leaf spring as before: pad on the IR board, 0.3 mm of preload, but 2.0 mm thick (was 2.5)
   and 10 mm tall (was 12) so it's softer. Its outer end sits in a slot: a front face, a back lip and a bottom stop.
+- A small **crush rib** near the outer end wedges it in the slot (0.1 mm interference), so it can't rock or slide up.
+  It needs a firm push to go in. If it is too tight, sand the rib a little. If it is loose, the clip will rattle, so reprint it.
 - **Order:** camera in from inside, then drop each clip in from the top. This works with the Pi already installed,
   which the screw version didn't allow.
 - Right side: the clip as printed. Left side: the same clip turned upside down (pad still facing the front).
@@ -70,10 +90,11 @@ as in `../brick/`, so the screws only clamp (see the note there).
 | Check | Result |
 |---|---|
 | Each part is one valid solid | yes |
-| Shell × lid, shell × clips, lid × clips, lid × Pi 5 model, clips × Pi 5 model overlap | **0 mm³** |
+| Shell × lid, lid × clips, every part × Pi 5 model (lifted 0.2 mm to its real height) | **0 mm³** |
+| Shell × clips | 0.3 mm³ each = the crush rib's 0.1 mm, as designed |
+| Clip rocking room in its slot | none (rib wedges it; back face on the lip) |
 | Shell × camera stand-in | 0 mm³ |
-| Clip pad × IR board | 8.5 mm³ = 0.3 mm of preload, as designed |
-| Shell × Pi 5 model | 18 mm³: the standoffs touch the board 0.2 mm deep (the same overlap exists in `../brick/`, so check the Pi sits flat) |
+| Clip pad × IR board | 6.6 mm³ = 0.3 mm of preload, as designed (chamfered pad) |
 | Overhangs > 45° (print orientation) | camera clips: none; lid: 4 hook undersides (32 mm²); shell: the old vents + 4 window tops (92 mm²) |
 
 ## Not verified yet
@@ -82,6 +103,8 @@ as in `../brick/`, so the screws only clamp (see the note there).
   0.2 mm post gap come from the numbers above, not from a print. Print the **lid and one clip first**, then the shell.
 - **The Active Cooler isn't in the Pi model.** The 4 posts stand at the Pi's 4 corner holes. If the real cooler touches a back post,
   remove it from `POST_HOLES` in `brick_snap.py` and re-run (the pins alone still locate the board).
+- The clip pad slides across the back of the IR board as it goes in. If that board has parts on its back where the pad
+  passes, fit the clip before pushing the camera fully home.
 - The camera clips use the old clip's contact point (IR board back at 9.4 mm from the front). If the real camera is thicker,
   change `PRELOAD` and re-run.
 - The ribbon path is as unverified as in `../brick/`: it passes between the posts.
@@ -91,3 +114,4 @@ as in `../brick/`, so the screws only clamp (see the note there).
 - `brick_snap.py`: parametric CadQuery model. `python brick_snap.py` writes `out/`. Hook size, window size and the post list are at the top.
 - `check.py`: overlap, overhang and snap-fit checks (needs `../ref/openpicase`).
 - `render.scad`: preview renders (needs `../brick/ref_derived/pi5_board.stl`).
+- `sections.py`: the cross-section drawing `renders/sections.png`.

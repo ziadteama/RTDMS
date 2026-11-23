@@ -55,7 +55,7 @@ ax = axs[1, 0]
 cut(ax, (0, 0, 15), (0, 0, 1), (0, 1), ("shell", "camera_clip"))
 ax.add_patch(Polygon([(18, 7.8), (36, 7.8), (36, 9.4), (18, 9.4)], closed=True, fc="#9ca3af", ec="black", lw=0.5, alpha=0.9))
 ax.set_xlim(14, 54); ax.set_ylim(0, 20)
-ax.set_title("3. Camera clip in its slot  (plan, section z = 15, right front corner)\ngrey = IR board; pad touches it; the clip's outer end is held between the front block and the back lip")
+ax.set_title("3. Camera clip in its slot  (plan, section z = 15, right front corner)\ngrey = IR board, pad 0.3 mm into it (preload); crush rib at x = 47 wedges the clip against the back lip")
 ax.set_xlabel("x (mm)"); ax.set_ylabel("y (mm, front wall at 0)")
 
 # 4. whole box side section at x = 50.8 (through arms + windows), to see where the 4 arms sit

@@ -91,6 +91,12 @@ LIP_T = 2.0
 CLIP_Y0 = LIP_Y0 - CLIP_T                       # clip front face = 10.8
 PAD_L = CLIP_Y0 - (IR_BACK_Y - PRELOAD)         # 1.7: pad tip is 0.3 mm past the IR-board back
 SLOT_ZTOP = 22.5
+RIB_X = 47.0             # crush rib on the clip's front face, near its outer end
+RIB_D = 1.2
+RIB_CRUSH = 0.1          # rib is 0.1 mm bigger than the slot gap: wedges the clip so it can't rock
+PAD_CHAMFER = 0.5        # lets the pad ride over the IR board's top edge while the clip slides down
+TOP_CHAMFER = 1.0        # 45 deg chamfer on the inside top edge of the shell: lead-in for the hooks
+ROOT_GUSSET = 1.0        # 45 deg fillet-like gusset where each arm meets the lid
 
 
 def cyl(d, h, pnt, dirn):
@@ -170,6 +176,9 @@ def shell(pi_screws=False):
             cuts.append(box(x0, x1, hy - WIN_W / 2, hy + WIN_W / 2, WIN_Z0, WIN_Z1))
     if pi_screws:   # M2.5 self-tapping into the standoffs (5-6 mm screws only), same 2.8 mm hole as ../brick/
         cuts += [cyl(2.8, 4.5, (*pb(*h), PCB_Z0 + 0.01), (0, 0, -1)) for h in PI_HOLES]
+    # inside top edge chamfer (all round): hook lead-in, and room for the arm's outer root gusset
+    cuts.append(cq.Workplane().sketch().rect(INNER_W, D - 2 * WALL).vertices().fillet(R_V - WALL).finalize()
+                .extrude(TOP_CHAMFER + 0.01, taper=-45).translate((0, D / 2, H_SHELL - TOP_CHAMFER)))
     for c in cuts:
         s = s.cut(c)
     return s
@@ -180,8 +189,11 @@ def arm():
     """One snap arm on the +x side, hanging down from the lid plate (assembled position)."""
     xo = LIP_X
     z0, zt = H_SHELL + 0.5, H_SHELL - ARM_L
-    prof = [(xo - ARM_T_ROOT, z0), (xo, z0), (xo, Z_RET), (xo + HOOK_OUT, Z_RET),
-            (xo + HOOK_OUT, Z_RET - (HOOK_H - HOOK_OUT)), (xo, zt), (xo - ARM_T_TIP, zt)]
+    g, go = ROOT_GUSSET, 0.6     # inner gusset, outer gusset (outer one fits the shell's top chamfer)
+    prof = [(xo - ARM_T_ROOT - g, z0), (xo + go, z0), (xo + go, H_SHELL), (xo, H_SHELL - go),
+            (xo, Z_RET), (xo + HOOK_OUT, Z_RET),
+            (xo + HOOK_OUT, Z_RET - (HOOK_H - HOOK_OUT)), (xo, zt), (xo - ARM_T_TIP, zt),
+            (xo - ARM_T_ROOT, H_SHELL - g), (xo - ARM_T_ROOT - g, H_SHELL)]
     a = cq.Workplane("XZ").polyline(prof).close().extrude(ARM_W / 2, both=True)   # centred on y = 0
     return a
 
@@ -219,8 +231,16 @@ def camera_clip():
     """Print two (the file holds one). Right side as printed; left side: the same clip turned upside down."""
     c = ybox((CLIP_X0 + CLIP_X1) / 2, CLIP_Y0, CAM_ZC, CLIP_X1 - CLIP_X0, CLIP_T, CLIP_H, 0)
     c = c.edges("|Y").fillet(2.0)
-    c = c.union(cyl(PAD_D, PAD_L + 0.01, (IR_DX, CLIP_Y0 + 0.01, CAM_ZC), (0, -1, 0)))
-    return c
+    pad = (cq.Workplane("XZ").circle(PAD_D / 2).extrude(PAD_L + 0.01)       # XZ normal is -y: grows to the front
+           .faces("<Y").chamfer(PAD_CHAMFER).translate((IR_DX, CLIP_Y0 + 0.01, CAM_ZC)))
+    c = c.union(pad)
+    # crush rib: vertical, rounded ends, sticks out (slot gap + RIB_CRUSH) from the front face
+    rib_y = CLIP_Y0 - (BLOCK_Y + 0.4 - BLOCK_Y) - RIB_CRUSH + RIB_D / 2      # rib front = CLIP_Y0 - 0.5
+    z0, z1 = CAM_ZC - CLIP_H / 2 + 2.0, CAM_ZC + CLIP_H / 2 - 2.0
+    rib = cq.Workplane().add(cq.Solid.makeCylinder(RIB_D / 2, z1 - z0, Vector(RIB_X, rib_y, z0), Vector(0, 0, 1)))
+    for z in (z0, z1):
+        rib = rib.union(cq.Workplane().add(cq.Solid.makeSphere(RIB_D / 2, Vector(RIB_X, rib_y, z), angleDegrees1=-90, angleDegrees2=90)))
+    return c.union(rib)
 
 
 # ------------------------------------------------------------------ export
