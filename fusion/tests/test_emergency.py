@@ -47,13 +47,34 @@ def test_missing_hr_never_blocks():
     assert run(m, [(0, x), (10, x)])[-1] is EmergencyStage.EMERGENCY
 
 
-def test_ack_eyes_open_or_wrist_move_reset():
-    for response in (In(closure_ms=CLOSED, ack=True), In(closure_ms=0),
-                     In(closure_ms=CLOSED, worn=True, wrist_still_s=1)):
-        m = EmergencyMonitor()
-        start = In(closure_ms=CLOSED, worn=True, wrist_still_s=60)
-        assert run(m, [(0, start), (4, response)]) == [
-            EmergencyStage.WAITING, EmergencyStage.NORMAL]
+def test_ack_clears_waiting():
+    m = EmergencyMonitor()
+    start = In(closure_ms=CLOSED, worn=True, wrist_still_s=60)
+    assert run(m, [(0, start), (4, In(closure_ms=CLOSED, ack=True))]) == [
+        EmergencyStage.WAITING, EmergencyStage.NORMAL]
+
+
+def test_brief_eye_open_does_not_clear_waiting():
+    m = EmergencyMonitor()
+    assert m.update(0, In(closure_ms=CLOSED)).stage is EmergencyStage.WAITING
+    assert m.update(0.5, In(closure_ms=0)).stage is EmergencyStage.WAITING
+    assert m.update(1.0, In(closure_ms=CLOSED)).stage is EmergencyStage.WAITING
+
+
+def test_sustained_eye_open_clears_waiting():
+    m = EmergencyMonitor()
+    assert m.update(0, In(closure_ms=CLOSED)).stage is EmergencyStage.WAITING
+    assert m.update(1.0, In(closure_ms=0)).stage is EmergencyStage.WAITING
+    assert m.update(2.6, In(closure_ms=0)).stage is EmergencyStage.NORMAL
+
+
+def test_wrist_move_does_not_clear_waiting():
+    m = EmergencyMonitor()
+    m.update(0, In(closure_ms=CLOSED, worn=True, wrist_still_s=60))
+    assert m.update(3, In(closure_ms=12_000, worn=True, wrist_still_s=0.2)).stage is (
+        EmergencyStage.WAITING)
+    assert m.update(10, In(closure_ms=20_000, worn=True, wrist_still_s=0.1)).stage is (
+        EmergencyStage.EMERGENCY)
 
 
 def test_face_lost_is_not_a_response():
@@ -90,17 +111,9 @@ def test_ack_restarts_the_count_instead_of_flapping():
     assert m.update(10, In(closure_ms=19000, **worn)).stage is EmergencyStage.WAITING
 
 
-def test_wrist_movement_also_restarts_the_count():
-    m = EmergencyMonitor()
-    m.update(0, In(closure_ms=CLOSED, worn=True, wrist_still_s=60))
-    assert m.update(3, In(closure_ms=12000, worn=True, wrist_still_s=0.5)).stage is (
-        EmergencyStage.NORMAL)
-    assert m.update(3.3, In(closure_ms=12300, worn=True, wrist_still_s=0.8)).stage is (
-        EmergencyStage.NORMAL)
-
-
-def test_eyes_opening_clears_the_restart_rule():
+def test_sustained_eyes_opening_clears_the_restart_rule():
     m = EmergencyMonitor()
     m.update(0, In(closure_ms=CLOSED))
-    m.update(1, In(closure_ms=0))  # eyes open: full reset
-    assert m.update(2, In(closure_ms=CLOSED)).stage is EmergencyStage.WAITING
+    m.update(1, In(closure_ms=0))
+    m.update(2.6, In(closure_ms=0))  # sustained open: full reset of restart latch
+    assert m.update(3, In(closure_ms=CLOSED)).stage is EmergencyStage.WAITING
