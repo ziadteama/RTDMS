@@ -175,12 +175,10 @@ Demystify every alert trigger so the driver understands exactly which driver mon
   - `face drowsy`: `"Eyes closed: eye closure exceeded normal duration."`
   - `face distracted`: `"Looking away: gaze diverted from road center."`
   - `phone sustained`: `"Phone in use: handset detected at ear or in hand."`
-  - `physio confirms`: `"Heart rate confirms: elevated heart rate fatigue marker."`
-  - `physio elevated`: `"Heart rate shows fatigue: elevated heart rate fatigue marker."`
   - `test alert`: `"Test alert: manually triggered from phone settings."`
 - Data Transparency Audit Copy:
   - Stored: `"Stored on this phone: timestamp, alert duration, trigger reason, and vehicle speed. Stored securely in local phone database."`
-  - Discarded: `"Discarded immediately: raw camera video frames, facial landmark measurements, and raw physiological samples. Never uploaded anywhere."`
+  - Discarded: `"Discarded immediately: raw camera video frames and facial landmark measurements. Heart rate is saved with trips unless turned off in Settings."`
 
 #### Accessibility
 - **Touch Target**: The expansion row has `minHeight: touch.min` (48dp) and full horizontal touch bounds.

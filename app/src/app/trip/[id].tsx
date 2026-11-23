@@ -38,6 +38,8 @@ export default function TripDetail() {
         return t(`state.${e.value}` as StringKey);
       case 'crash':
         return t('event.crash', { g: e.detail ?? '—' });
+      case 'unresponsive':
+        return t('event.unresponsive');
       case 'sos':
         return t('event.sos');
       case 'connected':
@@ -47,7 +49,7 @@ export default function TripDetail() {
     }
   };
   const dot = (e: (typeof events)[number]) =>
-    e.kind === 'alert' ? colors.alert[e.value as AlertPattern] : e.kind === 'crash' || e.kind === 'sos' ? colors.alert.max : colors.textTertiary;
+    e.kind === 'alert' ? colors.alert[e.value as AlertPattern] : e.kind === 'crash' || e.kind === 'unresponsive' || e.kind === 'sos' ? colors.alert.max : colors.textTertiary;
   const activePatterns = PATTERNS.filter((p) => s.alerts[p] > 0);
 
   return (
@@ -85,7 +87,7 @@ export default function TripDetail() {
               key={i.id}
               icon={i.kind === 'crash' ? 'crash' : 'sos'}
               iconColor={colors.alert.continuous}
-              label={i.kind === 'crash' ? t('event.crash', { g: i.gPeak ?? '—' }) : t('event.sos')}
+              label={i.kind === 'crash' ? t('event.crash', { g: i.gPeak ?? '—' }) : t(i.kind === 'unresponsive' ? 'event.unresponsive' : 'event.sos')}
               detail={t(`incident.outcome.${i.outcome}`)}
               chevron
               onPress={() => router.push({ pathname: '/incident/[id]', params: { id: String(i.id) } })}

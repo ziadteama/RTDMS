@@ -36,7 +36,7 @@ test.each(['command', 'incident'] as const)('%s holds the shared slot before any
   await expect(link.incident({})).rejects.toThrow('busy'); // native write is still pending
   pendingWrite.resolve();
   await expect(pending).resolves.toEqual({ ok: true, id: 'ambiguous-id' });
-  expect(jest.getTimerCount()).toBe(0);
+  expect(jest.getTimerCount()).toBe(1); // Connected clock refresh remains; result timer is gone.
 });
 
 test.each(['command', 'incident'] as const)('%s cancels a failed write registration and timer', async (kind) => {
@@ -44,7 +44,7 @@ test.each(['command', 'incident'] as const)('%s cancels a failed write registrat
   await flush();
   const write = jest.spyOn(device, 'writeCharacteristicWithResponseForService').mockRejectedValueOnce(new Error('write failed'));
   await expect(link[kind]({})).rejects.toThrow('write failed');
-  expect(jest.getTimerCount()).toBe(0);
+  expect(jest.getTimerCount()).toBe(1); // Connected clock refresh remains; result timer is gone.
   const next = link[kind]({});
   device.emitMonitor(CHAR_UUID.RESULT, { ok: true });
   await expect(next).resolves.toEqual({ ok: true });
@@ -57,7 +57,7 @@ test('encoding failure never reserves a slot or writes', async () => {
   const write = jest.spyOn(device, 'writeCharacteristicWithResponseForService');
   await expect(link.command({ text: 'x'.repeat(600) })).rejects.toThrow('512');
   expect(write).not.toHaveBeenCalled();
-  expect(jest.getTimerCount()).toBe(0);
+  expect(jest.getTimerCount()).toBe(1); // Connected clock refresh remains; result timer is gone.
   const next = link.incident({});
   device.emitMonitor(CHAR_UUID.RESULT, { ok: true });
   await expect(next).resolves.toEqual({ ok: true });
@@ -74,7 +74,7 @@ test('timeout while native write is pending is handled immediately', async () =>
   await expect(link.incident({})).rejects.toThrow('busy');
   pendingWrite.reject(new Error('late native failure'));
   await flush();
-  expect(jest.getTimerCount()).toBe(0);
+  expect(jest.getTimerCount()).toBe(1); // Connected clock refresh remains; result timer is gone.
 });
 
 test.each(['mtu', 'discovery', 'auth', 'clock'] as const)('stop during %s prevents setup from reviving the session', async (stage) => {

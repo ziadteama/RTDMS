@@ -12,7 +12,7 @@ What *has* passed, with dates and environments: [EVIDENCE.md](EVIDENCE.md).
 | Expo doctor | `npx expo-doctor` (`NODE_USE_ENV_PROXY=1` behind a proxy) | all checks pass |
 | Android build | `npx expo prebuild -p android && cd android && ./gradlew assembleDebug` | `BUILD SUCCESSFUL`, APK produced |
 | No hardcoded styles in screens | `grep -rnE "#[0-9a-fA-F]{3,8}\b\|fontSize\|fontWeight" src --include=*.tsx \| grep -v src/theme/` | only the comment in `text.tsx` |
-| No thresholds on model scores | `grep -rnE "perclos\|openness\|blink_rate\|fatigue_probability\|\.p\b" src --include=*.ts* \| grep -v test \| grep -E "[<>]=?"` | hits only in `pi/parse.ts` (a probability outside 0–1 is rejected as bad input) and `demo/scenario.ts` (generates mock data); none decides an alert |
+| No thresholds on model scores | `grep -rnE "perclos\|openness\|blink_rate\|\.p\b" src --include=*.ts* \| grep -v test \| grep -E "[<>]=?"` | hits only in `pi/parse.ts` (input validation) and `demo/scenario.ts` (generates mock data); none decides an alert |
 | No network beyond the Pi | `grep -rnE "fetch\(\|https://" src --include=*.ts*` | only `pi/transport.ts` (the Pi), the Maps link text inside the SOS SMS, and the incident screen's "Open in Maps" (the driver's tap hands it to the Maps app) |
 | Audience check | Every screen touched passes the audience test (`.cursor/rules/end-user-product.mdc`) | PR confirms: driver-facing screens contain no engineering/admin controls; CPU/throttle/memory/disk, per-model switches, numeric thresholds, address entry, demo mode, restart/shutdown, raw EAR/PERCLOS/HR/RR moved to Diagnostics |
 

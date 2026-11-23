@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 import { FakeBleLink } from '@/pi/ble/fake-link';
 import { BleTransport } from '@/pi/ble/transport';
-import { parseAlert, parsePhysio, parseStatus } from '@/pi/parse';
+import { parseAlert, parseHealth, parsePhysio, parseStatus } from '@/pi/parse';
 import { HttpTransport } from '@/pi/transport';
 import { INITIAL_LIVE, useLive } from '@/state/live';
 
@@ -23,7 +23,7 @@ test('both BLE consumers populate fields from the contract fixtures', async () =
     const live = useLive.getState();
     expect(live.status?.drowsiness).toMatchObject({ state: 'drowsy', perclos: 0.31, calibrated: true });
     expect(live.status?.hybrid).toMatchObject({ call: false, texting: true, p: 0.91 });
-    expect(live.physio?.hrv).toMatchObject({ state: 'valid', rmssd_ms: 35.1, quality: 'good' });
+    expect(live.physio).toEqual(fixture('physio'));
     expect(live.alert).toEqual(fixture('alert'));
     expect(parseStatus(await transport.get('/status'))).toEqual(live.status);
     expect(parsePhysio(await transport.get('/physio'))).toEqual(live.physio);
@@ -33,4 +33,10 @@ test('both BLE consumers populate fields from the contract fixtures', async () =
     transport.dispose();
     jest.useRealTimers();
   }
+});
+
+test('health retains the optional physiology diagnostics from v1.3', () => {
+  expect(parseHealth(fixture('health'))?.physio_diag).toEqual({
+    watch_offset_spread_ms: 38, late_packets: 0, shadow_agree: 3, shadow_disagree: 1, shadow_only: 2,
+  });
 });

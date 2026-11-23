@@ -97,7 +97,7 @@ function Header({ trips }: { trips: Trip[] }) {
               key={i.id}
               icon={i.kind === 'crash' ? 'crash' : 'sos'}
               iconColor={colors.alert.continuous}
-              label={i.kind === 'crash' ? t('event.crash', { g: i.gPeak ?? '—' }) : t('event.sos')}
+              label={i.kind === 'crash' ? t('event.crash', { g: i.gPeak ?? '—' }) : t(i.kind === 'unresponsive' ? 'event.unresponsive' : 'event.sos')}
               detail={`${formatDateTime(i.t)} · ${t(`incident.outcome.${i.outcome}`)}`}
               chevron
               onPress={() => router.push({ pathname: '/incident/[id]', params: { id: String(i.id) } })}

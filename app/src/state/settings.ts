@@ -32,6 +32,7 @@ export type Settings = {
   baseUrl: string;
   demo: boolean;
   paused: boolean;
+  saveTripHeartRate: boolean;
   sound: boolean;
   volume: number;
   vibration: Vibration;
@@ -57,6 +58,7 @@ export const DEFAULT_SETTINGS: Settings = {
   baseUrl: DEFAULT_BASE_URL,
   demo: false,
   paused: false,
+  saveTripHeartRate: true,
   sound: true,
   volume: 1,
   vibration: 'strong',

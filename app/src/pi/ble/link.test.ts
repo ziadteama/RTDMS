@@ -59,6 +59,24 @@ describe('PlxBleLink', () => {
     expect(fakeDevice.monitors.has(CHAR_UUID.RESULT)).toBe(true);
   });
 
+  it('refreshes clock every 60 seconds and stops on disconnect', async () => {
+    link.start(target);
+    await flushAsync();
+    const clocks = () => fakeDevice.writes.filter((w) => w.charUuid === CHAR_UUID.CLOCK);
+    expect(clocks()).toHaveLength(1);
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(clocks()).toHaveLength(2);
+    expect(decode(clocks()[1]!.value)).toEqual({ phone_ms: expect.any(Number) });
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(clocks()).toHaveLength(3);
+    mockManager.btState = 'PoweredOff' as State;
+    fakeDevice.simulateDisconnect();
+    await jest.advanceTimersByTimeAsync(120_000);
+    expect(clocks()).toHaveLength(3);
+    link.stop();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
   it('connects with NO auth write when there is no token (DEV open mode)', async () => {
     link.start({ name: 'RTDMS-Pi' });
     await flushAsync();

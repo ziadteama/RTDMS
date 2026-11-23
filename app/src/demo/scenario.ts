@@ -33,7 +33,6 @@ type Phase = {
   openness: number;
   closureMs: number;
   hr: number;
-  fatigue: number;
   quality: SignalQuality;
   pattern: AlertPattern;
   alertReasons: string[];
@@ -41,16 +40,16 @@ type Phase = {
 };
 
 const PHASES: Phase[] = [
-  { until: 20, name: 'normal', state: 'alert', reasons: [], perclos: 0.04, openness: 0.86, closureMs: 0, hr: 76, fatigue: 0.18, quality: 'good', pattern: 'none', alertReasons: [], speedKmh: 0 },
-  { until: 30, name: 'distracted', state: 'distracted', reasons: ['gaze off road'], perclos: 0.05, openness: 0.8, closureMs: 0, hr: 78, fatigue: 0.2, quality: 'good', pattern: 'short_beep', alertReasons: ['face distracted'], speedKmh: 55 },
-  { until: 40, name: 'normal', state: 'alert', reasons: [], perclos: 0.05, openness: 0.84, closureMs: 0, hr: 77, fatigue: 0.2, quality: 'good', pattern: 'none', alertReasons: [], speedKmh: 62 },
-  { until: 52, name: 'call', state: 'alert', reasons: [], call: true, perclos: 0.05, openness: 0.83, closureMs: 0, hr: 82, fatigue: 0.22, quality: 'good', pattern: 'continuous', alertReasons: ['phone sustained'], speedKmh: 64 },
-  { until: 62, name: 'normal', state: 'alert', reasons: [], perclos: 0.06, openness: 0.82, closureMs: 0, hr: 78, fatigue: 0.25, quality: 'good', pattern: 'none', alertReasons: [], speedKmh: 70 },
-  { until: 75, name: 'texting', state: 'distracted', reasons: ['head down'], texting: true, perclos: 0.07, openness: 0.7, closureMs: 0, hr: 80, fatigue: 0.27, quality: 'degraded', pattern: 'continuous', alertReasons: ['phone sustained', 'face distracted'], speedKmh: 48 },
-  { until: 85, name: 'warning', state: 'warning', reasons: ['perclos rising'], perclos: 0.17, openness: 0.58, closureMs: 600, hr: 70, fatigue: 0.45, quality: 'good', pattern: 'none', alertReasons: [], speedKmh: 66 },
-  { until: 100, name: 'drowsy', state: 'drowsy', reasons: ['perclos high', 'long eye closure'], perclos: 0.31, openness: 0.34, closureMs: 2400, hr: 66, fatigue: 0.62, quality: 'good', pattern: 'repeated', alertReasons: ['face drowsy'], speedKmh: 72 },
-  { until: 110, name: 'drowsy+physio', state: 'drowsy', reasons: ['perclos high', 'long eye closure'], perclos: 0.36, openness: 0.29, closureMs: 3100, hr: 64, fatigue: 0.78, quality: 'good', pattern: 'max', alertReasons: ['face drowsy', 'physio confirms'], speedKmh: 74 },
-  { until: 120, name: 'face lost', state: 'unavailable', reasons: ['no face'], face: false, perclos: 0.3, openness: 0, closureMs: 0, hr: 70, fatigue: 0.6, quality: 'bad', pattern: 'none', alertReasons: [], speedKmh: 30 },
+  { until: 20, name: 'normal', state: 'alert', reasons: [], perclos: 0.04, openness: 0.86, closureMs: 0, hr: 76, quality: 'good', pattern: 'none', alertReasons: [], speedKmh: 0 },
+  { until: 30, name: 'distracted', state: 'distracted', reasons: ['gaze off road'], perclos: 0.05, openness: 0.8, closureMs: 0, hr: 78, quality: 'good', pattern: 'short_beep', alertReasons: ['face distracted'], speedKmh: 55 },
+  { until: 40, name: 'normal', state: 'alert', reasons: [], perclos: 0.05, openness: 0.84, closureMs: 0, hr: 77, quality: 'good', pattern: 'none', alertReasons: [], speedKmh: 62 },
+  { until: 52, name: 'call', state: 'alert', reasons: [], call: true, perclos: 0.05, openness: 0.83, closureMs: 0, hr: 82, quality: 'good', pattern: 'continuous', alertReasons: ['phone sustained'], speedKmh: 64 },
+  { until: 62, name: 'normal', state: 'alert', reasons: [], perclos: 0.06, openness: 0.82, closureMs: 0, hr: 78, quality: 'good', pattern: 'none', alertReasons: [], speedKmh: 70 },
+  { until: 75, name: 'texting', state: 'distracted', reasons: ['head down'], texting: true, perclos: 0.07, openness: 0.7, closureMs: 0, hr: 80, quality: 'degraded', pattern: 'continuous', alertReasons: ['phone sustained', 'face distracted'], speedKmh: 48 },
+  { until: 85, name: 'warning', state: 'warning', reasons: ['perclos rising'], perclos: 0.17, openness: 0.58, closureMs: 600, hr: 70, quality: 'good', pattern: 'none', alertReasons: [], speedKmh: 66 },
+  { until: 100, name: 'drowsy', state: 'drowsy', reasons: ['perclos high', 'long eye closure'], perclos: 0.31, openness: 0.34, closureMs: 2400, hr: 66, quality: 'good', pattern: 'repeated', alertReasons: ['face drowsy'], speedKmh: 72 },
+  { until: 110, name: 'drowsy severe', state: 'drowsy', reasons: ['perclos high', 'long eye closure'], perclos: 0.36, openness: 0.29, closureMs: 3100, hr: 64, quality: 'good', pattern: 'max', alertReasons: ['face drowsy'], speedKmh: 74 },
+  { until: 120, name: 'face lost', state: 'unavailable', reasons: ['no face'], face: false, perclos: 0.3, openness: 0, closureMs: 0, hr: 70, quality: 'bad', pattern: 'none', alertReasons: [], speedKmh: 30 },
 ];
 
 /** Cheap deterministic jitter in [-1, 1]. */
@@ -121,16 +120,13 @@ export function physioAt(t: number): PiPhysio {
     watch_connected: watch,
     hr_bpm: watch ? hr : null,
     rr_ms: watch ? [Math.round(60000 / hr + wobble(t, 15) * 20), Math.round(60000 / hr + wobble(t, 16) * 20)] : [],
-    fatigue_probability: watch && t > 60 ? round(p.fatigue + wobble(t, 17) * 0.02, 2) : null,
-    hrv: watch
-      ? {
-          state: t < 60 ? 'warmup' : p.quality === 'good' ? 'valid' : 'degraded',
-          mean_hr_bpm: round(p.hr + wobble(t, 18), 1),
-          rmssd_ms: t < 60 ? null : round(38 - p.fatigue * 10 + wobble(t, 19) * 3, 1),
-          quality: p.quality,
-          coverage: p.quality === 'good' ? 0.94 : 0.71,
-        }
-      : null,
+    worn: watch,
+    quality: watch ? p.quality : null,
+    hr_baseline_bpm: watch ? 74 : null,
+    hr_delta_bpm: watch ? round(hr - 74, 1) : null,
+    hr_trend_bpm_per_10min: watch ? -0.8 : null,
+    hrv_state: watch ? (t < 60 ? 'warmup' : 'valid') : null,
+    rmssd_ms: watch && t >= 60 ? round(35 + wobble(t, 19) * 3, 1) : null,
     t: round(t, 2),
   };
 }

@@ -81,6 +81,13 @@ describe('buildSosSms', () => {
     expect(text).not.toContain('Automatic message');
   });
 
+  it.each([null, -179.99999])('unresponsive SMS is one GSM-7 part with longitude %s', (lon) => {
+    const text = buildSosSms({ kind: 'unresponsive', date: datePm, lat: -89.99999, lon });
+    expect(text).toContain('The driver is not responding.');
+    expect(isGsm7(text)).toBe(true);
+    expect(text.length).toBeLessThanOrEqual(160);
+  });
+
   it('formatTimeAmPm formats hours with leading zeros for single digits', () => {
     expect(formatTimeAmPm(new Date(2026, 10, 21, 0, 0))).toBe('12:00 AM');
     expect(formatTimeAmPm(new Date(2026, 10, 21, 12, 0))).toBe('12:00 PM');

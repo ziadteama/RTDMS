@@ -26,7 +26,7 @@ export type RegisterResponse = {
 
 export type SosRequestPayload = {
   client_id: string;
-  kind: 'crash' | 'manual';
+  kind: 'crash' | 'manual' | 'unresponsive';
   t_crash: number;
   lat: number | null;
   lon: number | null;

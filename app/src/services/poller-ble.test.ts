@@ -17,7 +17,7 @@ jest.mock('expo-secure-store', () => ({
 
 const STATUS = { fps: 14, face: true, state: 'alert', baseline: 1, levels: {}, ms: {} };
 const ALERT = { pattern: 'none', reasons: [], t: 1 };
-const PHYSIO = { watch_connected: true, hr_bpm: 70, rr_ms: [], fatigue_probability: 0.1, hrv: null, t: 1 };
+const PHYSIO = { watch_connected: true, hr_bpm: 70, rr_ms: [], quality: 'good', t: 1 };
 const BODIES: Record<string, unknown> = { '/status': STATUS, '/alert': ALERT, '/physio': PHYSIO };
 
 const link = new FakeBleLink();
@@ -100,6 +100,17 @@ describe('poller over Bluetooth', () => {
     link.emit('alert', { ...ALERT, reasons: ['changed'], t: 9 });
     expect(seen).toHaveBeenCalledTimes(1);
     off();
+    stop();
+  });
+
+  it('publishes emergency changes even when pattern and reasons stay unchanged', () => {
+    link.setState('online');
+    const stop = startPoller();
+    link.emit('alert', ALERT);
+    link.emit('alert', { ...ALERT, emergency: 'unresponsive' });
+    expect(useLive.getState().alert?.emergency).toBe('unresponsive');
+    link.emit('alert', ALERT);
+    expect(useLive.getState().alert?.emergency).toBeUndefined();
     stop();
   });
 

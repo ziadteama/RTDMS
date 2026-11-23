@@ -30,7 +30,7 @@ export type Trip = {
   summary: TripSummary;
 };
 
-export type TripEventKind = 'alert' | 'state' | 'crash' | 'sos' | 'connected' | 'disconnected';
+export type TripEventKind = 'alert' | 'state' | 'crash' | 'unresponsive' | 'sos' | 'connected' | 'disconnected';
 export type TripEvent = { id: number; tripId: number; t: number; kind: TripEventKind; value: string; detail: string | null };
 
 export type HrPoint = { t: number; bpm: number };
@@ -40,7 +40,7 @@ export type Incident = {
   id: number;
   tripId: number | null;
   t: number;
-  kind: 'crash' | 'manual';
+  kind: 'crash' | 'manual' | 'unresponsive';
   gPeak: number | null;
   lat: number | null;
   lon: number | null;

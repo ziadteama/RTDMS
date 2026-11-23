@@ -122,3 +122,13 @@ describe('useSettings store - BLE pairing', () => {
     expect(merged.token).toBeUndefined();
   });
 });
+
+test('trip HR consent defaults on for old installs and persists an opt-out', () => {
+  useSettings.getState().reset();
+  const merge = useSettings.persist.getOptions().merge!;
+  expect(merge({}, useSettings.getState()).saveTripHeartRate).toBe(true);
+  useSettings.getState().set({ saveTripHeartRate: false });
+  const stored = JSON.parse(mockStore.get('sahi.settings')!);
+  expect(stored.state.saveTripHeartRate).toBe(false);
+  expect(merge(stored.state, useSettings.getState()).saveTripHeartRate).toBe(false);
+});
