@@ -1,22 +1,40 @@
 [Unit]
-Description=RTDMS Pi runtime (BLE link, no camera)
+Description=RTDMS Pi runtime (camera + fusion + BLE link)
+# A user unit cannot order itself after the system bluetooth.service; wait-bluetooth.sh does that.
+# Never give up restarting (camera ribbon loose, adapter late): the limiter is off, backoff below.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
+# Site settings (camera rotation, extra flags such as --buzzer gpio); written once by install.sh,
+# never overwritten.
+EnvironmentFile=-%h/.config/rtdms/deploy.env
+Environment=RTDMS_ROTATE=180
+Environment=RTDMS_EXTRA_ARGS=
 ExecStartPre=/usr/bin/mkdir -p %h/.local/state/rtdms
 ExecStartPre=/usr/bin/chmod 700 %h/.local/state/rtdms
-ExecStart=%h/rtdms-pi/venv/bin/rtdms-pi --no-camera --ble --buzzer none --port 8090
+ExecStartPre=%h/rtdms-pi/pi/deploy/bin/wait-bluetooth.sh
+ExecStart=%h/rtdms/.venv/bin/rtdms-pi --camera --rotate ${RTDMS_ROTATE} --stream-port 8080 --ble --buzzer none --port 8090 $RTDMS_EXTRA_ARGS
 WorkingDirectory=%h/rtdms-pi
+Environment=PYTHONPATH=%h/rtdms/distraction/src:%h/rtdms/face/src
 Environment=STATE_DIRECTORY=%h/.local/state/rtdms
 Environment=OPENBLAS_NUM_THREADS=1
 Environment=OMP_NUM_THREADS=1
 Environment=PYTHONUNBUFFERED=1
-Restart=on-failure
+Restart=always
 RestartSec=3
-# the Pi also runs the vision models; this unit must yield to them
-Nice=10
-CPUWeight=20
-IOSchedulingClass=idle
+RestartSteps=4
+RestartMaxDelaySec=30
+TimeoutStartSec=120
+TimeoutStopSec=15
+# This unit is the product: the camera pipeline needs a full core share. A user unit cannot
+# lower Nice below 0, so the board's other jobs are the ones that yield (they run at Nice 10+).
+Nice=0
+CPUWeight=100
+IOSchedulingClass=best-effort
+# Observed ~0.9 GB used by the whole Pi with everything running; 3 GB is a leak fence, not a budget.
+MemoryHigh=2500M
+MemoryMax=3G
 
 [Install]
 WantedBy=default.target
