@@ -10,7 +10,7 @@ It only **reads** what the Pi already serves. It changes nothing on the Pi and s
 
 | Source | Port | Used for |
 |---|---|---|
-| Camera server (`rtdms-pi --stream-port 8080`, or `rtdms-camera`) | 8080 | `/status` (eyes, phone, drinking, fps, ms, temp) and `/stream.mjpg` (the browser loads it directly) |
+| Camera server (`rtdms-pi --stream-port 8080`, or `rtdms-camera`) | 8080 | `/status` (eyes, phone, drinking, fps, ms, temp) and `/stream.mjpg` (relayed through :8000, so the page needs one address) |
 | Pi runtime (`rtdms-pi --port 8090`) | 8090 | `/alert` (fusion decision), `/physio` (watch), `/health` (every 5 s) |
 
 A source that does not answer shows **offline**. It never shows a guess.

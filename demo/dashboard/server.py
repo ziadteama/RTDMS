@@ -116,8 +116,9 @@ def merge(cam: Json | None, alert: Json | None, physio: Json | None, health: Jso
             "calibration_step": d.get("calibration_step"),
             "calibration_left_s": num(d.get("calibration_left_s")),
         }
-        out["phone"] = {k: h.get(k) for k in ("call", "texting", "action", "p", "ear", "lap")}
-        out["drinking"] = {"detected": drinking,
+        out["phone"] = {k: h.get(k) for k in ("face", "call", "texting", "action", "p", "ear",
+                                              "lap")}
+        out["drinking"] = {"face": h.get("face"), "detected": drinking,
                            "p": h.get("p") if h.get("action") == "drinking" else None}
         ms = {k: v for k, v in (cam.get("ms") or {}).items() if num(v) is not None}
         perf.update(fps=num(cam.get("fps")), stages_ms=ms,
@@ -162,10 +163,8 @@ class Dashboard:
             "physio": Source(rt and rt + "/physio", clock),
             "health": Source(rt and rt + "/health", clock),
         }
-        # Loopback means "the Pi this page came from": the browser uses its own location.hostname.
-        loopback = pi_host in ("127.0.0.1", "localhost", "::1")
-        self.stream = None if mock else {"host": None if loopback else pi_host,
-                                         "port": stream_port}
+        # The camera MJPEG is relayed through this server, so the page needs one address only.
+        self.stream_url = None if mock else f"http://{host}:{stream_port}/stream.mjpg"
         self.drink = DrinkDebounce()
         self.drinking = False
         self.lock = threading.Lock()
@@ -209,7 +208,7 @@ class Dashboard:
         out["links"]["watch"] = {"ok": bool(heart and heart["watch_connected"]
                                             and heart["hr_bpm"] is not None)}
         out["mock"] = self.mock
-        out["stream"] = self.stream
+        out["stream"] = self.stream_url is not None
         return out
 
     def run(self, stop: threading.Event) -> None:
@@ -289,8 +288,28 @@ def make_handler(dash: Dashboard) -> type[BaseHTTPRequestHandler]:
                 self._send(200, "text/html; charset=utf-8", (HERE / "index.html").read_bytes())
             elif path == "/state":
                 self._send(200, "application/json", json.dumps(dash.state()).encode())
+            elif path == "/stream.mjpg" and dash.stream_url:
+                self._relay(dash.stream_url)
             else:
                 self._send(404, "text/plain", b"not found")
+
+        def _relay(self, url: str) -> None:
+            """Copy the camera's MJPEG through; the camera only encodes while someone watches."""
+            try:
+                up = urlopen(url, timeout=5)
+            except OSError:
+                self._send(502, "text/plain", b"camera stream offline")
+                return
+            with up:
+                self.send_response(200)
+                self.send_header("Content-Type", up.headers.get("Content-Type", ""))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                try:
+                    while chunk := up.read1(65536):
+                        self.wfile.write(chunk)
+                except OSError:
+                    pass  # viewer closed the page, or the camera stopped
 
         def _send(self, code: int, ctype: str, body: bytes) -> None:
             self.send_response(code)

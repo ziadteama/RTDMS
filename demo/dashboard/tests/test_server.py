@@ -68,13 +68,14 @@ def test_merged_state_from_live_sources(pi):
         clock.t += 0.25
     s = d.state()
     assert s["mock"] is False
-    assert s["stream"] == {"host": None, "port": pi[0]}  # loopback: browser uses its own host
+    assert s["stream"] is True
     assert all(s["links"][k]["ok"] for k in ("camera", "alert", "physio", "health", "watch"))
     assert s["eyes"]["state"] == "drowsy" and s["eyes"]["closure_ms"] == 2100
     assert s["alert"] == {"pattern": "repeated", "reasons": ["face drowsy"], "episode": 3,
                           "emergency": None}
     assert s["heart"]["hr_bpm"] == 66 and s["heart"]["baseline_bpm"] == 70
-    assert s["drinking"] == {"detected": True, "p": 0.9}
+    assert s["drinking"] == {"face": True, "detected": True, "p": 0.9}
+    assert s["phone"]["face"] is True
     assert s["perf"]["processing_ms"] == 43.0
     assert s["perf"]["temp_c"] == 63.0  # the camera's reading wins over /health
     assert s["perf"]["watch_rtt_p95_ms"] == 90 and s["perf"]["volts_5v"] == 5.1
@@ -142,7 +143,7 @@ def test_mock_is_flagged_and_covers_every_phase():
     for _ in range(int(server.MOCK_LOOP_S / 0.25)):
         d.tick()
         s = d.state()
-        assert s["mock"] is True and s["stream"] is None
+        assert s["mock"] is True and s["stream"] is False
         seen.add(s["alert"]["pattern"])
         if s["drinking"]["detected"]:
             seen.add("drinking")
@@ -150,6 +151,44 @@ def test_mock_is_flagged_and_covers_every_phase():
             seen.add("calibrating")
         clock.t += 0.25
     assert {"none", "short_beep", "repeated", "continuous", "drinking", "calibrating"} <= seen
+
+
+def test_stream_is_relayed_on_one_address():
+    mjpg = b"--frame\r\nContent-Type: image/jpeg\r\n\r\nJPEGDATA\r\n"
+
+    class Cam(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            self.send_response(200)
+            self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+            self.end_headers()
+            self.wfile.write(mjpg * 3)
+
+        def log_message(self, *a):
+            pass
+
+    cam = ThreadingHTTPServer(("127.0.0.1", 0), Cam)
+    threading.Thread(target=cam.serve_forever, daemon=True).start()
+    d = server.Dashboard("127.0.0.1", cam.server_address[1], 9, mock=False)
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), server.make_handler(d))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with urlopen(f"http://127.0.0.1:{srv.server_address[1]}/stream.mjpg?t=1") as r:
+            assert r.headers["Content-Type"].startswith("multipart/x-mixed-replace")
+            assert r.read() == mjpg * 3
+    finally:
+        srv.shutdown()
+        cam.shutdown()
+
+
+def test_stream_offline_is_502():
+    d = server.Dashboard("127.0.0.1", 9, 9, mock=False)
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), server.make_handler(d))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with pytest.raises(OSError, match="502"):
+            urlopen(f"http://127.0.0.1:{srv.server_address[1]}/stream.mjpg")
+    finally:
+        srv.shutdown()
 
 
 def test_http_routes():

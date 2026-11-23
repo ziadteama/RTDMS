@@ -149,8 +149,7 @@ let streamSet=false;
 function setStream(s,mock){
   if(streamSet)return;streamSet=true;
   if(mock||!s){$('ph-msg').textContent=mock?'Simulated data: no camera attached':'no camera';return}
-  let h=s.host||location.hostname;if(h.includes(':')&&!h.startsWith('['))h='['+h+']';
-  const url=`${location.protocol}//${h}:${s.port}/stream.mjpg`;
+  const url='stream.mjpg';
   const img=$('img');
   img.onload=()=>{$('ph').style.display='none';img.style.visibility=''};
   img.onerror=()=>{$('ph').style.display='';img.style.visibility='hidden';$('ph-msg').textContent='camera stream offline, retrying…';
@@ -192,6 +191,8 @@ function render(s){
   // phone
   const p=s.phone;
   if(!p){card('c-phone','off');$('p-big').textContent='Offline';$('p-sub').textContent=''}
+  else if(p.face===false){card('c-phone','off');$('p-big').textContent='No face';$('p-sub').textContent='needs the driver in view';
+    for(const k of ['p-action','p-ear','p-lap'])$(k).textContent='—'}
   else{const on=p.call||p.texting;card('c-phone',on?'crit':'ok');
     $('p-big').textContent=p.call?'PHONE CALL':p.texting?'TEXTING':'No phone';
     $('p-sub').textContent=on?'Alert raised':'Hands and ears clear';
@@ -200,6 +201,7 @@ function render(s){
   // drinking
   const d=s.drinking;
   if(!d){card('c-drink','off');$('d-big').textContent='Offline';$('d-sub').textContent=''}
+  else if(d.face===false){card('c-drink','off');$('d-big').textContent='No face';$('d-sub').textContent='needs the driver in view'}
   else{card('c-drink',d.detected?'warn':'ok');$('d-big').textContent=d.detected?'DRINKING':'Not drinking';
     $('d-sub').textContent=d.p!=null?`Classifier confidence ${pct(d.p)}`:'No cup at the mouth'}
 
