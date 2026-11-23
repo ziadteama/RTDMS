@@ -204,7 +204,11 @@ class DistractionPipeline:
         tm["detect"] = (time.perf_counter() - t0) * 1000
 
         t0 = time.perf_counter()
-        face = self.facemesh.process(face_in, t)
+        src_map = self.roi.view_to_frame() if p.facemesh.hires_crop and frame.ndim == 2 else None
+        if src_map is not None:  # crop the face from the full-resolution frame
+            face = self.facemesh.process(face_in, t, frame, src_map)
+        else:
+            face = self.facemesh.process(face_in, t)
         tm["facemesh"] = (time.perf_counter() - t0) * 1000
 
         if self.simple is not None:

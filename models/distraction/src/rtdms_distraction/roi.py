@@ -122,6 +122,13 @@ class DriverROI:
     def intrinsics(self) -> np.ndarray:
         return self.P
 
+    def view_to_frame(self) -> tuple[float, float, float] | None:
+        """(ox, oy, k) with frame_px = (ox, oy) + view_px * k, for a plain unmasked crop; None
+        when the view is rectified or masked (no such simple mapping / masked pixels)."""
+        if self.calib is not None or self._mask is not None:
+            return None
+        return float(self.rect[0]), float(self.rect[1]), 1.0 / self.scale
+
     def apply(self, gray: np.ndarray) -> np.ndarray:
         """(H, W) uint8 raw frame -> (out_h, out_w) uint8 driver view."""
         if self.calib is not None:
