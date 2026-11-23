@@ -83,7 +83,14 @@ def map_status(status: dict[str, Any], t: float) -> FrameResult:
         msg = d.get("message")
         is_failed = isinstance(msg, str) and msg.startswith("calibration failed")
         is_calibrated = calibrated is True or msg == "calibrated (phone)"
-        calibration = "ok" if is_calibrated else ("failed" if is_failed else None)
+        # "calibrating" first: a new Pi-camera run must be visible even over an older profile, so
+        # the phone can see calibrating -> ok / failed (Bluetooth status has no free-text message).
+        if msg == "calibrating":
+            calibration: str | None = "calibrating"
+        elif is_failed:
+            calibration = "failed"
+        else:
+            calibration = "ok" if is_calibrated else None
         face = FaceReport(
             state=str(d.get("state", "unavailable")) if visible else "unavailable",
             reasons=tuple(r for r in reasons if isinstance(r, str))
