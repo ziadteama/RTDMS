@@ -67,6 +67,7 @@ class EmergencyMonitor:
         self.config = config or EmergencyConfig()
         self._stage = EmergencyStage.NORMAL
         self._since = 0.0  # time the current stage began
+        self._responded_at: float | None = None  # last "I'm OK" / wrist movement while waiting
 
     @property
     def stage(self) -> EmergencyStage:
@@ -76,9 +77,15 @@ class EmergencyMonitor:
         cfg = self.config
         closed_s = (x.closure_ms or 0.0) / 1000.0
         if self._stage is EmergencyStage.NORMAL:
+            if self._responded_at is not None:
+                # A response restarts the count: re-escalate only after a fresh full closure, so an
+                # "I'm OK" with eyes still shut cannot flip the alarm back on at the next frame.
+                closed_s = min(closed_s, now - self._responded_at)
             if not x.ack and closed_s >= cfg.closure_trigger_s:
                 self._enter(EmergencyStage.WAITING, now)
         elif _responded(x, now - self._since):
+            eyes_open = x.closure_ms is not None and x.closure_ms <= 0
+            self._responded_at = None if eyes_open else now
             self._enter(EmergencyStage.NORMAL, now)
         elif self._stage is EmergencyStage.WAITING and now - self._since >= _window_s(cfg, x):
             self._enter(EmergencyStage.EMERGENCY, now)
