@@ -116,7 +116,7 @@ footer{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--gap)}
         <div class="big" id="p-big">—</div><div class="sub" id="p-sub"></div>
         <div class="row"><span>Classifier sees</span><b id="p-action">—</b></div>
         <div class="row"><span>Phone at ear</span><b id="p-ear">—</b></div>
-        <div class="row"><span>Phone in lap</span><b id="p-lap">—</b></div></div>
+        </div>
       <div class="card" id="c-drink"><h2>Drinking</h2>
         <div class="big" id="d-big">—</div><div class="sub" id="d-sub"></div>
         <div class="note">Detection only: drinking is shown here but does not raise an alert.</div></div>
@@ -186,9 +186,8 @@ function render(s){
   const e=s.eyes;
   if(!e){card('c-eyes','off');$('e-big').textContent='Offline';$('e-sub').textContent='camera not answering'}
   else{let [t,l]=STATE[e.state]||[e.state||'—','off'];if(!e.face){t='No face';l='off'}
-    if(e.occluded){t='Eyes hidden';l='off'}
     card('c-eyes',l);$('e-big').textContent=t;
-    $('e-sub').textContent=e.occluded?'Hand, phone or cup at the face: not counted':e.closure_ms>300?`Eyes closed ${(e.closure_ms/1000).toFixed(1)} s`:(e.calibrated?'Calibrated to this driver':'Not calibrated');
+    $('e-sub').textContent=e.closure_ms>300?`Eyes closed ${(e.closure_ms/1000).toFixed(1)} s`:(e.calibrated?'Calibrated to this driver':'Not calibrated');
     $('e-open').textContent=pct(e.openness);$('e-openbar').style.width=pct(e.openness==null?0:Math.min(1,e.openness));
     $('e-perclos').textContent=e.perclos==null?'—':pct(e.perclos)+(e.perclos_valid?'':' (warming up)');
     $('e-perclosbar').style.width=pct(e.perclos||0);$('e-perclosbar').style.background=e.state==='drowsy'?'var(--crit)':'var(--info)';
@@ -203,11 +202,11 @@ function render(s){
   const p=s.phone;
   if(!p){card('c-phone','off');$('p-big').textContent='Offline';$('p-sub').textContent=''}
   else if(p.face===false){card('c-phone','off');$('p-big').textContent='No face';$('p-sub').textContent='needs the driver in view';
-    for(const k of ['p-action','p-ear','p-lap'])$(k).textContent='—'}
-  else{const on=p.call||p.texting;card('c-phone',on?'crit':'ok');
-    $('p-big').textContent=p.call?'PHONE CALL':p.texting?'TEXTING':'No phone';
+    for(const k of ['p-action','p-ear'])$(k).textContent='—'}
+  else{const on=p.call;card('c-phone',on?'crit':'ok');
+    $('p-big').textContent=p.call?'PHONE CALL':'No phone';
     $('p-sub').textContent=on?'Alert raised':'Hands and ears clear';
-    $('p-action').textContent=p.action?`${p.action} ${pct(p.p)}`:'—';$('p-ear').textContent=pct(p.ear);$('p-lap').textContent=pct(p.lap)}
+    $('p-action').textContent=p.action?`${p.action} ${pct(p.p)}`:'—';$('p-ear').textContent=pct(p.ear)}
 
   // drinking
   const d=s.drinking;

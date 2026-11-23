@@ -15,8 +15,8 @@ CAM = {
     "drowsiness": {"state": "drowsy", "openness": 0.05, "perclos": 0.4, "perclos_valid": True,
                    "blink_rate": 9, "closure_ms": 2100, "calibrated": True,
                    "calibration_step": None, "calibration_left_s": None},
-    "hybrid": {"face": True, "call": False, "texting": False, "action": "drinking", "p": 0.9,
-               "ear": 0.02, "lap": 0.01},
+    "hybrid": {"face": True, "call": False, "action": "drinking", "p": 0.9,
+               "ear": 0.02},
 }
 RUNTIME = {
     "/alert": {"pattern": "repeated", "reasons": ["face drowsy"], "t": 1, "t_src": "pi",

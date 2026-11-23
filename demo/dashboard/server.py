@@ -108,7 +108,6 @@ def merge(cam: Json | None, alert: Json | None, physio: Json | None, health: Jso
         h = cam.get("hybrid") or {}
         out["eyes"] = {
             "face": bool(cam.get("face")),
-            "occluded": bool(d.get("occluded")),  # hand / phone / cup at the face
             "state": d.get("state"),
             "openness": num(d.get("openness")),
             "perclos": num(d.get("perclos")),
@@ -119,8 +118,7 @@ def merge(cam: Json | None, alert: Json | None, physio: Json | None, health: Jso
             "calibration_step": d.get("calibration_step"),
             "calibration_left_s": num(d.get("calibration_left_s")),
         }
-        out["phone"] = {k: h.get(k) for k in ("face", "call", "texting", "action", "p", "ear",
-                                              "lap")}
+        out["phone"] = {k: h.get(k) for k in ("face", "call", "action", "p", "ear")}
         out["drinking"] = {"face": h.get("face"), "detected": drinking,
                            "p": h.get("p") if h.get("action") == "drinking" else None}
         ms = {k: v for k, v in (cam.get("ms") or {}).items() if num(v) is not None}
@@ -268,8 +266,8 @@ def mock_sources(t: float) -> dict[str, Json]:
                        "perclos": round(perclos, 2), "perclos_valid": True,
                        "blink_rate": 14, "closure_ms": closure, "calibrated": True,
                        "calibration_step": step, "calibration_left_s": left},
-        "hybrid": {"face": True, "call": call, "texting": False, "action": action, "p": p,
-                   "ear": 0.81 if phase == "phone" else 0.03, "lap": 0.02},
+        "hybrid": {"face": True, "call": call, "action": action, "p": p,
+                   "ear": 0.81 if phase == "phone" else 0.03},
     }
     if drinking:
         cam["hybrid"]["action"] = "drinking"
