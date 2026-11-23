@@ -15,6 +15,8 @@ The single list of what is **not** done. Update it when something moves.
 
 ## Live demo (23 Nov evening) — detail in [[Demo Prep 2026-11-23]]
 
+Handoff for the next agent: [[Handoff 2026-11-23 Demo]].
+
 | Item | State |
 |---|---|
 | "Looking away" while looking ahead (iris gaze 0.183 > 0.16 with the head within limits) | measurement fields deployed; 1-minute test and fix pending |

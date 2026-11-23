@@ -20,6 +20,7 @@ Project 2 (the build phase this repo is for).
 
 ## Implementation (Project 2)
 
+- [[Handoff 2026-11-23 Demo]] — **next agent: start here** (live demo prep paused on 23 Nov; what is where, the Pi's state, next steps)
 - [[Open Items and Next Steps]] — **what is not done yet** (hardware, app, SOS, product questions)
 - [[MVP Readiness]] — is what we have enough for an MVP? (22 Nov: phone-side yes, full chain no; the gaps and the order to close them)
 - [[Project Log 2026-11]] — decisions, evidence and lessons of 21–22 Nov 2026
