@@ -58,8 +58,8 @@ def test_caching_and_rejected_frames(clock) -> None:
         assert source.tracker.duplicates == source.tracker.late == 1
         clock.advance(0.5)
         source.handle_write(packet(3))
-        assert source.latest() is first
-        assert hr.call_count == hrv.call_count == 1
+        assert source.latest() is not first  # always a fresh report object
+        assert hr.call_count == hrv.call_count == 1  # but the stream maths is cached
         clock.advance(0.5)
         assert source.latest() is not first
         assert hr.call_count == 2 and hrv.call_count == 1
@@ -116,3 +116,32 @@ def test_health_diagnostics(clock) -> None:
     actual = probe.probe()
     validate("health", actual)
     assert actual["physio_diag"] == diag
+
+
+def test_ack_and_motion_visible_on_next_call_despite_cache(clock) -> None:
+    source = GarminPhysioSource(clock=clock)
+    source.handle_write(packet(1))
+    first = source.latest()
+    assert first is not None and first.raw["ack_age_s"] is None
+    clock.advance(0.2)
+    source.handle_write(packet(2, motion=40, ack=True))
+    clock.advance(0.05)
+    report = source.latest()
+    assert report is not None
+    assert report.raw["ack_age_s"] is not None and report.raw["ack_age_s"] < 0.1
+    assert report.raw["wrist_still_s"] is not None and report.raw["wrist_still_s"] < 0.1
+    clock.advance(0.5)
+    later = source.latest()
+    assert later is not None and later.raw["ack_age_s"] > report.raw["ack_age_s"]
+
+
+def test_staleness_not_hidden_by_cache(clock) -> None:
+    source = GarminPhysioSource(clock=clock)
+    source.handle_write(packet(1))
+    assert source.latest() is not None
+    clock.advance(10.001)
+    assert source.latest() is None
+    source.handle_write(packet(2))  # back after a gap: snapshots recomputed at once
+    with patch.object(source._hr, "snapshot", wraps=source._hr.snapshot) as hr:
+        assert source.latest() is not None
+        assert hr.call_count == 1

@@ -29,13 +29,15 @@ class RingIncidentSink:
         ring: FrameRing,
         store: IncidentStore,
         transcoder: Mp4Transcoder | None = None,
-        clock: Callable[[], float] = time.time,
+        clock: Callable[[], float] = time.monotonic,
+        wall: Callable[[], float] = time.time,
         scheduler: Callable[[float, Callable[[], None]], Any] | None = None,
     ) -> None:
         self.ring = ring
         self.store = store
         self.transcoder = transcoder
-        self.clock = clock
+        # Pi monotonic: the phone clock offset (pi_mono_ms - phone_ms) maps t_crash onto it.
+        self.clock, self.wall = clock, wall
         self.scheduler = scheduler or self._default_schedule
         self._pending: dict[str, str] = {}
         self._lock = threading.Lock()
@@ -125,7 +127,7 @@ class RingIncidentSink:
             "lat": req.get("lat"),
             "lon": req.get("lon"),
             "clock_synced": synced,
-            "created": now_s,
+            "created": self.wall(),
             "duration_s": 25.0,
         }
         self._schedule_snapshot(inc_id, meta, t_start, t_end, delay)
