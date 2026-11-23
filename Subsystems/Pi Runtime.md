@@ -93,6 +93,19 @@ Plan and reasons: [[Physiology New Approach]].
 - **Watch alert:** characteristic 0b `watch_alert` = 2 raw bytes `[pattern, seq]` on every
   change + 5 s keep-alive; the watch echoes the seq, giving round-trip p50/p95 in `physio_diag`.
 
+## Boot and persistence (23 Nov, #92)
+
+Goal: whenever the Pi has power, everything for the product or a presentation is up, with no manual step.
+
+- **Unit:** `rtdms-pi-user` is the product unit: `--camera --rotate $RTDMS_ROTATE --stream-port 8080 --ble --buzzer none --port 8090`, `Restart=always` with backoff and no start limit, `Nice=0`, `MemoryMax=3G` (a leak fence). The hand-made `camera.conf` drop-in is retired (backup in `~/.config/rtdms/backup`). Site settings (rotation, extra flags) live in `~/.config/rtdms/deploy.env`, never overwritten.
+- **Order:** `wait-bluetooth.sh` runs before start (adapter powered, discoverable for the watch; never blocks the camera). `rtdms-ready.service` runs `check.sh --wait 240 --boot` and logs "RTDMS READY" when camera, BLE and HTTP are up.
+- **Scripts** (`pi/deploy/`): `install.sh` (idempotent, `--dry-run`, `--uninstall`, `--open|--secure`), `deploy.sh` (backup `.bak-<stamp>`, sync, restart), `check.sh` (fps, BLE, HTTP, throttled; reads interfaces only). Never touches eth0, tailscale0 or Wi-Fi.
+- **System bits:** linger on, persistent journal, BLE controller LE-only with 100–150 ms advertising (backup `main.conf.rtdms-backup`).
+- **Wi-Fi:** the phone-hotspot profile autoconnects (system-wide, password stored, priority 100, unlimited retries). A hotspot on `wlan0` is still a separate, untested item.
+- **Still dev:** BLE open mode stays on (no token) until pairing mode exists.
+- **Evidence:** one controlled reboot: camera 30 fps, BLE up, throttled 0x0, Wi-Fi back by itself.
+
+
 ## Incidents
 
 20 s of status and alert history at 10 fps is held in memory (JPEG frames feed in later from the stream `Shared`; wiring is a TODO). A phone `incident` write is mapped onto the ring with the clock offset from the last `clock` write; the same `client_id` returns the same incident id. The clip is written as `clip.avi` at once and transcoded by a `nice 19` ffmpeg job to `clip.mp4`; `clip_ready` flips when it exists. Retention is 20 incidents and a 500 MB free-disk floor. HTTP (list, files, Range, `POST /incident`, bearer token) currently runs on a temporary port 8081 until merged into the single :8080 server.

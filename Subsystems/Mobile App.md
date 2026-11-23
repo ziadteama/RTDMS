@@ -299,6 +299,13 @@ app/
 > Lock the live screen while the car moves (GPS speed > ~10 km/h): show only a big state
 > indicator. The app must not distract the driver.
 
+## Calibration and alerts on the unit (23 Nov)
+
+- **Calibrate** is one row in Settings. The phone only starts it; the Pi camera runs it and the screen follows the unit's `calibration_step` / `calibration_left_s` (spoken once per step; watchdogs: 15 s with no answer, 120 s cap). The old phone-camera flow is reachable only from Diagnostics.
+- **One presentation per alert episode** (`services/alert-policy.ts`): sound, voice and notification once per `episode`; each speech stops the previous; voice repeats at most every 8 s; the engine is muted while the unit calibrates. The Pi decides what is active ([[Pi Runtime]], alert policy in `fusion/`).
+- **Dev tip:** open the dev build from `http://100.86.213.114:8081`; `localhost:8081` needs the USB `adb reverse` tunnel and otherwise shows a blank screen.
+
+
 ## Divergences from this spec
 
 Each one is a decision taken while building, with the reason. The spec text above is left as
