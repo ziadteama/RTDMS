@@ -83,3 +83,11 @@ Pure core (message text, validation, limiter, status ranks) with the clock, DB a
 ## Status
 
 Built, 70 tests pass, dry-run smoke passes. Not verified: real send, delivery/read receipts, inbound `STOP`, Docker build, HTTPS exposure.
+
+## Runbook (24 Nov 2026)
+
+- The one live relay runs on the dev machine `plegmo-dev` as the user service `rtdms-relay` (enabled at boot, linger on), port 8088. Tailscale address `100.86.213.114`, which works from any network while both ends are on Tailscale.
+- `app/.env.local` must have `EXPO_PUBLIC_RELAY_URL=http://100.86.213.114:8088`. It once pointed at `100.76.154.59` (`plegmo-chatwoot`), which runs an old relay with a dead session: every SOS then showed "WhatsApp: failed" while SMS still worked. The API key must match `RELAY_API_KEY` in `~/RTDMS-coord/relay-data/relay.env`.
+- One WhatsApp session, one holder. A second process on the same session gives `440 Stream Errored (conflict)` and a connect/drop loop every ~3 s with no reason in the relay log.
+- After a re-link (`relay/deploy/relink-whatsapp.sh start`) the old "Ubuntu" linked device on the relay phone is stale; remove it. Contacts must be re-saved in the app so the new relay registers them and sends the opt-in.
+- Check: `curl http://100.86.213.114:8088/v1/health` must say `connected`.
